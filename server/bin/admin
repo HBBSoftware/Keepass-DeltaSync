@@ -1,0 +1,22 @@
+#!/usr/bin/env php
+<?php
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// Admin-CLI: oprettelse/sletning af brugere, generering af enrollment-tokens,
+// admin-tokens og manuel trigger af audit-log-oprydning.
+//
+// Forventede kommandoer (ikke implementeret endnu):
+//   token:create-admin
+//   user:create <username> [--display-name=...]
+//   user:disable <username>
+//   user:delete <username>
+//   user:enrollment <username>      # generér ny enrollment-token til ekstra enhed
+//   user:list
+//   log:cleanup                     # manuel oprydning af audit_log
+
+declare(strict_types=1);
+
+require __DIR__ . '/../vendor/autoload.php';
+
+fwrite(STDERR, "keepass-deltasync admin CLI — skeleton, kommandoer endnu ikke implementeret.\n");
+exit(1);

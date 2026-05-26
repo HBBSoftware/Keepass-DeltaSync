@@ -1,0 +1,12 @@
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build / language-specifikt sniges ind via komponent-mappers egne .gitignore
