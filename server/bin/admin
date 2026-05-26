@@ -2,12 +2,12 @@
 <?php
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Admin-CLI entry point. Selve kommando-dispatching ligger i
-// src/Cli/AdminCli.php, denne fil holder kun bootstrap.
+// Admin-CLI entry point. Kommando-dispatching ligger i src/Cli/AdminCli.php,
+// denne fil holder kun bootstrap.
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../bootstrap.php';
 
 use KeePassDeltaSync\Cli\AdminCli;
 
