@@ -8,6 +8,7 @@ namespace KeePassDeltaSync\Controllers;
 use KeePassDeltaSync\Audit\AuditLogger;
 use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthContext;
+use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Db\Connection;
 use KeePassDeltaSync\Http\HttpException;
 use KeePassDeltaSync\Http\JsonResponse;
@@ -25,7 +26,10 @@ use PDO;
  */
 final class DatabaseController
 {
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(
+        private readonly PDO    $pdo,
+        private readonly Config $config,
+    ) {}
 
     /** @param array<string,string> $params */
     public function create(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response

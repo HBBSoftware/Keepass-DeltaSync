@@ -7,6 +7,7 @@ namespace KeePassDeltaSync\Controllers;
 
 use KeePassDeltaSync\Audit\AuditLogger;
 use KeePassDeltaSync\Auth\AuthContext;
+use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Http\HttpException;
 use KeePassDeltaSync\Http\JsonResponse;
 use KeePassDeltaSync\Http\Request;
@@ -25,7 +26,10 @@ final class LogController
     private const int DEFAULT_LIMIT = 50;
     private const int MAX_LIMIT     = 200;
 
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(
+        private readonly PDO    $pdo,
+        private readonly Config $config,
+    ) {}
 
     /** @param array<string,string> $params */
     public function index(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response

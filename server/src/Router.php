@@ -10,6 +10,7 @@ use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthenticationException;
 use KeePassDeltaSync\Auth\TokenAuthenticator;
 use KeePassDeltaSync\Auth\TokenType;
+use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Http\HttpException;
 use KeePassDeltaSync\Http\JsonResponse;
 use KeePassDeltaSync\Http\Request;
@@ -76,6 +77,7 @@ final class Router
     public function dispatch(
         Request            $request,
         PDO                $pdo,
+        Config             $config,
         TokenAuthenticator $authenticator,
         AuditLogger        $logger,
     ): Response {
@@ -133,7 +135,7 @@ final class Router
             ]);
         }
 
-        $controller = new $fqcn($pdo);
+        $controller = new $fqcn($pdo, $config);
         if (!method_exists($controller, $method)) {
             throw new HttpException(500, "handler method $fqcn::$method missing");
         }

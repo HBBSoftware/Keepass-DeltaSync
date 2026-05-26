@@ -8,6 +8,7 @@ namespace KeePassDeltaSync\Controllers;
 use KeePassDeltaSync\Audit\AuditLogger;
 use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthContext;
+use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Db\Connection;
 use KeePassDeltaSync\Http\HttpException;
 use KeePassDeltaSync\Http\JsonResponse;
@@ -38,7 +39,10 @@ final class EntryController
     /** Max blob-størrelse pr. entry. 1 MB er rigeligt selv med attachments. */
     private const int MAX_BLOB_BYTES = 1024 * 1024;
 
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(
+        private readonly PDO    $pdo,
+        private readonly Config $config,
+    ) {}
 
     // ============================================================
     // Endpoints
