@@ -5,10 +5,10 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Cli;
 
+use KeePassDeltaSync\Admin\UserAdmin;
 use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Crypto\TokenHasher;
 use KeePassDeltaSync\Db\Connection;
-use PDO;
 
 /**
  * Dispatcher for `bin/admin`-kommandoer.
@@ -132,26 +132,14 @@ final class AdminCli
             fwrite(STDERR, "Username skal være 1-64 tegn fra [A-Za-z0-9_.-]\n");
             return 1;
         }
+        if ($displayName !== null && strlen($displayName) > 200) {
+            fwrite(STDERR, "display_name er for langt (max 200 tegn).\n");
+            return 1;
+        }
 
         try {
-            $pdo = Connection::fromConfig($this->config);
-            $result = Connection::transaction(
-                $pdo,
-                function (PDO $pdo) use ($username, $displayName): array {
-                    $ins = $pdo->prepare(
-                        'INSERT INTO users (username, display_name)
-                         VALUES (:u, :d) RETURNING id'
-                    );
-                    $ins->execute(['u' => $username, 'd' => $displayName]);
-                    $userId = (string) $ins->fetchColumn();
-
-                    $token = $this->insertEnrollmentToken($pdo, $userId);
-                    return ['user_id' => $userId, 'token' => $token];
-                },
-            );
+            $result = $this->userAdmin()->createUserWithEnrollment($username, $displayName);
         } catch (\PDOException $e) {
-            // SQLSTATE 23505 = unique_violation. PostgreSQL-fejlnavnet for username-uniqueness
-            // ender på "_username_key", men det er ikke garanteret stabilt — tjek SQLSTATE først.
             if ($e->getCode() === '23505') {
                 fwrite(STDERR, "Username '$username' eksisterer allerede.\n");
                 return 2;
@@ -160,10 +148,10 @@ final class AdminCli
         }
 
         $ttl = $this->config->enrollmentTokenTtlHours;
-        fwrite(STDOUT, "Bruger '$username' oprettet (id: {$result['user_id']}).\n");
+        fwrite(STDOUT, "Bruger '$username' oprettet (id: {$result['user']['id']}).\n");
         fwrite(STDOUT, "Enrollment-token (udløber om {$ttl} timer):\n\n");
-        fwrite(STDOUT, "  {$result['token']}\n\n");
-        fwrite(STDOUT, "Brug på enheden: keepass-deltasync enroll {$result['token']}\n");
+        fwrite(STDOUT, "  {$result['enrollment_token']}\n\n");
+        fwrite(STDOUT, "Brug på enheden: keepass-deltasync enroll {$result['enrollment_token']}\n");
         return 0;
     }
 
@@ -176,45 +164,30 @@ final class AdminCli
         $username = $args[0];
 
         try {
-            $pdo  = Connection::fromConfig($this->config);
-            $stmt = $pdo->prepare(
-                'SELECT id FROM users WHERE username = :u AND disabled = false'
-            );
-            $stmt->execute(['u' => $username]);
-            $userId = $stmt->fetchColumn();
-
-            if ($userId === false) {
+            $admin  = $this->userAdmin();
+            $userId = $admin->findUserByUsername($username);
+            if ($userId === null) {
                 fwrite(STDERR, "Bruger '$username' findes ikke (eller er deaktiveret).\n");
                 return 1;
             }
-
-            $token = $this->insertEnrollmentToken($pdo, (string) $userId);
+            // Garantet ikke-null siden findUserByUsername lige har valideret brugeren.
+            $result = $admin->createEnrollmentToken($userId);
         } catch (\PDOException $e) {
             return $this->reportDbError($e);
         }
 
         $ttl = $this->config->enrollmentTokenTtlHours;
         fwrite(STDOUT, "Ny enrollment-token til '$username' (udløber om {$ttl} timer):\n\n");
-        fwrite(STDOUT, "  $token\n\n");
+        fwrite(STDOUT, "  {$result['enrollment_token']}\n\n");
         return 0;
     }
 
-    /** @return string den nye token (klartekst) — kun returneret én gang. */
-    private function insertEnrollmentToken(PDO $pdo, string $userId): string
+    private function userAdmin(): UserAdmin
     {
-        $token = TokenHasher::generate();
-        $hash  = TokenHasher::hash($token);
-        $exp   = (new \DateTimeImmutable(
-            '+' . $this->config->enrollmentTokenTtlHours . ' hours'
-        ))->format('Y-m-d H:i:sP');
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO enrollment_tokens (token_hash, user_id, expires_at)
-             VALUES (:h, :uid, :exp)'
+        return new UserAdmin(
+            Connection::fromConfig($this->config),
+            $this->config->enrollmentTokenTtlHours,
         );
-        $stmt->execute(['h' => $hash, 'uid' => $userId, 'exp' => $exp]);
-
-        return $token;
     }
 
     private function reportDbError(\PDOException $e): int
