@@ -5,21 +5,35 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync;
 
+use KeePassDeltaSync\Auth\AuthenticationException;
+use KeePassDeltaSync\Auth\TokenAuthenticator;
+use KeePassDeltaSync\Auth\TokenType;
+use KeePassDeltaSync\Http\HttpException;
+use KeePassDeltaSync\Http\JsonResponse;
+use KeePassDeltaSync\Http\Request;
+use KeePassDeltaSync\Http\Response;
+use PDO;
+
 /**
- * Route-tabel for /api/v1/.
+ * Route-tabel + dispatcher for /api/v1/.
  *
- * Endpoint-listen følger spec § "API-endpoints". Controllers er endnu ikke
- * implementeret — hver route peger på en `Controller::method`-streng som
- * senere bliver opløst via en simpel controller-dispatcher.
+ * Routes registreres med {param}-placeholders som omsættes til regex og giver
+ * navngivne capture-grupper. Eksempel: '/api/v1/databases/{id}/entries/{uuid}'
+ * → '#^/api/v1/databases/(?P<id>[^/]+)/entries/(?P<uuid>[^/]+)$#'.
  *
- * Auth-typer:
- *   - 'device'     : enhedstoken (default for bruger-endpoints)
- *   - 'enrollment' : engangs-enrollment-token
- *   - 'admin'      : admin-token (kan ikke læse blob-indhold)
+ * Hver route har en required token-type ('admin' | 'enrollment' | 'device').
+ * TokenAuthenticator validerer KUN mod den relevante tabel, så en admin-token
+ * kan ikke smutte ind på et bruger-endpoint eller omvendt.
+ *
+ * 404 før auth: hvis ruten ikke findes (vilkårligt path under /api/v1/), så
+ * returnerer dispatcheren 404 uden at forsøge auth — det er den offentlige
+ * URL-flade og afslører ikke noget hemmeligt. 404 for "fremmed bruger's
+ * ressource" håndteres derimod af den enkelte controller efter auth, så
+ * vi opretholder 404-not-403-reglen fra spec'en uden info-leak.
  */
 final class Router
 {
-    /** @var list<array{method:string, path:string, handler:string, auth:string}> */
+    /** @var list<array{method:string, path:string, handler:string, auth:string, regex:string}> */
     private array $routes = [];
 
     public function registerRoutes(): void
@@ -57,28 +71,101 @@ final class Router
         $this->add('POST',   '/api/v1/admin/log/cleanup',                                        'Admin\\LogController::cleanup',          'admin');
     }
 
-    /** @return list<array{method:string, path:string, handler:string, auth:string}> */
-    public function routes(): array
+    public function dispatch(Request $request, PDO $pdo, TokenAuthenticator $authenticator): Response
     {
-        return $this->routes;
+        $match = $this->findRoute($request->method, $request->path);
+        if ($match === null) {
+            return new JsonResponse(404, [
+                'error'   => 'not_found',
+                'message' => 'route not found',
+            ]);
+        }
+
+        [$route, $params] = $match;
+
+        $bearer = $request->bearerToken();
+        if ($bearer === null) {
+            return new JsonResponse(401, [
+                'error'   => 'unauthorized',
+                'message' => 'missing bearer token',
+            ]);
+        }
+
+        try {
+            $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
+        } catch (AuthenticationException) {
+            return new JsonResponse(401, [
+                'error'   => 'unauthorized',
+                'message' => 'invalid token',
+            ]);
+        }
+
+        // Instantiér controller. Handler-strengen 'MeController::show' bliver
+        // til KeePassDeltaSync\Controllers\MeController::show. Sub-namespaces
+        // (fx 'Admin\\UserController::create') bevares.
+        [$class, $method] = explode('::', $route['handler'], 2);
+        $fqcn = 'KeePassDeltaSync\\Controllers\\' . $class;
+
+        if (!class_exists($fqcn)) {
+            // Controlleren er routet men ikke implementeret endnu.
+            return new JsonResponse(501, [
+                'error'   => 'not_implemented',
+                'message' => $fqcn . ' not yet implemented',
+            ]);
+        }
+
+        $controller = new $fqcn($pdo);
+        if (!method_exists($controller, $method)) {
+            throw new HttpException(500, "handler method $fqcn::$method missing");
+        }
+
+        /** @var Response */
+        return $controller->$method($request, $params, $ctx);
     }
 
-    public function dispatch(): never
+    /**
+     * Find første route der matcher method + path.
+     *
+     * @return array{0: array{method:string, path:string, handler:string, auth:string, regex:string}, 1: array<string,string>}|null
+     */
+    private function findRoute(string $method, string $path): ?array
     {
-        // TODO: route-matching + auth-middleware + controller-invocation.
-        // Indtil videre returneres 501 så vi tydeligt kan se at serveren kører,
-        // men endnu ikke håndterer requests.
-        http_response_code(501);
-        header('Content-Type: application/json');
-        echo json_encode([
-            'error'   => 'not_implemented',
-            'message' => 'Server skeleton — endpoints not yet wired.',
-        ]);
-        exit;
+        foreach ($this->routes as $route) {
+            if ($route['method'] !== $method) {
+                continue;
+            }
+            if (preg_match($route['regex'], $path, $matches)) {
+                $params = [];
+                foreach ($matches as $key => $value) {
+                    if (is_string($key)) {
+                        $params[$key] = $value;
+                    }
+                }
+                return [$route, $params];
+            }
+        }
+        return null;
     }
 
     private function add(string $method, string $path, string $handler, string $auth): void
     {
-        $this->routes[] = compact('method', 'path', 'handler', 'auth');
+        $regex = preg_replace_callback(
+            '/\{(\w+)\}/',
+            static fn(array $m): string => '(?P<' . $m[1] . '>[^/]+)',
+            $path,
+        );
+        $this->routes[] = [
+            'method'  => $method,
+            'path'    => $path,
+            'handler' => $handler,
+            'auth'    => $auth,
+            'regex'   => '#^' . $regex . '$#',
+        ];
+    }
+
+    /** @return list<array{method:string, path:string, handler:string, auth:string, regex:string}> */
+    public function routes(): array
+    {
+        return $this->routes;
     }
 }
