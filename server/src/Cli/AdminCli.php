@@ -47,6 +47,10 @@ final class AdminCli
             'token:create-admin'         => $this->createAdminToken(),
             'user:create'                => $this->createUser($rest),
             'user:enrollment'            => $this->createEnrollmentToken($rest),
+            'user:list'                  => $this->listUsers(),
+            'user:disable'               => $this->setUserDisabled($rest, true),
+            'user:enable'                => $this->setUserDisabled($rest, false),
+            'user:delete'                => $this->deleteUser($rest),
             null, '-h', '--help', 'help' => $this->printHelp(),
             default                      => $this->unknownCommand($command),
         };
@@ -60,24 +64,30 @@ final class AdminCli
         Anvendelse:
           admin <kommando> [argumenter]
 
-        Tilgængelige kommandoer:
+        Token-administration:
           token:create-admin
               Generér en ny admin-token. Token printes én gang til stdout
               og lagres kun som hash i DB.
 
+        Bruger-administration:
           user:create <username> [--display-name=...]
               Opret bruger og generér enrollment-token til den første enhed.
-              Tokenen printes én gang og kan ikke vises igen.
 
           user:enrollment <username>
               Generér en ny enrollment-token til en eksisterende bruger
               (fx hvis brugeren skal tilføje en ekstra enhed).
 
-        Planlagt (ikke implementeret endnu):
-          user:disable <username>
-          user:delete  <username>
           user:list
-          log:cleanup
+              Liste alle brugere med status, device- og database-tæller.
+
+          user:disable <username>
+          user:enable  <username>
+              Deaktivér eller genaktivér en bruger. Deaktiverede brugere
+              kan ikke autentificere, men deres data bevares.
+
+          user:delete <username>
+              Slet bruger permanent. CASCADE fjerner enheder, databaser
+              og entries. Kan ikke fortrydes.
 
         HELP);
         return 0;
@@ -179,6 +189,96 @@ final class AdminCli
         $ttl = $this->config->enrollmentTokenTtlHours;
         fwrite(STDOUT, "Ny enrollment-token til '$username' (udløber om {$ttl} timer):\n\n");
         fwrite(STDOUT, "  {$result['enrollment_token']}\n\n");
+        return 0;
+    }
+
+    private function listUsers(): int
+    {
+        try {
+            $users = $this->userAdmin()->listUsers();
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        if (empty($users)) {
+            fwrite(STDOUT, "(ingen brugere)\n");
+            return 0;
+        }
+
+        // Kolonne-bredder beregnes ud fra data (med header som minimum).
+        $usernameW = max(8, ...array_map(fn(array $u): int => strlen($u['username']), $users));
+        $displayW  = max(7, ...array_map(
+            fn(array $u): int => strlen((string) ($u['display_name'] ?? '-')),
+            $users,
+        ));
+
+        $fmt = "%-{$usernameW}s  %-{$displayW}s  %-8s  %7s  %9s  %s\n";
+        fwrite(STDOUT, sprintf(
+            $fmt,
+            'USERNAME', 'DISPLAY', 'STATUS', 'DEVICES', 'DATABASES', 'CREATED',
+        ));
+
+        foreach ($users as $u) {
+            fwrite(STDOUT, sprintf(
+                $fmt,
+                $u['username'],
+                $u['display_name'] ?? '-',
+                $u['disabled'] ? 'disabled' : 'active',
+                (string) $u['device_count'],
+                (string) $u['database_count'],
+                substr((string) $u['created_at'], 0, 10),
+            ));
+        }
+        return 0;
+    }
+
+    private function setUserDisabled(array $args, bool $disabled): int
+    {
+        $verb = $disabled ? 'disable' : 'enable';
+        if (count($args) < 1) {
+            fwrite(STDERR, "Brug: admin user:$verb <username>\n");
+            return 1;
+        }
+        $username = $args[0];
+
+        try {
+            $admin  = $this->userAdmin();
+            $userId = $admin->findUserByUsername($username, includeDisabled: true);
+            if ($userId === null) {
+                fwrite(STDERR, "Bruger '$username' findes ikke.\n");
+                return 1;
+            }
+            $admin->setDisabled($userId, $disabled);
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        $past = $disabled ? 'deaktiveret' : 'genaktiveret';
+        fwrite(STDOUT, "Bruger '$username' $past.\n");
+        return 0;
+    }
+
+    private function deleteUser(array $args): int
+    {
+        if (count($args) < 1) {
+            fwrite(STDERR, "Brug: admin user:delete <username>\n");
+            return 1;
+        }
+        $username = $args[0];
+
+        try {
+            $admin  = $this->userAdmin();
+            $userId = $admin->findUserByUsername($username, includeDisabled: true);
+            if ($userId === null) {
+                fwrite(STDERR, "Bruger '$username' findes ikke.\n");
+                return 1;
+            }
+            $admin->deleteUser($userId);
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        fwrite(STDOUT, "Bruger '$username' slettet. CASCADE har fjernet enheder, databaser og entries.\n");
         return 0;
     }
 

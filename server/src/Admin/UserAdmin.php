@@ -131,12 +131,24 @@ final class UserAdmin
         return $stmt->rowCount() > 0;
     }
 
-    /** Slå brugernavn op til ID. Returnerer null hvis ikke findes eller er deaktiveret. */
-    public function findUserByUsername(string $username): ?string
+    /**
+     * Slå brugernavn op til ID.
+     *
+     * @param bool $includeDisabled hvis true returneres også deaktiverede brugere.
+     *   Default false matcher det vi vil have for enrollment-flow (man kan ikke
+     *   udstede tokens til deaktiverede brugere). CLI-kommandoer som
+     *   `user:enable` og `user:delete` skal sætte true.
+     *
+     * @return ?string null hvis brugeren ikke findes (eller er deaktiveret når
+     *                 $includeDisabled = false).
+     */
+    public function findUserByUsername(string $username, bool $includeDisabled = false): ?string
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT id FROM users WHERE username = :u AND disabled = false'
-        );
+        $sql = 'SELECT id FROM users WHERE username = :u';
+        if (!$includeDisabled) {
+            $sql .= ' AND disabled = false';
+        }
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['u' => $username]);
         $id = $stmt->fetchColumn();
         return $id === false ? null : (string) $id;
