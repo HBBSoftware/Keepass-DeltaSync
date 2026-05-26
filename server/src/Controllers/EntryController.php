@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Controllers;
 
+use KeePassDeltaSync\Audit\AuditLogger;
+use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthContext;
 use KeePassDeltaSync\Db\Connection;
 use KeePassDeltaSync\Http\HttpException;
@@ -43,7 +45,7 @@ final class EntryController
     // ============================================================
 
     /** GET /databases/{id}/changes?since={seq} */
-    public function changes(Request $req, array $params, AuthContext $auth): Response
+    public function changes(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $since      = $this->parseSince($req);
@@ -80,6 +82,11 @@ final class EntryController
         $cur->execute(['db' => $databaseId]);
         $currentSeq = (int) ($cur->fetchColumn() ?: 0);
 
+        $log->debug(EventType::EntriesChangesFetched, [
+            'database_id' => $databaseId,
+            'details'     => ['since' => $since, 'count' => count($entries), 'current_seq' => $currentSeq],
+        ]);
+
         return new JsonResponse(200, [
             'current_seq' => $currentSeq,
             'entries'     => $entries,
@@ -87,7 +94,7 @@ final class EntryController
     }
 
     /** PUT /databases/{id}/entries/{uuid} */
-    public function put(Request $req, array $params, AuthContext $auth): Response
+    public function put(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $entryUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
@@ -97,6 +104,12 @@ final class EntryController
         $modifiedAt = $this->parseModifiedAt($body);
 
         $result = $this->insertNewVersion($databaseId, $entryUuid, $blobB64, $modifiedAt, deleted: false);
+
+        $log->debug(EventType::EntryPut, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $entryUuid,
+            'details'     => ['seq' => $result['seq']],
+        ]);
 
         return new JsonResponse(200, [
             'entry' => [
@@ -110,7 +123,7 @@ final class EntryController
     }
 
     /** DELETE /databases/{id}/entries/{uuid} — tombstone (også en version) */
-    public function destroy(Request $req, array $params, AuthContext $auth): Response
+    public function destroy(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $entryUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
@@ -120,6 +133,12 @@ final class EntryController
         $modifiedAt = $this->parseModifiedAt($body);
 
         $result = $this->insertNewVersion($databaseId, $entryUuid, $blobB64, $modifiedAt, deleted: true);
+
+        $log->debug(EventType::EntryDeleted, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $entryUuid,
+            'details'     => ['seq' => $result['seq']],
+        ]);
 
         return new JsonResponse(200, [
             'entry' => [
@@ -133,7 +152,7 @@ final class EntryController
     }
 
     /** GET /databases/{id}/entries/{uuid}/versions */
-    public function versions(Request $req, array $params, AuthContext $auth): Response
+    public function versions(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $entryUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
@@ -163,6 +182,12 @@ final class EntryController
             'blob'        => $r['blob'],
         ], $rows);
 
+        $log->debug(EventType::EntryVersionsListed, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $entryUuid,
+            'details'     => ['count' => count($versions)],
+        ]);
+
         return new JsonResponse(200, [
             'entry_uuid' => $entryUuid,
             'versions'   => $versions,
@@ -170,7 +195,7 @@ final class EntryController
     }
 
     /** GET /databases/{id}/entries/{uuid}/versions/{num} */
-    public function version(Request $req, array $params, AuthContext $auth): Response
+    public function version(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $entryUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
@@ -194,6 +219,12 @@ final class EntryController
             throw new HttpException(404, 'version not found', 'not_found');
         }
 
+        $log->debug(EventType::EntryVersionFetched, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $entryUuid,
+            'details'     => ['version_num' => $versionNum],
+        ]);
+
         return new JsonResponse(200, [
             'version_num' => (int) $row['version_num'],
             'modified_at' => self::isoUtc($row['modified_at']),
@@ -213,7 +244,7 @@ final class EntryController
      * at restore semantisk *gør noget* når der findes nyere edits på andre
      * enheder — ellers ville restore tabe merge'en til den nyere edit.
      */
-    public function restore(Request $req, array $params, AuthContext $auth): Response
+    public function restore(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
         $entryUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
@@ -249,6 +280,16 @@ final class EntryController
                 return $inserted;
             },
         ));
+
+        $log->debug(EventType::EntryRestored, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $entryUuid,
+            'details'     => [
+                'restored_from' => $versionNum,
+                'new_seq'       => $result['seq'],
+                'deleted'       => $result['deleted'],
+            ],
+        ]);
 
         return new JsonResponse(200, [
             'entry' => [

@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync;
 
+use KeePassDeltaSync\Audit\AuditLogger;
+use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthenticationException;
 use KeePassDeltaSync\Auth\TokenAuthenticator;
 use KeePassDeltaSync\Auth\TokenType;
@@ -71,8 +73,12 @@ final class Router
         $this->add('POST',   '/api/v1/admin/log/cleanup',                                        'Admin\\LogController::cleanup',          'admin');
     }
 
-    public function dispatch(Request $request, PDO $pdo, TokenAuthenticator $authenticator): Response
-    {
+    public function dispatch(
+        Request            $request,
+        PDO                $pdo,
+        TokenAuthenticator $authenticator,
+        AuditLogger        $logger,
+    ): Response {
         $match = $this->findRoute($request->method, $request->path);
         if ($match === null) {
             return new JsonResponse(404, [
@@ -85,6 +91,10 @@ final class Router
 
         $bearer = $request->bearerToken();
         if ($bearer === null) {
+            $logger->forRequest($request)->info(EventType::AuthFailure, [
+                'details' => ['route' => $route['path'], 'reason' => 'missing_bearer'],
+                'success' => false,
+            ]);
             return new JsonResponse(401, [
                 'error'   => 'unauthorized',
                 'message' => 'missing bearer token',
@@ -94,11 +104,20 @@ final class Router
         try {
             $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
         } catch (AuthenticationException) {
+            $logger->forRequest($request)->info(EventType::AuthFailure, [
+                'details' => ['route' => $route['path'], 'reason' => 'invalid_token'],
+                'success' => false,
+            ]);
             return new JsonResponse(401, [
                 'error'   => 'unauthorized',
                 'message' => 'invalid token',
             ]);
         }
+
+        $requestLogger = $logger->forRequest($request, $ctx);
+        $requestLogger->info(EventType::AuthSuccess, [
+            'details' => ['route' => $route['path'], 'method' => $request->method],
+        ]);
 
         // Instantiér controller. Handler-strengen 'MeController::show' bliver
         // til KeePassDeltaSync\Controllers\MeController::show. Sub-namespaces
@@ -120,7 +139,7 @@ final class Router
         }
 
         /** @var Response */
-        return $controller->$method($request, $params, $ctx);
+        return $controller->$method($request, $params, $ctx, $requestLogger);
     }
 
     /**

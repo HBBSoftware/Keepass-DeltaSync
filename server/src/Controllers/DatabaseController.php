@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Controllers;
 
+use KeePassDeltaSync\Audit\AuditLogger;
+use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthContext;
 use KeePassDeltaSync\Db\Connection;
 use KeePassDeltaSync\Http\HttpException;
@@ -26,7 +28,7 @@ final class DatabaseController
     public function __construct(private readonly PDO $pdo) {}
 
     /** @param array<string,string> $params */
-    public function create(Request $req, array $params, AuthContext $auth): Response
+    public function create(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $name = $this->parseName($req);
 
@@ -51,6 +53,11 @@ final class DatabaseController
             },
         );
 
+        $log->debug(EventType::DatabaseCreated, [
+            'database_id' => $row['id'],
+            'details'     => ['name' => $row['name']],
+        ]);
+
         return new JsonResponse(201, [
             'database' => [
                 'id'         => $row['id'],
@@ -61,7 +68,7 @@ final class DatabaseController
     }
 
     /** @param array<string,string> $params */
-    public function index(Request $req, array $params, AuthContext $auth): Response
+    public function index(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $stmt = $this->pdo->prepare(
             'SELECT id, name, created_at
@@ -77,7 +84,7 @@ final class DatabaseController
     }
 
     /** @param array<string,string> $params */
-    public function destroy(Request $req, array $params, AuthContext $auth): Response
+    public function destroy(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $id = $params['id'] ?? '';
         if (!self::isUuid($id)) {
@@ -94,6 +101,8 @@ final class DatabaseController
         if ($stmt->rowCount() === 0) {
             throw new HttpException(404, 'database not found', 'not_found');
         }
+
+        $log->debug(EventType::DatabaseDeleted, ['database_id' => $id]);
 
         // CASCADE har taget sig af entries, entry_versions og database_seq.
         return new Response(204, [], '');

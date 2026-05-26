@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Controllers;
 
+use KeePassDeltaSync\Audit\AuditLogger;
 use KeePassDeltaSync\Auth\AuthContext;
 use KeePassDeltaSync\Http\HttpException;
 use KeePassDeltaSync\Http\JsonResponse;
@@ -24,7 +25,7 @@ final class MeController
     public function __construct(private readonly PDO $pdo) {}
 
     /** @param array<string,string> $params */
-    public function show(Request $req, array $params, AuthContext $auth): Response
+    public function show(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $stmt = $this->pdo->prepare(
             'SELECT u.id            AS user_id,

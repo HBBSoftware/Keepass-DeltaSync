@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync;
 
+use KeePassDeltaSync\Audit\AuditLogger;
+use KeePassDeltaSync\Audit\LogLevel;
 use KeePassDeltaSync\Auth\TokenAuthenticator;
 use KeePassDeltaSync\Db\Connection;
 use KeePassDeltaSync\Http\HttpException;
@@ -45,7 +47,8 @@ final class App
         try {
             $pdo           = Connection::fromConfig($this->config);
             $authenticator = new TokenAuthenticator($pdo);
-            $response      = $this->router->dispatch($request, $pdo, $authenticator);
+            $logger        = new AuditLogger($pdo, LogLevel::fromConfig($this->config->logLevel));
+            $response      = $this->router->dispatch($request, $pdo, $authenticator, $logger);
         } catch (HttpException $e) {
             $response = new JsonResponse($e->status, [
                 'error'   => $e->errorCode ?? ('error_' . $e->status),

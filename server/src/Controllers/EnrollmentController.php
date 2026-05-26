@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Controllers;
 
+use KeePassDeltaSync\Audit\AuditLogger;
+use KeePassDeltaSync\Audit\EventType;
 use KeePassDeltaSync\Auth\AuthContext;
 use KeePassDeltaSync\Crypto\TokenHasher;
 use KeePassDeltaSync\Db\Connection;
@@ -28,7 +30,7 @@ final class EnrollmentController
     public function __construct(private readonly PDO $pdo) {}
 
     /** @param array<string,string> $params */
-    public function enroll(Request $req, array $params, AuthContext $auth): Response
+    public function enroll(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $deviceName = $this->parseDeviceName($req);
 
@@ -78,6 +80,11 @@ final class EnrollmentController
                 ];
             },
         );
+
+        $log->info(EventType::EnrollmentSuccess, [
+            'device_id' => $result['device_id'],
+            'details'   => ['device_name' => $deviceName],
+        ]);
 
         return new JsonResponse(201, [
             'device' => [
