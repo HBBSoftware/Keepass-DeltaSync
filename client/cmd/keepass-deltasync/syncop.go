@@ -135,6 +135,10 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		if terr != nil {
 			return 0, 0, 0, fmt.Errorf("entry %s: parse modified_at: %w", c.UUID, terr)
 		}
+		// Optag server's modified_at som "vi har set denne version" så
+		// push-delta næste sync ikke re-pusher den pullede entry.
+		e.db.RecordEntryState(c.UUID, modAt.UTC().Format("2006-01-02T15:04:05Z"))
+
 		if c.Deleted {
 			deletions = append(deletions, kdbx.StagingDeletion{UUID: c.UUID, DeletedAt: modAt})
 			continue
@@ -200,12 +204,14 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 }
 
 // pushChanges eksporterer den lokale .kdbx via keepassxc-cli, parser entries
-// og deletions, og uploader dem til serveren. Hvis since er non-nil filtreres
-// til kun entries/deletions med tidsstempel STRENGT efter since (sync delta-
-// push mode); hvis since er nil pushes alt (force push, init use case).
+// og deletions, og uploader dem til serveren. Filteret er pr.-entry: en entry
+// pushes hvis dens mtime er nyere end den seneste i db.EntryStates (eller
+// hvis den slet ikke er i map'en). Med force=true ignoreres map'en og alt
+// pushes (initial-sync / recovery use case).
 //
-// Caller'en gemmer config selv (typisk db.LastPush).
-func (e *runEnv) pushChanges(since *time.Time) (pushed, deleted int, err error) {
+// Efter hver succesfuld PUT/DELETE opdateres db.EntryStates så caller'en
+// kun behøver at gemme config én gang efter pushChanges returnerer.
+func (e *runEnv) pushChanges(force bool) (pushed, deleted int, err error) {
 	fmt.Fprintln(os.Stderr, "Exporting kdbx via keepassxc-cli...")
 	xmlBytes, err := e.cli.Export(e.ctx, e.db.LocalPath, e.password)
 	if err != nil {
@@ -217,14 +223,14 @@ func (e *runEnv) pushChanges(since *time.Time) (pushed, deleted int, err error) 
 		return 0, 0, fmt.Errorf("parse export: %w", err)
 	}
 
-	if since == nil {
-		fmt.Fprintf(os.Stderr, "Pushing all %d entries + %d tombstones (no filter).\n", len(entries), len(deletions))
+	if force {
+		fmt.Fprintf(os.Stderr, "Pushing all %d entries + %d tombstones (force).\n", len(entries), len(deletions))
 	} else {
-		fmt.Fprintf(os.Stderr, "Filtering entries modified after %s...\n", since.UTC().Format("2006-01-02T15:04:05Z"))
+		fmt.Fprintf(os.Stderr, "Found %d entries + %d tombstones; checking per-entry tracking...\n", len(entries), len(deletions))
 	}
 
 	for _, en := range entries {
-		if since != nil && !en.ModifiedAt.After(*since) {
+		if !force && !shouldPush(e.db.EntryStates, en.UUID, en.ModifiedAt) {
 			continue
 		}
 		blob, eerr := crypto.EncryptBlob(e.entryKey, en.Fragment)
@@ -234,20 +240,39 @@ func (e *runEnv) pushChanges(since *time.Time) (pushed, deleted int, err error) 
 		if _, perr := e.client.PutEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, en.UUID, blob, en.ModifiedAt); perr != nil {
 			return pushed, deleted, fmt.Errorf("PUT entry %s: %w", en.UUID, perr)
 		}
+		e.db.RecordEntryState(en.UUID, en.ModifiedAt.UTC().Format("2006-01-02T15:04:05Z"))
 		pushed++
 	}
 
 	for _, d := range deletions {
-		if since != nil && !d.DeletedAt.After(*since) {
+		if !force && !shouldPush(e.db.EntryStates, d.UUID, d.DeletedAt) {
 			continue
 		}
 		if _, derr := e.client.DeleteEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, d.UUID, nil, d.DeletedAt); derr != nil {
 			return pushed, deleted, fmt.Errorf("DELETE entry %s: %w", d.UUID, derr)
 		}
+		e.db.RecordEntryState(d.UUID, d.DeletedAt.UTC().Format("2006-01-02T15:04:05Z"))
 		deleted++
 	}
 
 	return pushed, deleted, nil
+}
+
+// shouldPush returnerer true hvis entry'en skal pushes til serveren — dvs.
+// vi har ingen recorded state, eller vores recorded mtime er strengt før
+// entry'ens nuværende mtime.
+func shouldPush(states map[string]string, uuid string, currentMtime time.Time) bool {
+	recorded, ok := states[uuid]
+	if !ok {
+		return true
+	}
+	recordedT, err := time.Parse(time.RFC3339, recorded)
+	if err != nil {
+		// Korrupt state-værdi: behandl som "aldrig pushet" så vi recovers
+		// ved at re-pushe entry'en og overskrive den dårlige værdi.
+		return true
+	}
+	return recordedT.Before(currentMtime)
 }
 
 // rewriteLastModificationTime erstatter den første forekomst af

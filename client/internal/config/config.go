@@ -42,12 +42,32 @@ type Server struct {
 // hos serveren. RemoteID er den server-genererede UUID — den UUID HKDF bruger
 // til at derivere entry-nøgler, så samme masterpassword på forskellige
 // databaser ikke giver samme nøglemateriale.
+//
+// EntryStates er per-entry mtime-tracking: en map fra entry-UUID til den
+// senest pushede (eller pullede) mtime som ISO 8601-streng. Push-delta
+// sammenligner pr. entry mod denne map, så hverken just-pullede entries
+// re-pushes eller same-second-edits mistes. Hvis en entry ikke er i map'en
+// betragtes den som "aldrig pushet" og pushes næste sync.
+//
+// LastPush er beholdt som deprecated felt for bagudkompatibilitet med ældre
+// configs — feltet skrives ikke længere af klienten, men eksisterende værdier
+// bevares så manuel inspektion stadig giver mening.
 type Database struct {
-	Name      string `toml:"name"`
-	LocalPath string `toml:"local_path"`
-	RemoteID  string `toml:"remote_id"`
-	LastSeq   int64  `toml:"last_seq"`
-	LastPush  string `toml:"last_push,omitempty"`
+	Name        string            `toml:"name"`
+	LocalPath   string            `toml:"local_path"`
+	RemoteID    string            `toml:"remote_id"`
+	LastSeq     int64             `toml:"last_seq"`
+	LastPush    string            `toml:"last_push,omitempty"`
+	EntryStates map[string]string `toml:"entry_states,omitempty"`
+}
+
+// RecordEntryState gemmer den seneste sete mtime for en entry (eller deletion).
+// Initialiserer map'en lazy. Bruges efter både push og pull.
+func (d *Database) RecordEntryState(uuid, mtimeISO string) {
+	if d.EntryStates == nil {
+		d.EntryStates = make(map[string]string)
+	}
+	d.EntryStates[uuid] = mtimeISO
 }
 
 // FindDatabase returnerer en pointer til den lokale database med det navn,

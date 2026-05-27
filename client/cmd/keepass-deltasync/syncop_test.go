@@ -8,6 +8,57 @@ import (
 	"time"
 )
 
+func TestShouldPush_NotTrackedYet(t *testing.T) {
+	states := map[string]string{}
+	mtime := time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC)
+	if !shouldPush(states, "abc", mtime) {
+		t.Fatal("entry not in states should be pushed")
+	}
+}
+
+func TestShouldPush_UnchangedSinceLastPush(t *testing.T) {
+	states := map[string]string{
+		"abc": "2026-05-27T10:00:00Z",
+	}
+	mtime := time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC)
+	if shouldPush(states, "abc", mtime) {
+		t.Fatal("entry with same mtime as recorded should NOT be re-pushed")
+	}
+}
+
+func TestShouldPush_EditedAfterLastPush(t *testing.T) {
+	states := map[string]string{
+		"abc": "2026-05-27T10:00:00Z",
+	}
+	mtime := time.Date(2026, 5, 27, 10, 0, 1, 0, time.UTC) // 1 second later
+	if !shouldPush(states, "abc", mtime) {
+		t.Fatal("entry with newer mtime should be pushed")
+	}
+}
+
+func TestShouldPush_OlderThanRecorded(t *testing.T) {
+	// Should not happen in practice (mtime only increases) but defend against
+	// a stale local file or clock skew.
+	states := map[string]string{
+		"abc": "2026-05-27T10:00:00Z",
+	}
+	mtime := time.Date(2026, 5, 27, 9, 0, 0, 0, time.UTC) // 1 hour earlier
+	if shouldPush(states, "abc", mtime) {
+		t.Fatal("entry older than recorded should not be re-pushed")
+	}
+}
+
+func TestShouldPush_CorruptRecordedValue(t *testing.T) {
+	// Defensive: if the stored value is unparseable, recover by re-pushing.
+	states := map[string]string{
+		"abc": "garbage-not-a-timestamp",
+	}
+	mtime := time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC)
+	if !shouldPush(states, "abc", mtime) {
+		t.Fatal("corrupt recorded value should trigger re-push (recovery)")
+	}
+}
+
 func TestRewriteLastModificationTime_Basic(t *testing.T) {
 	fragment := []byte(`
 		<UUID>foo==</UUID>

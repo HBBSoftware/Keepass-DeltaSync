@@ -11,28 +11,15 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 )
 
-// runSync er den bidirektionelle synkronisering: først pull (server → local
-// merge), så push af entries der er ændret siden sidste push (local → server).
+// runSync er den bidirektionelle synkronisering: pull (server → local merge),
+// så push af de entries der har ændret sig siden vi sidst pushede/pullede
+// dem.
 //
-// Algorithme:
-//
-//   sync_start  = now()
-//   old_push    = config.last_push (parset til time.Time)
-//
-//   PULL:  GET /changes, decrypt, merge ind i local
-//   PUSH:  export local, PUT entries med modified_at > old_push,
-//          DELETE tombstones med deletion_time > old_push
-//
-//   SAVE:  last_seq = pulled current_seq, last_push = sync_start
-//
-// last_push sættes til sync_start (ikke now()) så enhver entry der bliver
-// modificeret DURING sync (fx af en konkurrerende editor) bliver pushet
-// næste gang.
-//
-// Kendt v1-ineffektivitet: entries vi netop har pullet og merget kan have
-// modified_at > old_push hvis de stammer fra en device der har pushet
-// nyligt. De bliver re-pushet (server laver ny version, ingen data-tab).
-// Ved næste sync vil deres modified_at < new last_push og de springes over.
+// Push-delta-filteret er pr.-entry via db.EntryStates: hver entry pushes kun
+// hvis dens mtime er nyere end den senest sete værdi for samme UUID. Dette
+// erstatter det tidligere globale last_push-filter, som havde to subtle bugs:
+// (1) entries pullet i samme sync kunne re-pushes; (2) edits i samme sekund
+// som forrige sync kunne mistes pga. sekund-præcisions-sammenligning.
 func runSync(args []string) error {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	pwStdin := fs.Bool("password-stdin", false, "read masterpassword from stdin instead of interactive prompt")
@@ -53,8 +40,6 @@ func runSync(args []string) error {
 	}
 	name := fs.Arg(0)
 
-	syncStart := time.Now().UTC()
-
 	env, err := setupEnv(name, *pwStdin, *cliPath, 10*time.Minute,
 		fmt.Sprintf("Masterpassword for %s: ", name))
 	if err != nil {
@@ -62,37 +47,22 @@ func runSync(args []string) error {
 	}
 	defer env.cleanup()
 
-	// Parse den eksisterende last_push til en time.Time. Tom string betyder
-	// "aldrig pushet" — så vi pusher alt (since=nil) første gang.
-	var since *time.Time
-	if env.db.LastPush != "" {
-		t, err := time.Parse(time.RFC3339, env.db.LastPush)
-		if err != nil {
-			return fmt.Errorf("config last_push is not valid RFC 3339: %w", err)
-		}
-		since = &t
-	}
-
-	// PULL
 	newSeq, merged, deletions, err := env.pullChanges()
 	if err != nil {
 		return err
 	}
 
-	// PUSH-DELTA
-	pushed, deleted, err := env.pushChanges(since)
+	pushed, deleted, err := env.pushChanges(false)
 	if err != nil {
 		return err
 	}
 
-	// SAVE — last_seq + last_push opdateres atomarisk via en config-skrivning.
 	env.db.LastSeq = newSeq
-	env.db.LastPush = syncStart.Format("2006-01-02T15:04:05Z")
 	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Printf("Sync complete: pulled %d entries (+ %d tombstones), pushed %d entries (+ %d tombstones). last_seq=%d, last_push=%s\n",
-		merged, deletions, pushed, deleted, newSeq, env.db.LastPush)
+	fmt.Printf("Sync complete: pulled %d entries (+ %d tombstones), pushed %d entries (+ %d tombstones). last_seq=%d\n",
+		merged, deletions, pushed, deleted, newSeq)
 	return nil
 }

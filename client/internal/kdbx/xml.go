@@ -4,12 +4,20 @@ package kdbx
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"time"
 )
+
+// kdbx4EpochToUnixOffset er antal sekunder fra 0001-01-01 UTC til Unix-
+// epoken (1970-01-01). KDBX4-timestamps er int64 sekunder fra 0001-01-01,
+// så for at få en time.Time bruger vi time.Unix(secs+offset, 0). offset er
+// negativ pga. 0001 < 1970. Vi kan IKKE bruge time.Duration aritmetik her —
+// Go's Duration overflows for spans > ~292 år (max int64 nanosekunder).
+var kdbx4EpochToUnixOffset = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
 
 // Entry er én entry udlæst fra en .kdbx-eksport. Fragment er det rå XML-indhold
 // (uden den ydre <Entry>...</Entry>-wrapper). Det er denne fragment der krypteres
@@ -99,13 +107,16 @@ func decodeUUID(b64 string) (string, error) {
 	return fmt.Sprintf("%s-%s-%s-%s-%s", h[0:8], h[8:12], h[12:16], h[16:20], h[20:32]), nil
 }
 
-// parseKdbxTime accepterer ISO 8601 / RFC 3339 med Z eller offset. KeePassXC
-// 2.5+ skriver ISO 8601 i Z-form ("2026-05-27T08:00:00Z"). Ældre versioner
-// brugte et numerisk format — vi forventer kun det nye her.
+// parseKdbxTime accepterer både KDBX3's ISO 8601 ("2026-05-27T08:00:00Z") og
+// KDBX4's base64-encoded little-endian int64 ("HtWo4Q4AAAA=") som er sekunder
+// fra 0001-01-01 UTC. Hvilket format der bruges afhænger af kdbx-versionen +
+// keepassxc-cli's output-konfiguration; vores parser skal kunne håndtere
+// begge for at virke på tværs af databaser.
 func parseKdbxTime(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, errors.New("empty timestamp")
 	}
+	// ISO 8601 først (KDBX3 + nogle KDBX4-konfigurationer).
 	for _, layout := range []string{
 		time.RFC3339,
 		"2006-01-02T15:04:05Z",
@@ -114,6 +125,13 @@ func parseKdbxTime(s string) (time.Time, error) {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t.UTC(), nil
 		}
+	}
+	// Fallback: KDBX4 binary format. base64-decode → 8 bytes →
+	// little-endian int64 sekunder fra 0001-01-01 UTC.
+	if raw, err := base64.StdEncoding.DecodeString(s); err == nil && len(raw) == 8 {
+		secs := int64(binary.LittleEndian.Uint64(raw))
+		unixSecs := secs + kdbx4EpochToUnixOffset
+		return time.Unix(unixSecs, 0).UTC(), nil
 	}
 	return time.Time{}, fmt.Errorf("unrecognized timestamp format: %q", s)
 }

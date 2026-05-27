@@ -46,6 +46,8 @@ func runPull(args []string) error {
 		return err
 	}
 
+	// pullChanges har allerede opdateret env.db.EntryStates internt; vi
+	// gemmer config én gang her uanset om der var noget at merge.
 	env.db.LastSeq = newSeq
 	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)

@@ -11,16 +11,21 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 )
 
-// runPush eksporterer den lokale .kdbx og uploader ALLE entries til serveren
-// (ingen since-filter — det er det der adskiller `push` fra `sync`). Bruges
-// til initial-sync af en eksisterende kdbx eller til force-resend efter
-// servertab.
+// runPush eksporterer den lokale .kdbx og uploader entries til serveren.
+// Default: skipper entries der allerede er i db.EntryStates med matchende
+// mtime — samme delta-semantik som `sync`s push-fase. Med --force pushes
+// ALT uanset tracking-state (initial-sync, recovery efter serverforlis,
+// eller en mistanke om at server-state er korrupt).
+//
+// `push` adskiller sig fra `sync` ved ikke at pulle først — hvis du har
+// lokale ændringer som du vil have op nu og pull kan vente, brug `push`.
 func runPush(args []string) error {
 	fs := flag.NewFlagSet("push", flag.ContinueOnError)
 	pwStdin := fs.Bool("password-stdin", false, "read masterpassword from stdin instead of interactive prompt")
 	cliPath := fs.String("keepassxc-cli", "", "path to keepassxc-cli binary (overrides auto-detection)")
+	force := fs.Bool("force", false, "push every entry regardless of local tracking state")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync push <name> [--password-stdin] [--keepassxc-cli PATH]")
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync push <name> [--force] [--password-stdin] [--keepassxc-cli PATH]")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -42,12 +47,11 @@ func runPush(args []string) error {
 	}
 	defer env.cleanup()
 
-	pushed, deleted, err := env.pushChanges(nil)
+	pushed, deleted, err := env.pushChanges(*force)
 	if err != nil {
 		return err
 	}
 
-	env.db.LastPush = time.Now().UTC().Format("2006-01-02T15:04:05Z")
 	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
