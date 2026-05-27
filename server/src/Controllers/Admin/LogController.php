@@ -23,8 +23,8 @@ use PDO;
  */
 final class LogController
 {
-    private const int DEFAULT_LIMIT = 50;
-    private const int MAX_LIMIT     = 500;
+    private const DEFAULT_LIMIT = 50;
+    private const MAX_LIMIT     = 500;
 
     public function __construct(
         private readonly PDO    $pdo,

@@ -31,10 +31,10 @@ use PDO;
 final class Cleanup
 {
     /** Vilkårligt unikt heltal — pg_advisory_lock kræver et lock-ID i denne range. */
-    private const int ADVISORY_LOCK_KEY = 42;
+    private const ADVISORY_LOCK_KEY = 42;
 
     /** Hvor ofte cleanup må køre fra startup-trigger (sekunder). */
-    private const int THROTTLE_SECONDS = 3600;
+    private const THROTTLE_SECONDS = 3600;
 
     /**
      * Best-effort cleanup. Returnerer null hvis throttled eller hvis en anden

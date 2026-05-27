@@ -37,7 +37,7 @@ use PDO;
 final class EntryController
 {
     /** Max blob-størrelse pr. entry. 1 MB er rigeligt selv med attachments. */
-    private const int MAX_BLOB_BYTES = 1024 * 1024;
+    private const MAX_BLOB_BYTES = 1024 * 1024;
 
     public function __construct(
         private readonly PDO    $pdo,
