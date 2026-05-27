@@ -105,6 +105,56 @@ func (c *Client) Enroll(ctx context.Context, enrollmentToken, deviceName string)
 	return &out, nil
 }
 
+// User er bruger-info som returneret af /me.
+type User struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// Device er device-info som returneret af /me.
+type Device struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	EnrolledAt string `json:"enrolled_at"`
+	LastSeen   string `json:"last_seen"`
+}
+
+// MeResponse er det fulde svar fra /me.
+type MeResponse struct {
+	User   User   `json:"user"`
+	Device Device `json:"device"`
+}
+
+// Me kalder GET /api/v1/me med device-tokenet og returnerer bruger + device.
+// Server-side opdaterer last_seen ved succesfuld auth.
+func (c *Client) Me(ctx context.Context, deviceToken string) (*MeResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/me", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get me: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+
+	var out MeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out, nil
+}
+
 // parseError læser body og bygger en APIError. Hvis JSON-parsing fejler bruges
 // raw body som besked, så vi ikke skjuler nyttig diagnostik.
 func parseError(resp *http.Response) error {
