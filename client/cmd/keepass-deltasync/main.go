@@ -15,6 +15,7 @@ Usage:
 Commands:
   enroll <enrollment-token>   Register this device with the server
   status                      Show current enrollment + last-seen info
+  devices                     List all enrolled devices for this user
 `
 
 func main() {
@@ -28,6 +29,8 @@ func main() {
 		exitOnError(runEnroll(os.Args[2:]))
 	case "status":
 		exitOnError(runStatus(os.Args[2:]))
+	case "devices":
+		exitOnError(runDevices(os.Args[2:]))
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

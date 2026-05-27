@@ -155,6 +155,47 @@ func (c *Client) Me(ctx context.Context, deviceToken string) (*MeResponse, error
 	return &out, nil
 }
 
+// DeviceListEntry er én række i svaret fra GET /devices. Felterne overlapper
+// med Device men inkluderer is_current — adskilt type, så Device kan bruges
+// af endpoints (som /me) der ikke har det felt.
+type DeviceListEntry struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	EnrolledAt string `json:"enrolled_at"`
+	LastSeen   string `json:"last_seen"`
+	IsCurrent  bool   `json:"is_current"`
+}
+
+// ListDevices kalder GET /api/v1/devices og returnerer alle devices for den
+// bruger token'en hører til. Sorteret af serveren med nyeste enrollment først.
+func (c *Client) ListDevices(ctx context.Context, deviceToken string) ([]DeviceListEntry, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/devices", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get devices: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+
+	var out struct {
+		Devices []DeviceListEntry `json:"devices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out.Devices, nil
+}
+
 // parseError læser body og bygger en APIError. Hvis JSON-parsing fejler bruges
 // raw body som besked, så vi ikke skjuler nyttig diagnostik.
 func parseError(resp *http.Response) error {
