@@ -18,6 +18,8 @@ Commands:
   push <name>                 Upload all entries from a local .kdbx
   pull <name>                 Fetch server entries and merge into local .kdbx
   sync <name>                 Pull, then push entries modified since last sync
+  versions <name> <uuid>      List server-stored versions of an entry
+  restore <name> <uuid> <n>   Roll an entry back to version n (1, 2 or 3)
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
   databases                   List registered databases (local + server)
@@ -41,6 +43,10 @@ func main() {
 		exitOnError(runPull(os.Args[2:]))
 	case "sync":
 		exitOnError(runSync(os.Args[2:]))
+	case "versions":
+		exitOnError(runVersions(os.Args[2:]))
+	case "restore":
+		exitOnError(runRestore(os.Args[2:]))
 	case "status":
 		exitOnError(runStatus(os.Args[2:]))
 	case "devices":

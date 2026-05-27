@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
@@ -18,6 +19,11 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/kdbx"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/passwd"
 )
+
+// lastModificationTimeRe fanger entry'ens egen <LastModificationTime>. Vi
+// erstatter altid den første forekomst — der ligger inde i <Times>-blokken
+// FØR <History>, så efterfølgende historiske forekomster bevares uændret.
+var lastModificationTimeRe = regexp.MustCompile(`<LastModificationTime>[^<]*</LastModificationTime>`)
 
 // runEnv samler den shared state alle synkroniserings-kommandoer (pull/push/
 // sync) skal bruge: API-klient, kdbx-CLI, config, masterpassword og deriverede
@@ -137,6 +143,12 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		if derr != nil {
 			return 0, 0, 0, fmt.Errorf("entry %s: decrypt failed — wrong masterpassword? %w", c.UUID, derr)
 		}
+		// Server's metadata modified_at er sandheden — den interne
+		// <LastModificationTime> i blob'en kan være ældre (sker ved
+		// restore: server kopierer en gammel blob men sætter ny mtime
+		// for at vinde merge). Synk altid feltet til server's værdi så
+		// KeePassXC's merge picker den rigtige version.
+		fragment = rewriteLastModificationTime(fragment, modAt)
 		entries = append(entries, kdbx.StagingEntry{
 			UUID:       c.UUID,
 			Fragment:   fragment,
@@ -236,6 +248,24 @@ func (e *runEnv) pushChanges(since *time.Time) (pushed, deleted int, err error) 
 	}
 
 	return pushed, deleted, nil
+}
+
+// rewriteLastModificationTime erstatter den første forekomst af
+// <LastModificationTime>...</LastModificationTime> i fragmentet med en frisk
+// ISO-tidsstempel. Den første forekomst er entry'ens egen Times — historiske
+// versioner ligger i <History> bagefter og forbliver uændret.
+func rewriteLastModificationTime(fragment []byte, t time.Time) []byte {
+	loc := lastModificationTimeRe.FindIndex(fragment)
+	if loc == nil {
+		return fragment
+	}
+	iso := t.UTC().Format("2006-01-02T15:04:05Z")
+	replacement := []byte("<LastModificationTime>" + iso + "</LastModificationTime>")
+	out := make([]byte, 0, len(fragment)+len(replacement)-(loc[1]-loc[0]))
+	out = append(out, fragment[:loc[0]]...)
+	out = append(out, replacement...)
+	out = append(out, fragment[loc[1]:]...)
+	return out
 }
 
 // copyFile er en minimal helper til backup/restore. Ikke atomisk — men vi
