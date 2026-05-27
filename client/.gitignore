@@ -1,0 +1,5 @@
+# Build artifacts (output of `go build`)
+/keepass-deltasync
+/keepass-deltasync.exe
+/cmd/keepass-deltasync/keepass-deltasync
+/cmd/keepass-deltasync/keepass-deltasync.exe
