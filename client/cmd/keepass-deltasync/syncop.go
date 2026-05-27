@@ -161,7 +161,24 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 	}
 	fmt.Fprintf(os.Stderr, "Decrypted %d entries (+ %d tombstones).\n", len(entries), len(deletions))
 
-	stagingXML, err := kdbx.BuildStagingXML(entries, deletions)
+	// Find lokal Root-gruppes UUID, så staging-merge lander nye entries
+	// direkte i Root i stedet for at oprette en "deltasync"-undergruppe.
+	// Kræver en ekstra kdbx-export (~200ms), men kun når der faktisk er
+	// noget at merge.
+	localXML, err := e.cli.Export(e.ctx, e.db.LocalPath, e.password)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("export local for root uuid: %w", err)
+	}
+	rootUUID, err := kdbx.RootGroupUUID(localXML)
+	if err != nil {
+		// Defensiv: hvis vi ikke kan finde Root UUID, falder vi tilbage
+		// til en random staging-gruppe (= gammel deltasync-undergruppe-
+		// adfærd). Bedre noget der virker end en hård fejl.
+		fmt.Fprintf(os.Stderr, "warning: could not extract root UUID (%v); falling back to deltasync subgroup\n", err)
+		rootUUID = ""
+	}
+
+	stagingXML, err := kdbx.BuildStagingXML(entries, deletions, rootUUID)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("build staging xml: %w", err)
 	}

@@ -35,6 +35,22 @@ type Deletion struct {
 	DeletedAt time.Time
 }
 
+// RootGroupUUID parser XML-eksporten og returnerer Root-gruppens UUID i
+// KDBX' native base64-form. Bruges af pull-flowet til at bygge en staging-
+// kdbx hvis "deltasync"-gruppe har SAMME UUID som lokal Root, så
+// keepassxc-cli's merge placerer nye entries direkte i Root i stedet for at
+// oprette en separat undergruppe.
+func RootGroupUUID(xmlBytes []byte) (string, error) {
+	var doc kdbxFile
+	if err := xml.Unmarshal(xmlBytes, &doc); err != nil {
+		return "", fmt.Errorf("parse kdbx xml: %w", err)
+	}
+	if doc.Root.Group.UUID == "" {
+		return "", errors.New("root group has no UUID")
+	}
+	return doc.Root.Group.UUID, nil
+}
+
 // ParseExport tager en keepassxc-cli export-XML og udtrækker alle entries og
 // deletions. Entries i <History>-undertræer ignoreres — det er entry'ens egen
 // version-historik som serveren håndterer separat.
@@ -153,6 +169,7 @@ type root struct {
 }
 
 type group struct {
+	UUID    string  `xml:"UUID"`
 	Entries []entry `xml:"Entry"`
 	Groups  []group `xml:"Group"`
 }

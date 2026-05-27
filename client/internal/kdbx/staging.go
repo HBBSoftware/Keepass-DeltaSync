@@ -30,17 +30,24 @@ type StagingDeletion struct {
 }
 
 // BuildStagingXML konstruerer en valid KDBX-import-XML der wrapper alle
-// dekrypterede entries i én "deltasync"-gruppe + en <DeletedObjects>-liste.
+// dekrypterede entries i én staging-gruppe + en <DeletedObjects>-liste.
 // Resultatet kan fodres til `keepassxc-cli import` for at få en kdbx-fil,
 // som derefter merges ind i den lokale database.
 //
-// Begrænsning: nye entries fra andre enheder lander i en "deltasync"-undergruppe
-// i den lokale .kdbx efter merge. Allerede-eksisterende entries (matchet på
-// UUID) bliver opdateret in-place i deres oprindelige grupper.
-func BuildStagingXML(entries []StagingEntry, deletions []StagingDeletion) ([]byte, error) {
-	groupUUID, err := randomUUIDBase64()
-	if err != nil {
-		return nil, fmt.Errorf("staging group uuid: %w", err)
+// groupUUID styrer hvor merge placerer NYE entries (entries hvis UUID ikke
+// allerede findes i target). Hvis groupUUID matcher target's Root-gruppe-
+// UUID, lander de i Root. Hvis det er en ny UUID, oprettes en "deltasync"-
+// undergruppe. Tom string → der genereres en frisk random UUID.
+//
+// Allerede-eksisterende entries (matchet på UUID) bliver opdateret in-place
+// i deres oprindelige grupper uanset.
+func BuildStagingXML(entries []StagingEntry, deletions []StagingDeletion, groupUUID string) ([]byte, error) {
+	if groupUUID == "" {
+		var err error
+		groupUUID, err = randomUUIDBase64()
+		if err != nil {
+			return nil, fmt.Errorf("staging group uuid: %w", err)
+		}
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
