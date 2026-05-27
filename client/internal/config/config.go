@@ -28,13 +28,44 @@ const (
 
 // Config repræsenterer hele config-filen.
 type Config struct {
-	Server Server `toml:"server"`
+	Server    Server     `toml:"server"`
+	Databases []Database `toml:"database"`
 }
 
 // Server holder server-URL og device-token (sat efter enrollment).
 type Server struct {
 	URL         string `toml:"url"`
 	DeviceToken string `toml:"device_token,omitempty"`
+}
+
+// Database er bindingen mellem en lokal .kdbx-fil og en database registreret
+// hos serveren. RemoteID er den server-genererede UUID — den UUID HKDF bruger
+// til at derivere entry-nøgler, så samme masterpassword på forskellige
+// databaser ikke giver samme nøglemateriale.
+type Database struct {
+	Name      string `toml:"name"`
+	LocalPath string `toml:"local_path"`
+	RemoteID  string `toml:"remote_id"`
+	LastSeq   int64  `toml:"last_seq"`
+	LastPush  string `toml:"last_push,omitempty"`
+}
+
+// FindDatabase returnerer en pointer til den lokale database med det navn,
+// eller nil hvis ingen findes. Pointeren tillader caller'en at mutere
+// LastSeq/LastPush efter en sync.
+func (c *Config) FindDatabase(name string) *Database {
+	for i := range c.Databases {
+		if c.Databases[i].Name == name {
+			return &c.Databases[i]
+		}
+	}
+	return nil
+}
+
+// AddDatabase tilføjer en ny database-binding. Caller skal selv sørge for at
+// navnet ikke kollidere — FindDatabase før dette kald.
+func (c *Config) AddDatabase(db Database) {
+	c.Databases = append(c.Databases, db)
 }
 
 // Path returnerer den fulde sti til config-filen. Mappen oprettes ikke her.

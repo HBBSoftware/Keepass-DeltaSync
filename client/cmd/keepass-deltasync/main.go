@@ -14,8 +14,10 @@ Usage:
 
 Commands:
   enroll <enrollment-token>   Register this device with the server
+  init <name> <local.kdbx>    Register a local .kdbx for syncing
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
+  databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
 `
 
@@ -28,10 +30,14 @@ func main() {
 	switch os.Args[1] {
 	case "enroll":
 		exitOnError(runEnroll(os.Args[2:]))
+	case "init":
+		exitOnError(runInit(os.Args[2:]))
 	case "status":
 		exitOnError(runStatus(os.Args[2:]))
 	case "devices":
 		exitOnError(runDevices(os.Args[2:]))
+	case "databases":
+		exitOnError(runDatabases(os.Args[2:]))
 	case "log":
 		exitOnError(runLog(os.Args[2:]))
 	case "-h", "--help", "help":

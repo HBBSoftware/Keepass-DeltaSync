@@ -257,6 +257,87 @@ func (c *Client) ListLog(ctx context.Context, deviceToken string, since *time.Ti
 	return out.Log, nil
 }
 
+// Database er én database registreret hos serveren (returneret af
+// /databases-endpoints).
+type Database struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+}
+
+// CreateDatabase registrerer en ny database hos serveren og returnerer den
+// server-genererede UUID (Database.ID). Navnet er fri-form 1-200 chars.
+func (c *Client) CreateDatabase(ctx context.Context, deviceToken, name string) (*Database, error) {
+	buf, err := json.Marshal(map[string]string{"name": name})
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost,
+		c.baseURL+"/api/v1/databases",
+		bytes.NewReader(buf),
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("post databases: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, parseError(resp)
+	}
+
+	var out struct {
+		Database Database `json:"database"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	if out.Database.ID == "" {
+		return nil, errors.New("server returned empty database id")
+	}
+	return &out.Database, nil
+}
+
+// ListDatabases returnerer alle databaser registreret hos serveren for den
+// bruger token'en hører til.
+func (c *Client) ListDatabases(ctx context.Context, deviceToken string) ([]Database, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/databases", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get databases: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+
+	var out struct {
+		Databases []Database `json:"databases"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out.Databases, nil
+}
+
 // parseError læser body og bygger en APIError. Hvis JSON-parsing fejler bruges
 // raw body som besked, så vi ikke skjuler nyttig diagnostik.
 func parseError(resp *http.Response) error {
