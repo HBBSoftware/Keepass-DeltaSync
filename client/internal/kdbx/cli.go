@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -73,27 +74,72 @@ func (c *CLI) Binary() string { return c.binary }
 // exit code with the cli's error on stderr.
 func (c *CLI) Export(ctx context.Context, kdbxPath string, password []byte) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, c.binary, "export", "-f", "xml", "-q", kdbxPath)
-
-	// keepassxc-cli reads the password as a single line from stdin in -q mode.
-	stdin := bytes.NewBuffer(append(password, '\n'))
-	cmd.Stdin = stdin
+	cmd.Stdin = bytes.NewBuffer(passwordLine(password, 1))
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Strip likely-trailing newline so the error reads cleanly.
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return nil, fmt.Errorf("keepassxc-cli export failed: %s", msg)
+		return nil, fmt.Errorf("keepassxc-cli export failed: %s", cliErrMsg(stderr, err))
 	}
-
-	xml := stdout.Bytes()
-	if len(xml) == 0 {
+	if stdout.Len() == 0 {
 		return nil, errors.New("keepassxc-cli export returned empty output")
 	}
-	return xml, nil
+	return stdout.Bytes(), nil
+}
+
+// Import runs `keepassxc-cli import -p -q <xml> <kdbx>` and creates a new kdbx
+// at kdbxPath from the given XML file. Password is set as the new kdbx's
+// password (passed twice on stdin: set + verify).
+func (c *CLI) Import(ctx context.Context, xmlPath, kdbxPath string, password []byte) error {
+	cmd := exec.CommandContext(ctx, c.binary, "import", "-p", "-q", xmlPath, kdbxPath)
+	cmd.Stdin = bytes.NewBuffer(passwordLine(password, 2))
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdout = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("keepassxc-cli import failed: %s", cliErrMsg(stderr, err))
+	}
+	return nil
+}
+
+// Merge runs `keepassxc-cli merge -s -q <target> <source>`. With -s
+// (--same-credentials) the same password is applied to both files. Merge
+// modifies target in-place; caller is responsible for backup/rollback.
+func (c *CLI) Merge(ctx context.Context, targetPath, sourcePath string, password []byte) error {
+	cmd := exec.CommandContext(ctx, c.binary, "merge", "-s", "-q", targetPath, sourcePath)
+	cmd.Stdin = bytes.NewBuffer(passwordLine(password, 1))
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdout = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("keepassxc-cli merge failed: %s", cliErrMsg(stderr, err))
+	}
+	return nil
+}
+
+// passwordLine repeats password (followed by newline) the given number of
+// times. keepassxc-cli prompts for password twice when it's *setting* a
+// new password (import -p), once when *opening* an existing kdbx.
+func passwordLine(password []byte, times int) []byte {
+	buf := make([]byte, 0, (len(password)+1)*times)
+	for i := 0; i < times; i++ {
+		buf = append(buf, password...)
+		buf = append(buf, '\n')
+	}
+	return buf
+}
+
+// cliErrMsg builds a clean error message from a captured stderr buffer,
+// falling back to the underlying exit-error message if stderr is empty.
+func cliErrMsg(stderr bytes.Buffer, err error) string {
+	if msg := strings.TrimSpace(stderr.String()); msg != "" {
+		return msg
+	}
+	return err.Error()
 }

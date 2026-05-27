@@ -16,6 +16,7 @@ Commands:
   enroll <enrollment-token>   Register this device with the server
   init <name> <local.kdbx>    Register a local .kdbx for syncing
   push <name>                 Upload all entries from a local .kdbx
+  pull <name>                 Fetch server entries and merge into local .kdbx
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
   databases                   List registered databases (local + server)
@@ -35,6 +36,8 @@ func main() {
 		exitOnError(runInit(os.Args[2:]))
 	case "push":
 		exitOnError(runPush(os.Args[2:]))
+	case "pull":
+		exitOnError(runPull(os.Args[2:]))
 	case "status":
 		exitOnError(runStatus(os.Args[2:]))
 	case "devices":
