@@ -40,6 +40,9 @@ func main() {
 		exitOnError(runDatabases(os.Args[2:]))
 	case "log":
 		exitOnError(runLog(os.Args[2:]))
+	case "sync-test":
+		// Skjult diagnostik-kommando. Slettes når full sync er færdig.
+		exitOnError(runSyncTest(os.Args[2:]))
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

@@ -7,6 +7,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -336,6 +337,220 @@ func (c *Client) ListDatabases(ctx context.Context, deviceToken string) ([]Datab
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return out.Databases, nil
+}
+
+// EntryChange er én række i GET /changes-svaret: nyeste version af en entry
+// med wire-format blob (base64-encoded nonce ‖ ciphertext).
+type EntryChange struct {
+	UUID              string `json:"uuid"`
+	Blob              string `json:"blob"`
+	ModifiedAt        string `json:"modified_at"`
+	Deleted           bool   `json:"deleted"`
+	Seq               int64  `json:"seq"`
+	AvailableVersions int    `json:"available_versions"`
+}
+
+// ChangesResponse er svaret fra GET /databases/{id}/changes.
+type ChangesResponse struct {
+	CurrentSeq int64         `json:"current_seq"`
+	Entries    []EntryChange `json:"entries"`
+}
+
+// GetChanges henter alle entry-versioner med server_seq > since. Serveren
+// returnerer kun nyeste version pr. entry; ældre versioner kræver separate
+// GetVersions/GetVersion-kald.
+func (c *Client) GetChanges(ctx context.Context, deviceToken, databaseID string, since int64) (*ChangesResponse, error) {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/changes?since=%d", c.baseURL, databaseID, since)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get changes: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out ChangesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out, nil
+}
+
+// EntryPutResponse er det server-svar PUT/DELETE returnerer for en entry.
+type EntryPutResponse struct {
+	UUID       string `json:"uuid"`
+	ModifiedAt string `json:"modified_at"`
+	Deleted    bool   `json:"deleted"`
+	Seq        int64  `json:"seq"`
+	CreatedAt  string `json:"created_at"`
+}
+
+// PutEntry uploader en ny entry-version. blob er den rå wire-format
+// (nonce ‖ ciphertext); klienten base64-encoder undervejs. modifiedAt er den
+// KeePass-side last-modified timestamp og må gerne være i fortiden.
+func (c *Client) PutEntry(ctx context.Context, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
+	return c.writeEntry(ctx, http.MethodPut, deviceToken, databaseID, entryUUID, blob, modifiedAt, true)
+}
+
+// DeleteEntry markerer entry'en som tombstone. Tæller som en ny version på
+// serveren. blob er typisk nil/tom (server accepterer manglende blob).
+func (c *Client) DeleteEntry(ctx context.Context, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
+	return c.writeEntry(ctx, http.MethodDelete, deviceToken, databaseID, entryUUID, blob, modifiedAt, false)
+}
+
+func (c *Client) writeEntry(ctx context.Context, method, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time, blobRequired bool) (*EntryPutResponse, error) {
+	body := map[string]any{
+		"modified_at": modifiedAt.UTC().Format("2006-01-02T15:04:05Z"),
+	}
+	if blob != nil {
+		body["blob"] = base64.StdEncoding.EncodeToString(blob)
+	} else if blobRequired {
+		return nil, errors.New("blob is required for PUT")
+	}
+
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	u := fmt.Sprintf("%s/api/v1/databases/%s/entries/%s", c.baseURL, databaseID, entryUUID)
+	req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(buf))
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s entry: %w", method, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+
+	var out struct {
+		Entry EntryPutResponse `json:"entry"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out.Entry, nil
+}
+
+// EntryVersion er én historisk version af en entry.
+type EntryVersion struct {
+	VersionNum int    `json:"version_num"`
+	ModifiedAt string `json:"modified_at"`
+	CreatedAt  string `json:"created_at"`
+	Deleted    bool   `json:"deleted"`
+	Blob       string `json:"blob"`
+}
+
+// GetVersions lister alle bevarede versioner (op til 3) af en entry, nyeste først.
+func (c *Client) GetVersions(ctx context.Context, deviceToken, databaseID, entryUUID string) ([]EntryVersion, error) {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/entries/%s/versions", c.baseURL, databaseID, entryUUID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get versions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out struct {
+		EntryUUID string         `json:"entry_uuid"`
+		Versions  []EntryVersion `json:"versions"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out.Versions, nil
+}
+
+// GetVersion henter én specifik version (num 1, 2 eller 3) af en entry.
+func (c *Client) GetVersion(ctx context.Context, deviceToken, databaseID, entryUUID string, num int) (*EntryVersion, error) {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/entries/%s/versions/%d", c.baseURL, databaseID, entryUUID, num)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get version: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out EntryVersion
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out, nil
+}
+
+// RestoreVersion ruller en gammel version frem som ny nyeste. Serveren bumper
+// server_seq og bevarer historik (modsat overwrite).
+type RestoreResponse struct {
+	UUID          string `json:"uuid"`
+	ModifiedAt    string `json:"modified_at"`
+	Deleted       bool   `json:"deleted"`
+	Seq           int64  `json:"seq"`
+	CreatedAt     string `json:"created_at"`
+	RestoredFrom  int    `json:"restored_from"`
+}
+
+func (c *Client) RestoreVersion(ctx context.Context, deviceToken, databaseID, entryUUID string, num int) (*RestoreResponse, error) {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/entries/%s/restore/%d", c.baseURL, databaseID, entryUUID, num)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("restore version: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out struct {
+		Entry RestoreResponse `json:"entry"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out.Entry, nil
+}
+
+// authJSON sætter standard-headers for autentificerede JSON-requests.
+func (c *Client) authJSON(req *http.Request, deviceToken string) {
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
 }
 
 // parseError læser body og bygger en APIError. Hvis JSON-parsing fejler bruges
