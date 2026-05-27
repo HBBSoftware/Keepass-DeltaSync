@@ -3,30 +3,22 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
-	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
-	"gitlab.com/Star95/keepass-deltasync/client/internal/crypto"
-	"gitlab.com/Star95/keepass-deltasync/client/internal/kdbx"
-	"gitlab.com/Star95/keepass-deltasync/client/internal/passwd"
 )
 
-// runPush eksporterer hele den lokale .kdbx via keepassxc-cli, krypterer hver
-// entry separat, og uploader dem som nye versioner. DeletedObjects i
-// .kdbx-filen sendes som DELETE-calls til serveren.
-//
-// V1 push-strategi: alle entries hver gang. Hver kørsel skaber nye versioner
-// på serveren — enklere end inkrementel push og umuligt at få desync.
+// runPush eksporterer den lokale .kdbx og uploader ALLE entries til serveren
+// (ingen since-filter — det er det der adskiller `push` fra `sync`). Bruges
+// til initial-sync af en eksisterende kdbx eller til force-resend efter
+// servertab.
 func runPush(args []string) error {
 	fs := flag.NewFlagSet("push", flag.ContinueOnError)
 	pwStdin := fs.Bool("password-stdin", false, "read masterpassword from stdin instead of interactive prompt")
-	cliPath := fs.String("keepassxc-cli", "", "path to keepassxc-cli binary (overrides auto-detection and $KEEPASSXC_CLI)")
+	cliPath := fs.String("keepassxc-cli", "", "path to keepassxc-cli binary (overrides auto-detection)")
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync push <name> [--password-stdin] [--keepassxc-cli PATH]")
 		fs.PrintDefaults()
@@ -43,87 +35,20 @@ func runPush(args []string) error {
 	}
 	name := fs.Arg(0)
 
-	cfg, err := config.Load()
+	env, err := setupEnv(name, *pwStdin, *cliPath, 5*time.Minute,
+		fmt.Sprintf("Masterpassword for %s: ", name))
 	if err != nil {
 		return err
 	}
-	if cfg.Server.URL == "" || cfg.Server.DeviceToken == "" {
-		return errors.New("not enrolled — run `keepass-deltasync enroll` first")
-	}
-	db := cfg.FindDatabase(name)
-	if db == nil {
-		return fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", name)
-	}
-	if _, err := os.Stat(db.LocalPath); err != nil {
-		return fmt.Errorf("local kdbx %s: %w", db.LocalPath, err)
-	}
+	defer env.cleanup()
 
-	cli, err := kdbx.NewCLI(*cliPath)
+	pushed, deleted, err := env.pushChanges(nil)
 	if err != nil {
 		return err
 	}
 
-	password, err := passwd.Read(fmt.Sprintf("Masterpassword for %s: ", name), *pwStdin)
-	if err != nil {
-		return err
-	}
-	defer passwd.Zero(password)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	fmt.Fprintln(os.Stderr, "Exporting kdbx via keepassxc-cli...")
-	xmlBytes, err := cli.Export(ctx, db.LocalPath, password)
-	if err != nil {
-		return err
-	}
-
-	entries, deletions, err := kdbx.ParseExport(xmlBytes)
-	if err != nil {
-		return fmt.Errorf("parse export: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "Found %d entries, %d deletions in kdbx.\n", len(entries), len(deletions))
-
-	fmt.Fprintln(os.Stderr, "Deriving master key (Argon2id, ~200ms)...")
-	masterKey, err := crypto.DeriveMasterKey(password, db.RemoteID)
-	if err != nil {
-		return fmt.Errorf("derive master key: %w", err)
-	}
-	defer passwd.Zero(masterKey)
-
-	entryKey, err := crypto.DeriveEntryKey(masterKey, db.RemoteID)
-	if err != nil {
-		return fmt.Errorf("derive entry key: %w", err)
-	}
-	defer passwd.Zero(entryKey)
-
-	client := api.New(cfg.Server.URL)
-
-	// PUT alle entries
-	pushed := 0
-	for _, e := range entries {
-		blob, err := crypto.EncryptBlob(entryKey, e.Fragment)
-		if err != nil {
-			return fmt.Errorf("encrypt entry %s: %w", e.UUID, err)
-		}
-		if _, err := client.PutEntry(ctx, cfg.Server.DeviceToken, db.RemoteID, e.UUID, blob, e.ModifiedAt); err != nil {
-			return fmt.Errorf("PUT entry %s: %w", e.UUID, err)
-		}
-		pushed++
-	}
-
-	// DELETE alle tombstones
-	deleted := 0
-	for _, d := range deletions {
-		if _, err := client.DeleteEntry(ctx, cfg.Server.DeviceToken, db.RemoteID, d.UUID, nil, d.DeletedAt); err != nil {
-			return fmt.Errorf("DELETE entry %s: %w", d.UUID, err)
-		}
-		deleted++
-	}
-
-	// Opdatér last_push i config
-	db.LastPush = time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	if err := config.Save(cfg); err != nil {
+	env.db.LastPush = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
