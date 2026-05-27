@@ -209,18 +209,20 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 // hvis den slet ikke er i map'en). Med force=true ignoreres map'en og alt
 // pushes (initial-sync / recovery use case).
 //
-// Efter hver succesfuld PUT/DELETE opdateres db.EntryStates så caller'en
-// kun behøver at gemme config én gang efter pushChanges returnerer.
-func (e *runEnv) pushChanges(force bool) (pushed, deleted int, err error) {
+// Returnerer også maxSeq — den højeste server_seq returneret af nogen PUT
+// eller DELETE i denne kørsel (0 hvis intet blev pushet). Caller'en kan
+// avancere db.LastSeq forbi denne værdi, så vores egne pushes ikke pulles
+// tilbage ved næste sync.
+func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err error) {
 	fmt.Fprintln(os.Stderr, "Exporting kdbx via keepassxc-cli...")
 	xmlBytes, err := e.cli.Export(e.ctx, e.db.LocalPath, e.password)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	entries, deletions, err := kdbx.ParseExport(xmlBytes)
 	if err != nil {
-		return 0, 0, fmt.Errorf("parse export: %w", err)
+		return 0, 0, 0, fmt.Errorf("parse export: %w", err)
 	}
 
 	if force {
@@ -235,10 +237,14 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, err error) {
 		}
 		blob, eerr := crypto.EncryptBlob(e.entryKey, en.Fragment)
 		if eerr != nil {
-			return pushed, deleted, fmt.Errorf("encrypt entry %s: %w", en.UUID, eerr)
+			return pushed, deleted, maxSeq, fmt.Errorf("encrypt entry %s: %w", en.UUID, eerr)
 		}
-		if _, perr := e.client.PutEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, en.UUID, blob, en.ModifiedAt); perr != nil {
-			return pushed, deleted, fmt.Errorf("PUT entry %s: %w", en.UUID, perr)
+		resp, perr := e.client.PutEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, en.UUID, blob, en.ModifiedAt)
+		if perr != nil {
+			return pushed, deleted, maxSeq, fmt.Errorf("PUT entry %s: %w", en.UUID, perr)
+		}
+		if resp.Seq > maxSeq {
+			maxSeq = resp.Seq
 		}
 		e.db.RecordEntryState(en.UUID, en.ModifiedAt.UTC().Format("2006-01-02T15:04:05Z"))
 		pushed++
@@ -248,14 +254,18 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, err error) {
 		if !force && !shouldPush(e.db.EntryStates, d.UUID, d.DeletedAt) {
 			continue
 		}
-		if _, derr := e.client.DeleteEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, d.UUID, nil, d.DeletedAt); derr != nil {
-			return pushed, deleted, fmt.Errorf("DELETE entry %s: %w", d.UUID, derr)
+		resp, derr := e.client.DeleteEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, d.UUID, nil, d.DeletedAt)
+		if derr != nil {
+			return pushed, deleted, maxSeq, fmt.Errorf("DELETE entry %s: %w", d.UUID, derr)
+		}
+		if resp.Seq > maxSeq {
+			maxSeq = resp.Seq
 		}
 		e.db.RecordEntryState(d.UUID, d.DeletedAt.UTC().Format("2006-01-02T15:04:05Z"))
 		deleted++
 	}
 
-	return pushed, deleted, nil
+	return pushed, deleted, maxSeq, nil
 }
 
 // shouldPush returnerer true hvis entry'en skal pushes til serveren — dvs.

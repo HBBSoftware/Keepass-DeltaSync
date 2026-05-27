@@ -47,11 +47,16 @@ func runPush(args []string) error {
 	}
 	defer env.cleanup()
 
-	pushed, deleted, err := env.pushChanges(*force)
+	pushed, deleted, maxSeq, err := env.pushChanges(*force)
 	if err != nil {
 		return err
 	}
 
+	// Avancér last_seq forbi vores egne pushes, så næste pull/sync ikke
+	// henter dem tilbage.
+	if maxSeq > env.db.LastSeq {
+		env.db.LastSeq = maxSeq
+	}
 	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}

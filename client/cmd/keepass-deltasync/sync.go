@@ -52,11 +52,16 @@ func runSync(args []string) error {
 		return err
 	}
 
-	pushed, deleted, err := env.pushChanges(false)
+	pushed, deleted, maxPushSeq, err := env.pushChanges(false)
 	if err != nil {
 		return err
 	}
 
+	// Avancér last_seq forbi det vi netop har pushet, så næste sync's pull
+	// ikke fetcher vores egne entries tilbage.
+	if maxPushSeq > newSeq {
+		newSeq = maxPushSeq
+	}
 	env.db.LastSeq = newSeq
 	if err := config.Save(env.cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
