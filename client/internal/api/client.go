@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -194,6 +196,65 @@ func (c *Client) ListDevices(ctx context.Context, deviceToken string) ([]DeviceL
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return out.Devices, nil
+}
+
+// LogEntry er én række i den autentificerede brugers audit-log.
+// `Details` er fri-form JSON og afhænger af event_type — gemmes raw så
+// klienten kan vise det uden at kende alle skemaer.
+type LogEntry struct {
+	OccurredAt string          `json:"occurred_at"`
+	Level      string          `json:"level"`
+	EventType  string          `json:"event_type"`
+	IPAddress  string          `json:"ip_address"`
+	UserAgent  string          `json:"user_agent"`
+	DatabaseID *string         `json:"database_id"`
+	EntryUUID  *string         `json:"entry_uuid"`
+	Details    json.RawMessage `json:"details"`
+	Success    bool            `json:"success"`
+}
+
+// ListLog kalder GET /api/v1/log med valgfri since-tid og limit. since er
+// null hvis intet filter ønskes; serveren accepterer ISO 8601 med tidszone.
+// limit clampes server-side til [1, 200] med default 50.
+func (c *Client) ListLog(ctx context.Context, deviceToken string, since *time.Time, limit int) ([]LogEntry, error) {
+	u := c.baseURL + "/api/v1/log"
+	q := url.Values{}
+	if since != nil {
+		q.Set("since", since.UTC().Format("2006-01-02T15:04:05Z"))
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if enc := q.Encode(); enc != "" {
+		u += "?" + enc
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get log: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+
+	var out struct {
+		Log   []LogEntry `json:"log"`
+		Count int        `json:"count"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out.Log, nil
 }
 
 // parseError læser body og bygger en APIError. Hvis JSON-parsing fejler bruges

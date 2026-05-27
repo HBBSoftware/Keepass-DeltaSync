@@ -16,6 +16,7 @@ Commands:
   enroll <enrollment-token>   Register this device with the server
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
+  log                         Show this user's recent audit-log activity
 `
 
 func main() {
@@ -31,6 +32,8 @@ func main() {
 		exitOnError(runStatus(os.Args[2:]))
 	case "devices":
 		exitOnError(runDevices(os.Args[2:]))
+	case "log":
+		exitOnError(runLog(os.Args[2:]))
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
