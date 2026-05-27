@@ -1,0 +1,22 @@
+# Route alle requests til index.php hvis der ikke findes en konkret fil/dir.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bevar Authorization-headeren — nogle FastCGI-opsætninger stripper den ellers.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Skjul dotfiles (sikkerhed: forhindrer adgang til evt. .env, .git osv.)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Forbyd direkte adgang til bootstrap.php og config-mappen, hvis de skulle ende i public/ ved et uheld.
+<FilesMatch "(?i)^(bootstrap\.php|composer\.(json|lock))$">
+    Require all denied
+</FilesMatch>
