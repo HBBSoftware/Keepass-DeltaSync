@@ -14,6 +14,7 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/crypto"
+	"gitlab.com/Star95/keepass-deltasync/client/internal/keyring"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/passwd"
 )
 
@@ -90,9 +91,15 @@ func runShare(args []string) error {
 	}
 
 	// Deriver master_key fra masterpassword. Argon2id ~200ms.
-	password, err := passwd.Read(fmt.Sprintf("Masterpassword for %s: ", dbName), *pwStdin)
-	if err != nil {
-		return err
+	// Tjek OS-keyring først (samme convention som daemon-mode), fall back til prompt.
+	password, kerr := keyring.Get(db.RemoteID)
+	if kerr != nil {
+		password, err = passwd.Read(fmt.Sprintf("Masterpassword for %s: ", dbName), *pwStdin)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[%s] masterpassword loaded from OS keyring.\n", dbName)
 	}
 	defer passwd.Zero(password)
 

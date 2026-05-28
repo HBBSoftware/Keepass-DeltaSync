@@ -29,6 +29,7 @@ Commands:
   devices                     List all enrolled devices for this user
   databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
+  admin <subcommand>          Admin commands (token-sql, user-create, user-list, ...)
 `
 
 func main() {
@@ -70,6 +71,8 @@ func main() {
 		exitOnError(runDatabases(os.Args[2:]))
 	case "log":
 		exitOnError(runLog(os.Args[2:]))
+	case "admin":
+		exitOnError(runAdmin(os.Args[2:]))
 	case "sync-test":
 		// Skjult diagnostik-kommando. Slettes når full sync er færdig.
 		exitOnError(runSyncTest(os.Args[2:]))

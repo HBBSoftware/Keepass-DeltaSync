@@ -9,4 +9,7 @@
 Thumbs.db
 desktop.ini
 
+# Test scratch (Bob-config + vault for v2-sharing live-tests)
+.test/
+
 # Build / language-specifikt sniges ind via komponent-mappers egne .gitignore
