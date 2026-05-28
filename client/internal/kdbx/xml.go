@@ -9,8 +9,15 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
+
+// nullKdbxUUID er KeePassXC's repræsentation af "ingen UUID" (16 null-bytes
+// base64-encoded). Bruges som sentinel for RecycleBinUUID når recycle bin
+// endnu ikke er materialiseret — den bliver først rigtig UUID efter første
+// gang en entry sendes til Papirkurv.
+const nullKdbxUUID = "AAAAAAAAAAAAAAAAAAAAAA=="
 
 // kdbx4EpochToUnixOffset er antal sekunder fra 0001-01-01 UTC til Unix-
 // epoken (1970-01-01). KDBX4-timestamps er int64 sekunder fra 0001-01-01,
@@ -54,18 +61,29 @@ func RootGroupUUID(xmlBytes []byte) (string, error) {
 // ParseExport tager en keepassxc-cli export-XML og udtrækker alle entries og
 // deletions. Entries i <History>-undertræer ignoreres — det er entry'ens egen
 // version-historik som serveren håndterer separat.
+//
+// Entries der ligger i recycle-bin-gruppen (matches via <Meta><RecycleBinUUID>)
+// behandles som synthetic deletions med DeletedAt = entry'ens
+// <LocationChanged>. Det betyder at "delete i KeePassXC GUI" propagerer som
+// faktisk sletning til andre enheder, selv om brugeren ikke har "Empty Recycle
+// Bin" først. Trade-off: undelete (flyt entry tilbage ud af Papirkurv) virker
+// ikke på tværs af enheder — entry'en er allerede slettet på server. Hvis
+// recycle-bin er deaktiveret eller endnu ikke materialiseret
+// (RecycleBinUUID = null), gør synthesis intet.
 func ParseExport(xmlBytes []byte) ([]Entry, []Deletion, error) {
 	var doc kdbxFile
 	if err := xml.Unmarshal(xmlBytes, &doc); err != nil {
 		return nil, nil, fmt.Errorf("parse kdbx xml: %w", err)
 	}
 
+	recycleBinUUID := activeRecycleBinUUID(doc.Meta)
+
 	var entries []Entry
-	if err := collectEntries(&doc.Root.Group, &entries); err != nil {
+	deletions := make([]Deletion, 0, len(doc.Root.DeletedObjects.Objects))
+	if err := collectEntries(&doc.Root.Group, recycleBinUUID, &entries, &deletions); err != nil {
 		return nil, nil, err
 	}
 
-	deletions := make([]Deletion, 0, len(doc.Root.DeletedObjects.Objects))
 	for _, d := range doc.Root.DeletedObjects.Objects {
 		uuid, err := decodeUUID(d.UUID)
 		if err != nil {
@@ -81,27 +99,58 @@ func ParseExport(xmlBytes []byte) ([]Entry, []Deletion, error) {
 	return entries, deletions, nil
 }
 
-// collectEntries walks groups recursively, collecting entries at every level.
-// Nested <Entry> elements inside <History> are NOT visited — they live inside
-// each Entry's InnerXML and stay there.
-func collectEntries(g *group, out *[]Entry) error {
+// activeRecycleBinUUID returnerer recycle-bin-gruppens UUID i base64-form
+// hvis recycle bin er enabled OG en gruppe faktisk er udpeget. Returnerer ""
+// hvis ingen synthesis skal foretages.
+func activeRecycleBinUUID(m meta) string {
+	if !strings.EqualFold(strings.TrimSpace(m.RecycleBinEnabled), "True") {
+		return ""
+	}
+	if m.RecycleBinUUID == "" || m.RecycleBinUUID == nullKdbxUUID {
+		return ""
+	}
+	return m.RecycleBinUUID
+}
+
+// collectEntries walks groups recursively. Entries i gruppen med UUID
+// recycleBinUUID synthesizes som Deletion i stedet for at lande i entries-
+// listen. Entries inde i <History>-undertræer besøges ikke — de lever som
+// raw InnerXML på hver parent-entry.
+func collectEntries(g *group, recycleBinUUID string, entries *[]Entry, deletions *[]Deletion) error {
+	inRecycleBin := recycleBinUUID != "" && g.UUID == recycleBinUUID
 	for _, e := range g.Entries {
 		uuid, err := decodeUUID(e.UUID)
 		if err != nil {
 			return fmt.Errorf("entry uuid: %w", err)
 		}
+		if inRecycleBin {
+			// LocationChanged er tidspunktet hvor entry blev flyttet ind i
+			// recycle bin — semantisk det rigtige "delete-tidspunkt". Fallback
+			// til LastModificationTime hvis LocationChanged er tom (ældre
+			// databaser eller corner cases).
+			ts := e.Times.LocationChanged
+			if ts == "" {
+				ts = e.Times.LastModificationTime
+			}
+			t, err := parseKdbxTime(ts)
+			if err != nil {
+				return fmt.Errorf("recycle-bin deletion-time for entry %s: %w", uuid, err)
+			}
+			*deletions = append(*deletions, Deletion{UUID: uuid, DeletedAt: t})
+			continue
+		}
 		t, err := parseKdbxTime(e.Times.LastModificationTime)
 		if err != nil {
 			return fmt.Errorf("modified-time for entry %s: %w", uuid, err)
 		}
-		*out = append(*out, Entry{
+		*entries = append(*entries, Entry{
 			UUID:       uuid,
 			ModifiedAt: t,
 			Fragment:   []byte(e.InnerXML),
 		})
 	}
 	for i := range g.Groups {
-		if err := collectEntries(&g.Groups[i], out); err != nil {
+		if err := collectEntries(&g.Groups[i], recycleBinUUID, entries, deletions); err != nil {
 			return err
 		}
 	}
@@ -160,12 +209,18 @@ func parseKdbxTime(s string) (time.Time, error) {
 
 type kdbxFile struct {
 	XMLName xml.Name `xml:"KeePassFile"`
+	Meta    meta     `xml:"Meta"`
 	Root    root     `xml:"Root"`
 }
 
+type meta struct {
+	RecycleBinEnabled string `xml:"RecycleBinEnabled"` // "True"/"False"
+	RecycleBinUUID    string `xml:"RecycleBinUUID"`    // base64-encoded 16-byte UUID, nullKdbxUUID hvis ikke materialiseret
+}
+
 type root struct {
-	Group          group           `xml:"Group"`
-	DeletedObjects deletedObjects  `xml:"DeletedObjects"`
+	Group          group          `xml:"Group"`
+	DeletedObjects deletedObjects `xml:"DeletedObjects"`
 }
 
 type group struct {
@@ -182,6 +237,7 @@ type entry struct {
 
 type entryTimes struct {
 	LastModificationTime string `xml:"LastModificationTime"`
+	LocationChanged      string `xml:"LocationChanged"`
 }
 
 type deletedObjects struct {

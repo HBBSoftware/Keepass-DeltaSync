@@ -58,6 +58,122 @@ func TestParseKdbxTime_BadInput(t *testing.T) {
 	}
 }
 
+// recycleBinXML builder en minimal KeePassFile-XML med konfigurerbar Meta og
+// to entries — én i recycle bin, én i Root. Bruges af recycle-bin-testene.
+func recycleBinXML(recycleEnabled, recycleUUID string) string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<KeePassFile>
+  <Meta>
+    <RecycleBinEnabled>` + recycleEnabled + `</RecycleBinEnabled>
+    <RecycleBinUUID>` + recycleUUID + `</RecycleBinUUID>
+  </Meta>
+  <Root>
+    <Group>
+      <UUID>2w8iR46R3u2YWzT0zjtpA==</UUID>
+      <Name>Root</Name>
+      <Entry>
+        <UUID>AAECAwQFBgcICQoLDA0ODw==</UUID>
+        <Times>
+          <LastModificationTime>2026-05-28T10:00:00Z</LastModificationTime>
+          <LocationChanged>2026-05-28T10:00:00Z</LocationChanged>
+        </Times>
+        <String>
+          <Key>Title</Key>
+          <Value>alive</Value>
+        </String>
+      </Entry>
+      <Group>
+        <UUID>p06hnoEmTfeRpUWM1a14cw==</UUID>
+        <Name>Papirkurv</Name>
+        <Entry>
+          <UUID>EBESExQVFhcYGRobHB0eHw==</UUID>
+          <Times>
+            <LastModificationTime>2026-05-28T11:00:00Z</LastModificationTime>
+            <LocationChanged>2026-05-28T11:30:00Z</LocationChanged>
+          </Times>
+          <String>
+            <Key>Title</Key>
+            <Value>trashed</Value>
+          </String>
+        </Entry>
+      </Group>
+    </Group>
+    <DeletedObjects/>
+  </Root>
+</KeePassFile>`
+}
+
+func TestParseExport_RecycleBinSynthesizesDeletion(t *testing.T) {
+	xml := recycleBinXML("True", "p06hnoEmTfeRpUWM1a14cw==")
+	entries, deletions, err := ParseExport([]byte(xml))
+	if err != nil {
+		t.Fatalf("ParseExport: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 live entry, got %d", len(entries))
+	}
+	if len(deletions) != 1 {
+		t.Fatalf("expected 1 synthetic deletion, got %d", len(deletions))
+	}
+	// Den trashede entry skal være den synthetic deletion.
+	wantTrashedUUID := "10111213-1415-1617-1819-1a1b1c1d1e1f"
+	if deletions[0].UUID != wantTrashedUUID {
+		t.Fatalf("deletion uuid = %q, want %q", deletions[0].UUID, wantTrashedUUID)
+	}
+	// DeletedAt skal være LocationChanged (11:30), ikke LastModificationTime (11:00).
+	wantDeletedAt := time.Date(2026, 5, 28, 11, 30, 0, 0, time.UTC)
+	if !deletions[0].DeletedAt.Equal(wantDeletedAt) {
+		t.Fatalf("DeletedAt = %v, want %v (should be LocationChanged, not LastModificationTime)", deletions[0].DeletedAt, wantDeletedAt)
+	}
+}
+
+func TestParseExport_RecycleBinDisabledNoSynthesis(t *testing.T) {
+	xml := recycleBinXML("False", "p06hnoEmTfeRpUWM1a14cw==")
+	entries, deletions, err := ParseExport([]byte(xml))
+	if err != nil {
+		t.Fatalf("ParseExport: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries when recycle bin disabled (no synthesis), got %d", len(entries))
+	}
+	if len(deletions) != 0 {
+		t.Fatalf("expected 0 deletions, got %d", len(deletions))
+	}
+}
+
+func TestParseExport_NullRecycleBinUUIDNoSynthesis(t *testing.T) {
+	// Recycle bin enabled, men UUID er null-sentinel — gruppen er aldrig
+	// blevet materialiseret, så ingen entries er i den. Vi må ikke
+	// uagtsomt klassificere noget som slettet.
+	xml := recycleBinXML("True", nullKdbxUUID)
+	entries, deletions, err := ParseExport([]byte(xml))
+	if err != nil {
+		t.Fatalf("ParseExport: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries when RecycleBinUUID is null, got %d", len(entries))
+	}
+	if len(deletions) != 0 {
+		t.Fatalf("expected 0 deletions, got %d", len(deletions))
+	}
+}
+
+func TestParseExport_RecycleBinUUIDMustMatchNotJustName(t *testing.T) {
+	// Gruppe hedder "Papirkurv" men har et ANDET UUID end RecycleBinUUID.
+	// Vi må kun synthesize på UUID-match — ikke navne-match.
+	xml := recycleBinXML("True", "deadbeefdeadbeefdeadbeefdead==")
+	entries, deletions, err := ParseExport([]byte(xml))
+	if err != nil {
+		t.Fatalf("ParseExport: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries when RecycleBinUUID doesn't match group, got %d", len(entries))
+	}
+	if len(deletions) != 0 {
+		t.Fatalf("expected 0 deletions, got %d", len(deletions))
+	}
+}
+
 // stdBase64Encode is a tiny inline helper to avoid pulling in encoding/base64
 // at the top of the test file when this is the only use.
 func stdBase64Encode(b []byte) string {
