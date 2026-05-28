@@ -7,6 +7,13 @@ import (
 	"os"
 )
 
+// version sættes ved release-build via ldflags:
+//
+//	go build -ldflags="-X main.version=v1.0.0" ./cmd/keepass-deltasync
+//
+// Default-værdien "dev" angiver en lokal build (uden tag).
+var version = "dev"
+
 const usage = `keepass-deltasync — sync KeePass databases via a Delta-Sync server.
 
 Usage:
@@ -78,6 +85,8 @@ func main() {
 		exitOnError(runSyncTest(os.Args[2:]))
 	case "-h", "--help", "help":
 		fmt.Print(usage)
+	case "-v", "--version", "version":
+		fmt.Printf("keepass-deltasync %s\n", version)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n%s", os.Args[1], usage)
 		os.Exit(2)

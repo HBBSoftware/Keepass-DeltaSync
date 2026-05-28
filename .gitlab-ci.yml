@@ -1,0 +1,129 @@
+# GitLab CI/CD pipeline for keepass-deltasync.
+#
+# Stages:
+#   - test:    runs `go vet` + `go test` on every commit and MR
+#   - build:   cross-compiles client binaries for 4 platforms — only on
+#              git tags matching vX.Y.Z (semver)
+#   - release: publishes a GitLab Release with download links — same gate
+#
+# To cut a new release:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# The release page shows up at
+#   https://gitlab.com/Star95/keepass-deltasync/-/releases
+
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  GO_VERSION: "1.22"
+
+# ----------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------
+
+test:client:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
+  before_script:
+    - cd client
+  script:
+    - go vet ./...
+    - go test ./...
+
+# ----------------------------------------------------------------------
+# Cross-compile binaries (only on git tags vX.Y.Z)
+# ----------------------------------------------------------------------
+
+build:client:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  before_script:
+    - apk add --no-cache tar gzip zip coreutils
+  script:
+    - mkdir -p dist
+    - |
+      set -eu
+      TARGETS="linux/amd64 darwin/amd64 darwin/arm64 windows/amd64"
+      for t in $TARGETS; do
+        GOOS="${t%/*}"
+        GOARCH="${t#*/}"
+        EXT=""
+        ARCHIVE_EXT="tar.gz"
+        if [ "$GOOS" = "windows" ]; then
+          EXT=".exe"
+          ARCHIVE_EXT="zip"
+        fi
+        STAGE_DIR="dist/keepass-deltasync-${CI_COMMIT_TAG}-${GOOS}-${GOARCH}"
+        mkdir -p "$STAGE_DIR"
+        echo "==> Building $GOOS/$GOARCH"
+        ( cd client && \
+          GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${CI_COMMIT_TAG}" \
+            -o "../${STAGE_DIR}/keepass-deltasync${EXT}" \
+            ./cmd/keepass-deltasync )
+        cp README.md "$STAGE_DIR/" 2>/dev/null || true
+        cp client/README.md "$STAGE_DIR/CLIENT-README.md" 2>/dev/null || true
+        cp LICENSE "$STAGE_DIR/" 2>/dev/null || true
+        ARCHIVE="dist/keepass-deltasync-${CI_COMMIT_TAG}-${GOOS}-${GOARCH}.${ARCHIVE_EXT}"
+        if [ "$ARCHIVE_EXT" = "zip" ]; then
+          ( cd dist && zip -qr "$(basename "$ARCHIVE")" "$(basename "$STAGE_DIR")" )
+        else
+          tar czf "$ARCHIVE" -C dist "$(basename "$STAGE_DIR")"
+        fi
+        rm -rf "$STAGE_DIR"
+        echo "    → $ARCHIVE"
+      done
+    - cd dist && sha256sum *.tar.gz *.zip > SHA256SUMS && cat SHA256SUMS
+  artifacts:
+    name: "keepass-deltasync-${CI_COMMIT_TAG}"
+    paths:
+      - dist/*.tar.gz
+      - dist/*.zip
+      - dist/SHA256SUMS
+    expire_in: never
+
+# ----------------------------------------------------------------------
+# Publish GitLab Release
+# ----------------------------------------------------------------------
+
+release:client:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - job: build:client
+      artifacts: true
+  script:
+    - echo "Creating release ${CI_COMMIT_TAG}"
+  release:
+    name: 'keepass-deltasync ${CI_COMMIT_TAG}'
+    description: |
+      Pre-built keepass-deltasync client binaries for ${CI_COMMIT_TAG}.
+
+      Verify integrity with SHA256SUMS. Build from source: see README.md.
+    tag_name: '${CI_COMMIT_TAG}'
+    assets:
+      links:
+        - name: 'Linux (amd64) — .tar.gz'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/keepass-deltasync-${CI_COMMIT_TAG}-linux-amd64.tar.gz?job=build:client'
+          link_type: 'package'
+        - name: 'macOS Intel (amd64) — .tar.gz'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/keepass-deltasync-${CI_COMMIT_TAG}-darwin-amd64.tar.gz?job=build:client'
+          link_type: 'package'
+        - name: 'macOS Apple Silicon (arm64) — .tar.gz'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/keepass-deltasync-${CI_COMMIT_TAG}-darwin-arm64.tar.gz?job=build:client'
+          link_type: 'package'
+        - name: 'Windows (amd64) — .zip'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/keepass-deltasync-${CI_COMMIT_TAG}-windows-amd64.zip?job=build:client'
+          link_type: 'package'
+        - name: 'SHA256SUMS'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/dist/SHA256SUMS?job=build:client'
+          link_type: 'other'

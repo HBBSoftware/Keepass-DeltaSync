@@ -6,6 +6,8 @@ Filformatet (.kdbx) ændres ikke. Synkronisering sker via en let server der kun 
 
 🌐 **Hjemmeside:** [https://deltasync.bjoerck-braun.dk/](https://deltasync.bjoerck-braun.dk/) — visuel introduktion, arkitektur-diagrammer og bruger-guide.
 
+📦 **Pre-built klient-binærer:** [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — download for din OS (Linux/macOS/Windows), ingen Go-installation nødvendig.
+
 📚 **Detaljer:** [`docs/`](docs/) — threat-model, concurrent-write-semantik, deployment-recipes. Fuld specifikation i [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md).
 
 ## Struktur
@@ -37,10 +39,16 @@ Se [`server/README.md`](server/README.md) for deployment. Skema-migrationer i [`
 
 ### Som første-gangs-bruger (klient-side)
 
-```sh
-# Bygg klient
-cd client && go build -o keepass-deltasync ./cmd/keepass-deltasync
+**Option A: Download præ-bygget binær** fra [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — vælg din OS, udpak, og brug binæren direkte. Ingen Go-installation.
 
+**Option B: Byg selv fra source** (kræver Go 1.22+):
+```sh
+cd client && go build -o keepass-deltasync ./cmd/keepass-deltasync
+```
+
+Derefter (begge options):
+
+```sh
 # Administrator har givet dig en enrollment-token
 ./keepass-deltasync enroll --server https://your-server.example.com <token>
 
