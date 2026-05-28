@@ -127,6 +127,54 @@ func TestWrapKey_RejectsWrongSizedPublicKey(t *testing.T) {
 	}
 }
 
+func TestPublicKeyFromPrivate_RoundTrip(t *testing.T) {
+	// Generér et keypair, drop public, prøv at udlede public fra private,
+	// verificér at det er samme bytes.
+	pub, priv, err := GenerateBoxKeypair()
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	derived, err := PublicKeyFromPrivate(priv)
+	if err != nil {
+		t.Fatalf("PublicKeyFromPrivate: %v", err)
+	}
+	if !bytes.Equal(derived, pub) {
+		t.Fatalf("derived public key mismatch: got %x, want %x", derived, pub)
+	}
+}
+
+func TestPublicKeyFromPrivate_UnwrapWithDerivedPub(t *testing.T) {
+	// Realistisk use case: vi har kun gemt private-key, men UnwrapKey
+	// kræver begge. Skal kunne unwrappe en sealed-box ved at udlede
+	// public fra private.
+	_, priv, err := GenerateBoxKeypair()
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	derivedPub, err := PublicKeyFromPrivate(priv)
+	if err != nil {
+		t.Fatalf("derive pub: %v", err)
+	}
+	plaintext := []byte("shared-master-key-bytes-for-test")
+	sealed, err := WrapKey(plaintext, derivedPub)
+	if err != nil {
+		t.Fatalf("wrap: %v", err)
+	}
+	out, err := UnwrapKey(sealed, derivedPub, priv)
+	if err != nil {
+		t.Fatalf("unwrap: %v", err)
+	}
+	if !bytes.Equal(out, plaintext) {
+		t.Fatalf("round-trip mismatch: got %x, want %x", out, plaintext)
+	}
+}
+
+func TestPublicKeyFromPrivate_RejectsWrongSize(t *testing.T) {
+	if _, err := PublicKeyFromPrivate(make([]byte, 31)); err == nil {
+		t.Fatal("accepted 31-byte private key, should reject")
+	}
+}
+
 func TestUnwrapKey_RejectsWrongSizedKeys(t *testing.T) {
 	pub, priv, _ := GenerateBoxKeypair()
 	sealed, _ := WrapKey([]byte("x"), pub)

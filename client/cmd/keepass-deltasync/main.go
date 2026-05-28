@@ -15,6 +15,7 @@ Usage:
 Commands:
   enroll <enrollment-token>   Register this device with the server
   init <name> <local.kdbx>    Register a local .kdbx for syncing
+  init-shared <remote> <path> Bootstrap a local .kdbx for a database shared with you
   push <name>                 Upload all entries from a local .kdbx
   pull <name>                 Fetch server entries and merge into local .kdbx
   sync <name>                 Pull, then push entries modified since last sync
@@ -41,6 +42,8 @@ func main() {
 		exitOnError(runEnroll(os.Args[2:]))
 	case "init":
 		exitOnError(runInit(os.Args[2:]))
+	case "init-shared":
+		exitOnError(runInitShared(os.Args[2:]))
 	case "push":
 		exitOnError(runPush(os.Args[2:]))
 	case "pull":

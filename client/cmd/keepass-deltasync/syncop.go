@@ -68,15 +68,27 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 	if err != nil {
 		return nil, err
 	}
+	client := api.New(cfg.Server.URL)
 
 	// Auto-upgrade legacy enheder (enrolled før v2) med X25519 keypair før
 	// vi prompter for password. På den måde får brugeren ikke skrevet sit
 	// masterpassword forgæves hvis netværket er nede.
 	upgradeCtx, upgradeCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	upErr := ensureDevicePublicKey(upgradeCtx, cfg, api.New(cfg.Server.URL))
+	upErr := ensureDevicePublicKey(upgradeCtx, cfg, client)
 	upgradeCancel()
 	if upErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: auto-upgrade of device keypair failed (%v) — sharing features will not work until fixed\n", upErr)
+	}
+
+	// Slå role + wrapped_master_key op for denne database. For members
+	// bruges wrapped_master_key til at unwrappe master_key i stedet for at
+	// derivere fra password. Vi gør det FØR password-prompt så netværksfejl
+	// ikke spilder brugerens tastearbejde.
+	roleCtx, roleCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	serverDB, err := findServerDatabase(roleCtx, client, cfg.Server.DeviceToken, db.RemoteID)
+	roleCancel()
+	if err != nil {
+		return nil, fmt.Errorf("lookup db role: %w", err)
 	}
 
 	password, err := passwd.Read(prompt, pwStdin)
@@ -84,7 +96,7 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 		return nil, err
 	}
 
-	masterKey, entryKey, err := deriveKeys(password, db.RemoteID)
+	masterKey, entryKey, err := resolveMasterEntryKeys(password, serverDB.Role, db.RemoteID, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
 	if err != nil {
 		passwd.Zero(password)
 		return nil, err
@@ -93,6 +105,62 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 	env := newRunEnvBorrowed(context.Background(), cfg, db, cli, password, masterKey, entryKey, timeout)
 	env.ownsKeys = true
 	return env, nil
+}
+
+// findServerDatabase finder en database i serverens database-liste på remote_id.
+// Bruges af setupEnv (og daemon) til at hente role + wrapped_master_key for en
+// kendt lokal binding. Hvis serveren ikke har den (slettet, eller share blev
+// trukket tilbage), returneres en klar fejl.
+func findServerDatabase(ctx context.Context, client *api.Client, deviceToken, remoteID string) (*api.Database, error) {
+	dbs, err := client.ListDatabases(ctx, deviceToken)
+	if err != nil {
+		return nil, fmt.Errorf("list databases: %w", err)
+	}
+	for i := range dbs {
+		if dbs[i].ID == remoteID {
+			return &dbs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("database %s not found on server (deleted, or you lost access)", remoteID)
+}
+
+// resolveMasterEntryKeys returnerer entry-kryptering-keys for en database
+// baseret pa rolle. For owners: Argon2id(password). For members: unwrap
+// wrapped_master_key med device-keypair. Caller ejer det returnerede
+// keymateriale og skal zero det.
+//
+// password er det LOKALE kdbx-password (til keepassxc-cli). For owners er
+// det også masterpassword'et til Argon2id-derivation; for members er det
+// uafhængigt — Bob har valgt sit eget password til sin lokale kopi.
+func resolveMasterEntryKeys(password []byte, role, remoteID string, wrappedKeyB64 *string, devicePriv []byte) (masterKey, entryKey []byte, err error) {
+	if role == "member" {
+		if wrappedKeyB64 == nil {
+			return nil, nil, errors.New("server reports member role but wrapped_master_key is missing — owner must re-share")
+		}
+		if len(devicePriv) == 0 {
+			return nil, nil, errors.New("device private key not in config — re-enroll or run any other command first to auto-upgrade")
+		}
+		wrapped, err := base64.StdEncoding.DecodeString(*wrappedKeyB64)
+		if err != nil {
+			return nil, nil, fmt.Errorf("decode wrapped key: %w", err)
+		}
+		pub, err := crypto.PublicKeyFromPrivate(devicePriv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("derive device public key: %w", err)
+		}
+		masterKey, err = crypto.UnwrapKey(wrapped, pub, devicePriv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unwrap master key: %w", err)
+		}
+		entryKey, err = crypto.DeriveEntryKey(masterKey, remoteID)
+		if err != nil {
+			passwd.Zero(masterKey)
+			return nil, nil, fmt.Errorf("derive entry key: %w", err)
+		}
+		return masterKey, entryKey, nil
+	}
+	// owner (eller pre-v2 server der ikke har role).
+	return deriveKeys(password, remoteID)
 }
 
 // loadDBAndCLI udfører den ikke-hemmelighedsbærende del af setup: config-load,

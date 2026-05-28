@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -51,6 +52,25 @@ func WrapKey(plaintext, recipientPublicKey []byte) ([]byte, error) {
 		return nil, fmt.Errorf("seal anonymous: %w", err)
 	}
 	return sealed, nil
+}
+
+// PublicKeyFromPrivate udleder X25519 public-key'en der svarer til et givet
+// private-key. Bruges når vi har gemt vores private-key i config og skal
+// rekonstruere public til UnwrapKey (sealed-box's OpenAnonymous kræver
+// begge dele af keypair'et).
+//
+// Operationen er scalar multiplication af private mod curve25519 basepoint
+// — samme operation som box.GenerateKey udfører efter at have valgt en
+// random scalar.
+func PublicKeyFromPrivate(privateKey []byte) ([]byte, error) {
+	if len(privateKey) != BoxPrivateKeySize {
+		return nil, fmt.Errorf("private key must be %d bytes, got %d", BoxPrivateKeySize, len(privateKey))
+	}
+	pub, err := curve25519.X25519(privateKey, curve25519.Basepoint)
+	if err != nil {
+		return nil, fmt.Errorf("derive public key: %w", err)
+	}
+	return pub, nil
 }
 
 // UnwrapKey åbner en sealed-box krypteret med vores public-key. Hvis ciphertext

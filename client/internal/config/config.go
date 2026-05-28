@@ -126,7 +126,14 @@ func (c *Config) AddDatabase(db Database) {
 }
 
 // Path returnerer den fulde sti til config-filen. Mappen oprettes ikke her.
+//
+// $KEEPASS_DELTASYNC_CONFIG overrider hele stien — bruges til at køre flere
+// brugeres klienter parallelt på samme maskine (test- og delings-scenarier).
+// Værdien skal være den fulde sti til config.toml-filen, ikke kun mappen.
 func Path() (string, error) {
+	if override := os.Getenv("KEEPASS_DELTASYNC_CONFIG"); override != "" {
+		return override, nil
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("locate user config dir: %w", err)

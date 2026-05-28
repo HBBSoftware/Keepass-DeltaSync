@@ -113,6 +113,21 @@ func TestServer_LegacyConfigLoadsWithoutKey(t *testing.T) {
 	}
 }
 
+// TestPath_EnvOverride verificerer at KEEPASS_DELTASYNC_CONFIG overrider
+// hele config-stien — kritisk for parallelle test-klienter på samme maskine.
+func TestPath_EnvOverride(t *testing.T) {
+	custom := filepath.Join(t.TempDir(), "my-custom.toml")
+	t.Setenv("KEEPASS_DELTASYNC_CONFIG", custom)
+
+	got, err := Path()
+	if err != nil {
+		t.Fatalf("Path: %v", err)
+	}
+	if got != custom {
+		t.Fatalf("Path() = %q, want %q", got, custom)
+	}
+}
+
 func writeLegacyConfig(t *testing.T, path string) error {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

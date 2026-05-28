@@ -235,8 +235,13 @@ func (w *dbWorker) zeroKeys() {
 }
 
 // setupDaemonWorkers løser passwords for alle valgte databaser via keyring
-// eller prompt, deriverer keys, og bygger workers. Returnerer workers
-// undervejs så caller'en kan zero dem hvis setup fejler midtvejs.
+// eller prompt, deriverer keys (eller unwrap'er for members), og bygger
+// workers. Returnerer workers undervejs så caller'en kan zero dem hvis setup
+// fejler midtvejs.
+//
+// role + wrapped_master_key fetches én gang ved daemon-startup. Hvis Alice
+// re-share'r mid-run (rotation af wrapped_master_key), kræves daemon-restart
+// for at picke den nye key.
 func setupDaemonWorkers(cfg *config.Config, dbs []*config.Database, cliPath string, pwStdin, storeKeyring bool, pollInterval, debounce, syncTimeout time.Duration) ([]*dbWorker, error) {
 	cli, err := kdbx.NewCLI(cliPath)
 	if err != nil {
@@ -248,13 +253,31 @@ func setupDaemonWorkers(cfg *config.Config, dbs []*config.Database, cliPath stri
 		}
 	}
 
+	// Fetch role + wrapped_master_key for alle databaser i ét kald.
+	client := api.New(cfg.Server.URL)
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	serverDBs, err := client.ListDatabases(dbCtx, cfg.Server.DeviceToken)
+	dbCancel()
+	if err != nil {
+		return nil, fmt.Errorf("list databases: %w", err)
+	}
+	serverDBByID := make(map[string]*api.Database, len(serverDBs))
+	for i := range serverDBs {
+		serverDBByID[serverDBs[i].ID] = &serverDBs[i]
+	}
+
 	workers := make([]*dbWorker, 0, len(dbs))
 	for _, db := range dbs {
+		serverDB := serverDBByID[db.RemoteID]
+		if serverDB == nil {
+			return workers, fmt.Errorf("database %s (%s) not found on server", db.Name, db.RemoteID)
+		}
+
 		pw, fromKeyring, err := resolvePassword(db, pwStdin)
 		if err != nil {
 			return workers, err
 		}
-		masterKey, entryKey, err := deriveKeys(pw, db.RemoteID)
+		masterKey, entryKey, err := resolveMasterEntryKeys(pw, serverDB.Role, db.RemoteID, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
 		if err != nil {
 			passwd.Zero(pw)
 			return workers, err
