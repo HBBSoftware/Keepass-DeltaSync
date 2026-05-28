@@ -44,6 +44,20 @@ type runEnv struct {
 	masterKey []byte
 	entryKey  []byte
 	ownsKeys  bool
+	// quiet undertrykker per-cycle progress-prints ("Fetching...",
+	// "Exporting...", "Found N entries...") til stderr. Warnings og errors
+	// printes uanset. Daemon-loopet sætter quiet=true så hvert poll-tick
+	// ikke spammer logs på no-op-syncs.
+	quiet bool
+}
+
+// progressf skriver per-cycle progress til stderr, men no-op'er hvis quiet
+// er sat. Warnings og errors må ikke bruge denne — de skal printes uanset.
+func (e *runEnv) progressf(format string, args ...any) {
+	if e.quiet {
+		return
+	}
+	fmt.Fprintf(os.Stderr, format, args...)
 }
 
 // setupEnv resolverer config, database-binding, kdbx-cli, password og deriverede
@@ -151,12 +165,12 @@ func (e *runEnv) cleanup() {
 // nye current_seq fra serveren samt antal entries og tombstones merget.
 // Caller'en gemmer config selv.
 func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err error) {
-	fmt.Fprintf(os.Stderr, "Fetching changes since seq=%d...\n", e.db.LastSeq)
+	e.progressf("Fetching changes since seq=%d...\n", e.db.LastSeq)
 	changes, err := e.client.GetChanges(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, e.db.LastSeq)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("GET /changes: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "Server has current_seq=%d, %d new entries.\n", changes.CurrentSeq, len(changes.Entries))
+	e.progressf("Server has current_seq=%d, %d new entries.\n", changes.CurrentSeq, len(changes.Entries))
 
 	if len(changes.Entries) == 0 {
 		return changes.CurrentSeq, 0, 0, nil
@@ -197,7 +211,7 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 			ModifiedAt: modAt,
 		})
 	}
-	fmt.Fprintf(os.Stderr, "Decrypted %d entries (+ %d tombstones).\n", len(entries), len(deletions))
+	e.progressf("Decrypted %d entries (+ %d tombstones).\n", len(entries), len(deletions))
 
 	// Find lokal Root-gruppes UUID, så staging-merge lander nye entries
 	// direkte i Root i stedet for at oprette en "deltasync"-undergruppe.
@@ -233,7 +247,7 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		return 0, 0, 0, fmt.Errorf("write staging xml: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "Building staging kdbx...")
+	e.progressf("Building staging kdbx...\n")
 	if err := e.cli.Import(e.ctx, tmpXML, tmpKDBX, e.password); err != nil {
 		return 0, 0, 0, err
 	}
@@ -243,7 +257,7 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		return 0, 0, 0, fmt.Errorf("backup local kdbx: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "Merging staging into local kdbx...")
+	e.progressf("Merging staging into local kdbx...\n")
 	if err := e.cli.Merge(e.ctx, e.db.LocalPath, tmpKDBX, e.password); err != nil {
 		if restoreErr := copyFile(backupPath, e.db.LocalPath); restoreErr != nil {
 			return 0, 0, 0, fmt.Errorf("merge failed AND restore failed (backup at %s): merge=%v, restore=%w", backupPath, err, restoreErr)
@@ -269,7 +283,7 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 // avancere db.LastSeq forbi denne værdi, så vores egne pushes ikke pulles
 // tilbage ved næste sync.
 func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err error) {
-	fmt.Fprintln(os.Stderr, "Exporting kdbx via keepassxc-cli...")
+	e.progressf("Exporting kdbx via keepassxc-cli...\n")
 	xmlBytes, err := e.cli.Export(e.ctx, e.db.LocalPath, e.password)
 	if err != nil {
 		return 0, 0, 0, err
@@ -281,9 +295,9 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 	}
 
 	if force {
-		fmt.Fprintf(os.Stderr, "Pushing all %d entries + %d tombstones (force).\n", len(entries), len(deletions))
+		e.progressf("Pushing all %d entries + %d tombstones (force).\n", len(entries), len(deletions))
 	} else {
-		fmt.Fprintf(os.Stderr, "Found %d entries + %d tombstones; checking per-entry tracking...\n", len(entries), len(deletions))
+		e.progressf("Found %d entries + %d tombstones; checking per-entry tracking...\n", len(entries), len(deletions))
 	}
 
 	for _, en := range entries {

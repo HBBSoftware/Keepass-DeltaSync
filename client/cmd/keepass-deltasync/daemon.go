@@ -403,6 +403,7 @@ func (w *dbWorker) doSync(ctx context.Context, state *daemonState, logf func(str
 	}
 
 	env := newRunEnvBorrowed(ctx, w.cfg, w.db, w.cli, w.password, w.masterKey, w.entryKey, w.syncTimeout)
+	env.quiet = true
 	defer env.cleanup()
 
 	newSeq, merged, deletions, err := env.pullChanges()
