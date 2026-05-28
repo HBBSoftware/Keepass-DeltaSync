@@ -87,7 +87,25 @@ final class Router
         TokenAuthenticator $authenticator,
         AuditLogger        $logger,
     ): Response {
-        $match = $this->findRoute($request->method, $request->path);
+        // Strip APP_BASE_PATH-prefix før route-matching. Tillader at
+        // serveren deployes under en under-sti (fx https://host/sync/api/v1/...)
+        // uden at hver route skal kende prefix'et. basePath er "" eller "/prefix"
+        // efter normalisering i Config::loadFromEnv. Vi kræver at prefix
+        // efterfølges af "/" eller slut-på-streng, så "/syncplus" ikke uagtsomt
+        // matcher prefix "/sync".
+        $path = $request->path;
+        if ($config->basePath !== '') {
+            $prefix = $config->basePath;
+            $plen   = strlen($prefix);
+            if (str_starts_with($path, $prefix)) {
+                $afterPrefix = substr($path, $plen);
+                if ($afterPrefix === '' || $afterPrefix[0] === '/') {
+                    $path = $afterPrefix === '' ? '/' : $afterPrefix;
+                }
+            }
+        }
+
+        $match = $this->findRoute($request->method, $path);
         if ($match === null) {
             return new JsonResponse(404, [
                 'error'   => 'not_found',

@@ -19,6 +19,7 @@ final class Config
         public readonly string $logLevel,
         public readonly int    $auditRetentionDays,
         public readonly int    $enrollmentTokenTtlHours,
+        public readonly string $basePath,
     ) {}
 
     public static function loadFromEnv(string $rootDir): self
@@ -32,7 +33,23 @@ final class Config
             logLevel:                self::env('LOG_LEVEL', 'INFO'),
             auditRetentionDays:      (int) self::env('AUDIT_RETENTION_DAYS', '30'),
             enrollmentTokenTtlHours: (int) self::env('ENROLLMENT_TOKEN_TTL_HOURS', '24'),
+            basePath:                self::normalizeBasePath(self::env('APP_BASE_PATH', '')),
         );
+    }
+
+    /**
+     * normalizeBasePath sikrer at base-path er enten tom string (= serveret
+     * på server-roden) eller "/prefix" (leading slash, ingen trailing slash).
+     * Brugeren kan angive med eller uden slashes; vi normaliserer.
+     */
+    private static function normalizeBasePath(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '' || $raw === '/') {
+            return '';
+        }
+        $raw = '/' . ltrim($raw, '/');
+        return rtrim($raw, '/');
     }
 
     private static function loadDotEnv(string $path): void

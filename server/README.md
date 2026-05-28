@@ -44,6 +44,10 @@ Alle endpoints ligger under `/api/v1/`. Auth via `Authorization: Bearer <token>`
 
 Den fulde endpoint-liste er registreret i [`src/Router.php`](src/Router.php). For semantik se [spec'en § API-endpoints](../keepass-deltasync-spec.md#api-endpoints).
 
+### Path-prefix (valgfri)
+
+Sæt `APP_BASE_PATH=/sync` i `.env` hvis serveren skal deployes under en under-sti — typisk for at dele subdomæne med en hjemmeside. Klienter peger så deres `server.url` til fx `https://host/sync`. Router'en strippes prefix før route-matching, så `src/Router.php` forbliver uændret. Tom værdi (default) = serveret på roden.
+
 ## Sikkerheds-grundregler
 
 - TLS er påkrævet i drift — håndteres typisk af reverse-proxy (nginx, Caddy).
