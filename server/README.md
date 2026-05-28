@@ -55,15 +55,16 @@ Sæt `APP_BASE_PATH=/sync` i `.env` hvis serveren skal deployes under en under-s
 - Server-administrator har **ingen** kryptografisk adgang til entry-indhold — blobs er krypteret med klient-afledte nøgler.
 - Cross-user-isolation: alle requests scopes til den autentificerede brugers data. Adgang til andres ressourcer returnerer 404 (ikke 403) for at undgå information leak.
 
+## Deployment
+
+Tre konkrete recipes findes i [`../docs/deployment.md`](../docs/deployment.md):
+
+- **Recipe 1**: standard root-deployment
+- **Recipe 2**: API under sub-path (fx `/sync`), hjemmeside på roden af samme subdomæne
+- **Recipe 3**: subdomæne-separation (API + hjemmeside på to vhosts)
+
 ## Status
 
-Skelet på plads. Følgende mangler stadig — se også [Milestone 1 i spec'en](../keepass-deltasync-spec.md#milestone-1--server-mvp):
+Produktion-klar pr. 2026-05-28. v1 (single-user sync, 3-versioners historik, restore, audit-log) og v2 (multi-bruger sharing med X25519 sealed-box wrapping) er implementeret og live-valideret. Klient-CLI har admin-subkommandoer der wrapper bruger-administration.
 
-- [ ] Request/Response-håndtering og route-dispatch
-- [ ] PDO-forbindelse + transaktioner
-- [ ] Token-auth-middleware (admin/enrollment/device)
-- [ ] Controllere for hvert endpoint
-- [ ] Audit-logger (INFO/DEBUG via `LOG_LEVEL`)
-- [ ] Oprydnings-trigger ved opstart (advisory lock + 1-times throttle)
-- [ ] Admin-CLI-kommandoer (`token:create-admin`, `user:create`, `user:delete`, ...)
-- [ ] Integrationstests (cross-user isolation, version-rotation, log-oprydning)
+Se [`../keepass-deltasync-spec.md`](../keepass-deltasync-spec.md) for fuld specifikation.

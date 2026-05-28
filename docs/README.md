@@ -7,6 +7,7 @@ Fælles dokumentation — protokol-specifikation, betjeningsguides, threat model
 
 ## Tilgængelige dokumenter
 
+- `deployment.md` — tre konkrete server-deployment-recipes (root, sub-path, subdomæne)
 - `threat-model.md` — hvad serveren ser, hvad den ikke ser, multi-bruger trust-overvejelser
 - `v2-concurrent-write-semantics.md` — race-condition-analyse for v2's multi-bruger sharing
 - `v2-test-plan.md` — live-test-procedure for M3+M4 (share-flow + accept-flow)
@@ -15,5 +16,5 @@ Fælles dokumentation — protokol-specifikation, betjeningsguides, threat model
 
 - `protocol.md` — fuldt HTTP-API + JSON-skemaer
 - `crypto.md` — XChaCha20-Poly1305 + HKDF-detaljer, nøgleafledning
-- `operations.md` — deployment, backup, migration, log-håndtering
+- `operations.md` — backup, migration, log-håndtering
 - `admin-guide.md` — admin-CLI og admin-API
