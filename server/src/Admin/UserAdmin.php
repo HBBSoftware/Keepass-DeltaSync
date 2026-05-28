@@ -95,12 +95,18 @@ final class UserAdmin
      */
     public function listUsers(): array
     {
+        // database_count tæller kun databases hvor brugeren er owner — det er
+        // det stabile mål for "hvor mange databaser ejer denne bruger" efter
+        // v2's sharing-model. Member-rows kunne tilføjes som separat
+        // shared_count senere hvis admin har brug for at se det.
         $stmt = $this->pdo->query(
-            'SELECT u.id, u.username, u.display_name, u.created_at, u.disabled,
-                    (SELECT count(*) FROM devices   d  WHERE d.user_id  = u.id) AS device_count,
-                    (SELECT count(*) FROM databases db WHERE db.user_id = u.id) AS database_count
+            "SELECT u.id, u.username, u.display_name, u.created_at, u.disabled,
+                    (SELECT count(*) FROM devices d
+                      WHERE d.user_id = u.id) AS device_count,
+                    (SELECT count(*) FROM database_members dm
+                      WHERE dm.user_id = u.id AND dm.role = 'owner') AS database_count
                FROM users u
-              ORDER BY u.username'
+              ORDER BY u.username"
         );
         return array_map(fn(array $r): array => [
             'id'             => $r['id'],

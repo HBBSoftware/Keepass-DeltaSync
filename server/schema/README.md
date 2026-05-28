@@ -10,6 +10,7 @@ Filerne er nummereret og skal køres i rækkefølge. Pt. håndteres migrationer 
 | `004_system_state.sql` | `system_state` (KV til throttling af baggrundsopgaver) |
 | `005_version_rotation_trigger.sql` | `BEFORE INSERT`-trigger på `entry_versions` (max 3 versioner pr. entry) |
 | `006_device_public_keys.sql` | `devices.public_key BYTEA` (X25519 til v2 multi-bruger sharing; NULL for legacy) |
+| `007_database_members.sql` | `database_members` (v2 ACL-tabel: owner/member, wrapped_master_key) + drop `databases.user_id` |
 
 ## Kørsel
 

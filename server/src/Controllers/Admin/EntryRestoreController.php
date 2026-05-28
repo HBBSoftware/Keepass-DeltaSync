@@ -58,17 +58,27 @@ final class EntryRestoreController
         }
         $versionNum = (int) $versionNumStr;
 
-        // Slå database op uden user_id-scope — admin må alle. Owner-id'en
-        // bruges til audit-log så det er klart hvem admin handlede på vegne af.
+        // Slå database + owner op uden user_id-scope — admin må alle.
+        // Owner-id'en bruges til audit-log så det er klart hvem admin
+        // handlede på vegne af. Efter v2's sharing-model er owner identificeret
+        // via database_members.role = 'owner'. Hvis flere owners (= overdragelse
+        // mid-restore), tag den der blev added først.
         $dbStmt = $this->pdo->prepare(
-            'SELECT id, user_id FROM databases WHERE id = :id'
+            "SELECT d.id,
+                    (SELECT user_id FROM database_members dm
+                      WHERE dm.database_id = d.id
+                        AND dm.role        = 'owner'
+                      ORDER BY dm.added_at ASC
+                      LIMIT 1) AS owner_user_id
+               FROM databases d
+              WHERE d.id = :id"
         );
         $dbStmt->execute(['id' => $databaseId]);
         $db = $dbStmt->fetch();
         if (!$db) {
             throw new HttpException(404, 'database not found', 'not_found');
         }
-        $ownerUserId = (string) $db['user_id'];
+        $ownerUserId = (string) ($db['owner_user_id'] ?? '');
 
         $now = (new \DateTimeImmutable())->format('Y-m-d\TH:i:sP');
 

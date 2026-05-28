@@ -316,8 +316,15 @@ final class EntryController
         if (!self::isUuid($id)) {
             throw new HttpException(404, 'database not found', 'not_found');
         }
+        // Både owners og members har read-write adgang på entries-niveau i
+        // v2.0 (ingen reader-role). Sletning af databasen er stadig kun for
+        // owner; det enforces i DatabaseController::destroy.
         $stmt = $this->pdo->prepare(
-            'SELECT id FROM databases WHERE id = :id AND user_id = :uid'
+            'SELECT d.id
+               FROM databases d
+               JOIN database_members dm ON dm.database_id = d.id
+              WHERE d.id      = :id
+                AND dm.user_id = :uid'
         );
         $stmt->execute(['id' => $id, 'uid' => $auth->userId]);
         $found = $stmt->fetchColumn();

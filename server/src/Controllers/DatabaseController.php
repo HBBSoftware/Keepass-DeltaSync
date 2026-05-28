@@ -40,12 +40,20 @@ final class DatabaseController
             $this->pdo,
             function (PDO $pdo) use ($auth, $name): array {
                 $ins = $pdo->prepare(
-                    'INSERT INTO databases (user_id, name)
-                     VALUES (:uid, :name)
+                    'INSERT INTO databases (name)
+                     VALUES (:name)
                      RETURNING id, name, created_at'
                 );
-                $ins->execute(['uid' => $auth->userId, 'name' => $name]);
+                $ins->execute(['name' => $name]);
                 $row = $ins->fetch();
+
+                // Creator bliver automatisk owner i database_members. wrapped_master_key
+                // er NULL for owners — de bruger Argon2id-derivation lokalt.
+                $member = $pdo->prepare(
+                    "INSERT INTO database_members (database_id, user_id, wrapped_master_key, role, added_by)
+                     VALUES (:db, :uid, NULL, 'owner', :uid)"
+                );
+                $member->execute(['db' => $row['id'], 'uid' => $auth->userId]);
 
                 // Initiér server_seq-tælleren. database_seq.next_seq defaulter til 1.
                 $seq = $pdo->prepare(
@@ -74,11 +82,14 @@ final class DatabaseController
     /** @param array<string,string> $params */
     public function index(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
+        // Inkluder både owner- og member-databaser. Klient kan se rolle for
+        // hver via 'role'-feltet (member kan ikke slette eller dele videre).
         $stmt = $this->pdo->prepare(
-            'SELECT id, name, created_at
-               FROM databases
-              WHERE user_id = :uid
-              ORDER BY name, created_at'
+            'SELECT d.id, d.name, d.created_at, dm.role
+               FROM databases d
+               JOIN database_members dm ON dm.database_id = d.id
+              WHERE dm.user_id = :uid
+              ORDER BY d.name, d.created_at'
         );
         $stmt->execute(['uid' => $auth->userId]);
 
@@ -97,8 +108,17 @@ final class DatabaseController
             throw new HttpException(404, 'database not found', 'not_found');
         }
 
+        // Kun owner kan slette databasen. Members får samme 404 som
+        // ikke-medlemmer — ingen lækage af "du er medlem men ikke ejer".
         $stmt = $this->pdo->prepare(
-            'DELETE FROM databases WHERE id = :id AND user_id = :uid'
+            "DELETE FROM databases
+              WHERE id = :id
+                AND EXISTS (
+                    SELECT 1 FROM database_members
+                     WHERE database_id = :id
+                       AND user_id     = :uid
+                       AND role        = 'owner'
+                )"
         );
         $stmt->execute(['id' => $id, 'uid' => $auth->userId]);
 
@@ -108,7 +128,8 @@ final class DatabaseController
 
         $log->debug(EventType::DatabaseDeleted, ['database_id' => $id]);
 
-        // CASCADE har taget sig af entries, entry_versions og database_seq.
+        // CASCADE har taget sig af entries, entry_versions, database_seq
+        // og database_members.
         return new Response(204, [], '');
     }
 
