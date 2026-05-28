@@ -21,6 +21,9 @@ Commands:
   daemon                      Foreground sync loop: fsnotify + polling for all (or --db) databases
   versions <name> <uuid>      List server-stored versions of an entry
   restore <name> <uuid> <n>   Roll an entry back to version n (1, 2 or 3)
+  share <name> <username>     Share an owned database with another user (v2)
+  unshare <name> <username>   Remove a member (or yourself) from a database
+  shares <name>               List members of a database (owner only)
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
   databases                   List registered databases (local + server)
@@ -50,6 +53,12 @@ func main() {
 		exitOnError(runVersions(os.Args[2:]))
 	case "restore":
 		exitOnError(runRestore(os.Args[2:]))
+	case "share":
+		exitOnError(runShare(os.Args[2:]))
+	case "unshare":
+		exitOnError(runUnshare(os.Args[2:]))
+	case "shares":
+		exitOnError(runShares(os.Args[2:]))
 	case "status":
 		exitOnError(runStatus(os.Args[2:]))
 	case "devices":

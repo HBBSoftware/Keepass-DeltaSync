@@ -298,11 +298,15 @@ func (c *Client) ListLog(ctx context.Context, deviceToken string, since *time.Ti
 }
 
 // Database er én database registreret hos serveren (returneret af
-// /databases-endpoints).
+// /databases-endpoints). Role er "owner" eller "member" og angiver hvilken
+// ACL caller'en har. WrappedMasterKey er base64-encoded sealed-box krypteret
+// til vores enheds public-key; sat for members, nil for owners.
 type Database struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	CreatedAt        string  `json:"created_at"`
+	Role             string  `json:"role,omitempty"`
+	WrappedMasterKey *string `json:"wrapped_master_key,omitempty"`
 }
 
 // CreateDatabase registrerer en ny database hos serveren og returnerer den
@@ -376,6 +380,131 @@ func (c *Client) ListDatabases(ctx context.Context, deviceToken string) ([]Datab
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return out.Databases, nil
+}
+
+// UserLookup er svaret fra GET /users/lookup. TargetDevice er den enhed
+// vi skal wrappe master_key til (nyeste enhed med public_key for den
+// fundne bruger).
+type UserLookup struct {
+	User struct {
+		ID          string `json:"id"`
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+	} `json:"user"`
+	TargetDevice struct {
+		ID         string `json:"id"`
+		Name       string `json:"name"`
+		PublicKey  string `json:"public_key"`
+		EnrolledAt string `json:"enrolled_at"`
+	} `json:"target_device"`
+}
+
+// LookupUser slår en bruger op pa username og returnerer info om den
+// "target device" Alice's klient skal wrappe master_key til.
+func (c *Client) LookupUser(ctx context.Context, deviceToken, username string) (*UserLookup, error) {
+	u := c.baseURL + "/api/v1/users/lookup?username=" + url.QueryEscape(username)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("lookup user: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out UserLookup
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &out, nil
+}
+
+// ShareMember er én række i list-shares respons.
+type ShareMember struct {
+	UserID      string  `json:"user_id"`
+	Username    string  `json:"username"`
+	DisplayName *string `json:"display_name"`
+	Role        string  `json:"role"`
+	AddedAt     string  `json:"added_at"`
+	AddedBy     *string `json:"added_by"`
+}
+
+// ListShares henter medlems-listen for en database (owner-only på server).
+func (c *Client) ListShares(ctx context.Context, deviceToken, databaseID string) ([]ShareMember, error) {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/shares", c.baseURL, databaseID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list shares: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseError(resp)
+	}
+	var out struct {
+		Members []ShareMember `json:"members"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out.Members, nil
+}
+
+// ShareDatabase tilfojer (eller roterer) en members wrapped_master_key.
+func (c *Client) ShareDatabase(ctx context.Context, deviceToken, databaseID, targetUserID string, wrappedKey []byte) error {
+	buf, err := json.Marshal(map[string]string{
+		"user_id":            targetUserID,
+		"wrapped_master_key": base64.StdEncoding.EncodeToString(wrappedKey),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	u := fmt.Sprintf("%s/api/v1/databases/%s/shares", c.baseURL, databaseID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(buf))
+	if err != nil {
+		return err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("share database: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return parseError(resp)
+	}
+	return nil
+}
+
+// UnshareDatabase fjerner en member (eller lader member forlade selv).
+func (c *Client) UnshareDatabase(ctx context.Context, deviceToken, databaseID, targetUserID string) error {
+	u := fmt.Sprintf("%s/api/v1/databases/%s/shares/%s", c.baseURL, databaseID, targetUserID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)
+	if err != nil {
+		return err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("unshare database: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return parseError(resp)
+	}
+	return nil
 }
 
 // EntryChange er én række i GET /changes-svaret: nyeste version af en entry

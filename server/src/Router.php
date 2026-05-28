@@ -52,6 +52,11 @@ final class Router
         $this->add('GET',    '/api/v1/databases',                                     'DatabaseController::index',   'device');
         $this->add('DELETE', '/api/v1/databases/{id}',                                'DatabaseController::destroy', 'device');
 
+        $this->add('GET',    '/api/v1/users/lookup',                                  'ShareController::lookupUser', 'device');
+        $this->add('GET',    '/api/v1/databases/{id}/shares',                         'ShareController::index',      'device');
+        $this->add('POST',   '/api/v1/databases/{id}/shares',                         'ShareController::create',     'device');
+        $this->add('DELETE', '/api/v1/databases/{id}/shares/{user_id}',               'ShareController::destroy',    'device');
+
         $this->add('GET',    '/api/v1/databases/{id}/changes',                        'EntryController::changes',    'device');
         $this->add('PUT',    '/api/v1/databases/{id}/entries/{uuid}',                 'EntryController::put',        'device');
         $this->add('DELETE', '/api/v1/databases/{id}/entries/{uuid}',                 'EntryController::destroy',    'device');

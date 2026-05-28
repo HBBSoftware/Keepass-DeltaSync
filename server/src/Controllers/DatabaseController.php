@@ -84,17 +84,30 @@ final class DatabaseController
     {
         // Inkluder både owner- og member-databaser. Klient kan se rolle for
         // hver via 'role'-feltet (member kan ikke slette eller dele videre).
+        // wrapped_master_key returneres som base64-streng for members; NULL
+        // for owners (de bruger Argon2id-derivation lokalt). M4's accept-flow
+        // bruger feltet til at bootstrappe en lokal kopi af delte databaser.
         $stmt = $this->pdo->prepare(
-            'SELECT d.id, d.name, d.created_at, dm.role
+            "SELECT d.id, d.name, d.created_at, dm.role,
+                    encode(dm.wrapped_master_key, 'base64') AS wrapped_master_key
                FROM databases d
                JOIN database_members dm ON dm.database_id = d.id
               WHERE dm.user_id = :uid
-              ORDER BY d.name, d.created_at'
+              ORDER BY d.name, d.created_at"
         );
         $stmt->execute(['uid' => $auth->userId]);
 
+        $rows = array_map(static function (array $r): array {
+            if ($r['wrapped_master_key'] !== null) {
+                // encode() wrapper hvert 76. char med \n — strip dem så
+                // klienten får clean base64.
+                $r['wrapped_master_key'] = str_replace("\n", '', (string) $r['wrapped_master_key']);
+            }
+            return $r;
+        }, $stmt->fetchAll());
+
         return new JsonResponse(200, [
-            'databases' => $stmt->fetchAll(),
+            'databases' => $rows,
         ]);
     }
 
