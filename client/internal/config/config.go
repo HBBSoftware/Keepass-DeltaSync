@@ -10,6 +10,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,6 +19,36 @@ import (
 
 	"github.com/BurntSushi/toml"
 )
+
+// Base64Bytes er en []byte der serialiseres som base64-string i TOML. Bruges
+// til binære felter (device private key) der ellers ikke passer i TOML's
+// string-format. Tomme slices serialiseres som tom string og round-trip'er
+// tilbage til nil ved Load.
+type Base64Bytes []byte
+
+// MarshalText implementerer encoding.TextMarshaler så BurntSushi/toml
+// encoder feltet som base64-string.
+func (b Base64Bytes) MarshalText() ([]byte, error) {
+	if len(b) == 0 {
+		return []byte{}, nil
+	}
+	return []byte(base64.StdEncoding.EncodeToString(b)), nil
+}
+
+// UnmarshalText implementerer encoding.TextUnmarshaler så BurntSushi/toml
+// decoder en base64-string tilbage til bytes. Tom string giver nil-slice.
+func (b *Base64Bytes) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*b = nil
+		return nil
+	}
+	decoded, err := base64.StdEncoding.DecodeString(string(text))
+	if err != nil {
+		return fmt.Errorf("decode base64: %w", err)
+	}
+	*b = decoded
+	return nil
+}
 
 const (
 	appDir     = "keepass-deltasync"
@@ -33,9 +64,15 @@ type Config struct {
 }
 
 // Server holder server-URL og device-token (sat efter enrollment).
+//
+// DevicePrivateKey er denne enheds X25519 private-key til v2-sharing's
+// sealed-box key-wrapping. Genereres lokalt ved enroll, public-delen
+// uploades til server, private-delen forbliver kun lokalt. Legacy enheder
+// (enrolled før v2) har feltet tomt indtil auto-upgrade kører.
 type Server struct {
-	URL         string `toml:"url"`
-	DeviceToken string `toml:"device_token,omitempty"`
+	URL              string      `toml:"url"`
+	DeviceToken      string      `toml:"device_token,omitempty"`
+	DevicePrivateKey Base64Bytes `toml:"device_private_key,omitempty"`
 }
 
 // Database er bindingen mellem en lokal .kdbx-fil og en database registreret

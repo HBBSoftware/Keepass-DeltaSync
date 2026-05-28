@@ -17,6 +17,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/kdbx"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/keyring"
@@ -84,6 +85,13 @@ func runDaemon(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Auto-upgrade keypair før vi prompter for masterpassword(s).
+	upgradeCtx, upgradeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if upErr := ensureDevicePublicKey(upgradeCtx, cfg, api.New(cfg.Server.URL)); upErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: auto-upgrade of device keypair failed (%v) — sharing features will not work\n", upErr)
+	}
+	upgradeCancel()
 
 	workers, err := setupDaemonWorkers(cfg, selected, *cliPath, *pwStdin, *storeKeyring, *pollInterval, *debounce, *syncTimeout)
 	if err != nil {

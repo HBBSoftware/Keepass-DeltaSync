@@ -46,6 +46,7 @@ final class Router
 
         // --- Bruger-endpoints (enhedstoken) ---
         $this->add('GET',    '/api/v1/me',                                            'MeController::show',          'device');
+        $this->add('PATCH',  '/api/v1/me',                                            'MeController::update',        'device');
 
         $this->add('POST',   '/api/v1/databases',                                     'DatabaseController::create',  'device');
         $this->add('GET',    '/api/v1/databases',                                     'DatabaseController::index',   'device');

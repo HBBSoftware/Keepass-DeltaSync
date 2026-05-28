@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
+	"gitlab.com/Star95/keepass-deltasync/client/internal/crypto"
 )
 
 // runEnroll håndterer "keepass-deltasync enroll [--server URL] [--device-name N] <token>".
@@ -56,17 +57,25 @@ func runEnroll(args []string) error {
 		}
 	}
 
+	// Generér device-keypair lokalt: private bliver i config, public sendes
+	// til serveren så andre brugere kan wrappe shared database-keys til os.
+	pubKey, privKey, err := crypto.GenerateBoxKeypair()
+	if err != nil {
+		return fmt.Errorf("generate device keypair: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	client := api.New(serverURL)
-	resp, err := client.Enroll(ctx, enrollmentToken, deviceName)
+	resp, err := client.Enroll(ctx, enrollmentToken, deviceName, pubKey)
 	if err != nil {
 		return err
 	}
 
 	cfg.Server.URL = serverURL
 	cfg.Server.DeviceToken = resp.Token
+	cfg.Server.DevicePrivateKey = config.Base64Bytes(privKey)
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}

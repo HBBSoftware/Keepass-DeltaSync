@@ -65,10 +65,15 @@ type EnrollResponse struct {
 
 // Enroll bytter en enrollment-token til en permanent device-token via
 // POST /api/v1/devices/enroll. deviceName er valgfrit (sendes hvis non-tom).
-func (c *Client) Enroll(ctx context.Context, enrollmentToken, deviceName string) (*EnrollResponse, error) {
+// publicKey er enhedens X25519 public-key til v2-sharing (base64-encoded i
+// JSON); må være nil for legacy-flow, men v2-klienter bør altid sende det.
+func (c *Client) Enroll(ctx context.Context, enrollmentToken, deviceName string, publicKey []byte) (*EnrollResponse, error) {
 	body := map[string]any{}
 	if deviceName != "" {
 		body["device_name"] = deviceName
+	}
+	if publicKey != nil {
+		body["public_key"] = base64.StdEncoding.EncodeToString(publicKey)
 	}
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -116,18 +121,52 @@ type User struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// Device er device-info som returneret af /me.
+// Device er device-info som returneret af /me. PublicKey er en nullable
+// base64-streng (32-byte X25519); NULL for legacy-enheder enrolled før v2.
 type Device struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	EnrolledAt string `json:"enrolled_at"`
-	LastSeen   string `json:"last_seen"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	EnrolledAt string  `json:"enrolled_at"`
+	LastSeen   string  `json:"last_seen"`
+	PublicKey  *string `json:"public_key,omitempty"`
 }
 
 // MeResponse er det fulde svar fra /me.
 type MeResponse struct {
 	User   User   `json:"user"`
 	Device Device `json:"device"`
+}
+
+// UpdateDevicePublicKey opdaterer den nuværende enheds public_key via
+// PATCH /api/v1/me. Bruges af auto-upgrade-flowet til at sætte public_key
+// på legacy-enheder enrolled før v2.
+func (c *Client) UpdateDevicePublicKey(ctx context.Context, deviceToken string, publicKey []byte) error {
+	if len(publicKey) != 32 {
+		return fmt.Errorf("public key must be 32 bytes, got %d", len(publicKey))
+	}
+	buf, err := json.Marshal(map[string]string{
+		"public_key": base64.StdEncoding.EncodeToString(publicKey),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.baseURL+"/api/v1/me", bytes.NewReader(buf))
+	if err != nil {
+		return err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("patch me: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return parseError(resp)
+	}
+	return nil
 }
 
 // Me kalder GET /api/v1/me med device-tokenet og returnerer bruger + device.

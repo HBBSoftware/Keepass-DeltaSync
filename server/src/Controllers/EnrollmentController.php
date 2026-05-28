@@ -37,6 +37,7 @@ final class EnrollmentController
     public function enroll(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
         $deviceName = $this->parseDeviceName($req);
+        $publicKey  = $this->parsePublicKey($req);
 
         if ($auth->userId === null || $auth->enrollmentTokenHash === null) {
             // Defensiv: TokenAuthenticator skal have sat begge for enrollment-tokens.
@@ -48,7 +49,7 @@ final class EnrollmentController
 
         $result = Connection::transaction(
             $this->pdo,
-            function (PDO $pdo) use ($userId, $enrollmentTokenHash, $deviceName): array {
+            function (PDO $pdo) use ($userId, $enrollmentTokenHash, $deviceName, $publicKey): array {
                 $upd = $pdo->prepare(
                     'UPDATE enrollment_tokens
                         SET used = true
@@ -65,15 +66,20 @@ final class EnrollmentController
                 $deviceToken = TokenHasher::generate();
                 $deviceHash  = TokenHasher::hash($deviceToken);
 
+                // BYTEA passes via base64-text + decode() i SQL — samme
+                // pattern som entry_versions.blob, undgår PDO-binær-mareridt.
+                // decode(NULL, 'base64') returnerer NULL, så vi behøver ikke
+                // CASE-conditional for legacy-enheder uden public_key.
                 $ins = $pdo->prepare(
-                    'INSERT INTO devices (user_id, name, token_hash)
-                     VALUES (:uid, :name, :h)
+                    'INSERT INTO devices (user_id, name, token_hash, public_key)
+                     VALUES (:uid, :name, :h, decode(:pk_b64, \'base64\'))
                      RETURNING id, enrolled_at'
                 );
                 $ins->execute([
-                    'uid'  => $userId,
-                    'name' => $deviceName,
-                    'h'    => $deviceHash,
+                    'uid'    => $userId,
+                    'name'   => $deviceName,
+                    'h'      => $deviceHash,
+                    'pk_b64' => $publicKey === null ? null : base64_encode($publicKey),
                 ]);
                 $row = $ins->fetch();
 
@@ -121,5 +127,34 @@ final class EnrollmentController
             throw new HttpException(400, 'device_name too long (max 200 chars)', 'invalid_body');
         }
         return $name;
+    }
+
+    /**
+     * parsePublicKey læser den valgfri public_key fra request body. Forventet
+     * format: base64-encoded 32 bytes (X25519). Tom/manglende felt returnerer
+     * null — klienten kan så uploade key senere via PATCH /me. Ugyldig
+     * længde eller invalid base64 giver 400.
+     */
+    private function parsePublicKey(Request $req): ?string
+    {
+        $body = $req->jsonBody();
+        if (!array_key_exists('public_key', $body)) {
+            return null;
+        }
+        $val = $body['public_key'];
+        if ($val === null || $val === '') {
+            return null;
+        }
+        if (!is_string($val)) {
+            throw new HttpException(400, 'public_key must be a base64 string', 'invalid_body');
+        }
+        $decoded = base64_decode($val, true);
+        if ($decoded === false) {
+            throw new HttpException(400, 'public_key is not valid base64', 'invalid_body');
+        }
+        if (strlen($decoded) !== 32) {
+            throw new HttpException(400, 'public_key must decode to 32 bytes (X25519)', 'invalid_body');
+        }
+        return $decoded;
     }
 }

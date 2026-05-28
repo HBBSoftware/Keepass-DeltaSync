@@ -69,6 +69,16 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 		return nil, err
 	}
 
+	// Auto-upgrade legacy enheder (enrolled før v2) med X25519 keypair før
+	// vi prompter for password. På den måde får brugeren ikke skrevet sit
+	// masterpassword forgæves hvis netværket er nede.
+	upgradeCtx, upgradeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	upErr := ensureDevicePublicKey(upgradeCtx, cfg, api.New(cfg.Server.URL))
+	upgradeCancel()
+	if upErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: auto-upgrade of device keypair failed (%v) — sharing features will not work until fixed\n", upErr)
+	}
+
 	password, err := passwd.Read(prompt, pwStdin)
 	if err != nil {
 		return nil, err
