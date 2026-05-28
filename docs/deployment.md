@@ -113,16 +113,29 @@ kan oprette ekstra vhosts/subdomæner hos din hoster.
 
 1. **Upload server/-koden** (PSR-4 fallback i `bootstrap.php` betyder du
    ikke behøver `composer install` på hosten — vendor/ er ikke krævet).
-2. **Opret database** i PostgreSQL 14+. Kør migrationer:
-   ```sh
-   for f in schema/*.sql; do psql "$DATABASE_URL" -f "$f"; done
-   ```
-   Eller paste hver migration i DBeaver hvis du ikke har shell-adgang.
-3. **Udfyld `.env`** baseret på `.env.example`.
-4. **Første admin-token**: kør `setup.php` ÉN gang via browser, eller brug
-   `keepass-deltasync admin token-sql` (paste SQL'en i DBeaver).
-5. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2)
-   så det ikke kan misbruges.
+2. **Opret en tom PostgreSQL 14+-database** og en bruger med write-access.
+3. **Kør setup-wizard'en** ved at åbne `https://<dit-domæne>/setup.php` i
+   browser. Wizard'en:
+   - Beder om DB-credentials, tester forbindelsen, skriver `server/.env`
+   - Kører alle schema-migrationer (`schema/*.sql`)
+   - Genererer det første admin-token (vises ÉN gang — gem det med det samme)
+   - UI på engelsk default, dansk via `?lang=da`
+4. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2)
+   så det ikke kan misbruges. Wizard'en blokerer auto-genkørsel når
+   admin_tokens har rækker, men filen er stadig unødvendig angrebs-flade.
+
+Alternativt (uden setup.php — hvis du foretrækker scripted setup):
+```sh
+# Migration via psql (kræver shell-adgang)
+for f in schema/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+# eller paste hver migration i DBeaver
+
+# Generér admin-token via SQL
+keepass-deltasync admin token-sql  # giver dig SQL'en til DBeaver
+
+# Eller via server-CLI hvis du har shell:
+php server/bin/admin token:create-admin
+```
 
 ## Path-prefix mekanik (Recipe 2 detaljer)
 
