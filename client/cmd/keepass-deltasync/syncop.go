@@ -27,8 +27,12 @@ var lastModificationTimeRe = regexp.MustCompile(`<LastModificationTime>[^<]*</La
 
 // runEnv samler den shared state alle synkroniserings-kommandoer (pull/push/
 // sync) skal bruge: API-klient, kdbx-CLI, config, masterpassword og deriverede
-// nøgler. Bygges via setupEnv og frigøres via cleanup() (zeroer alle hemmelige
-// bytes).
+// nøgler. Bygges via setupEnv (one-shot CLI-kommandoer) eller
+// newRunEnvBorrowed (daemon-loop, hvor keys ejes af caller).
+//
+// ownsKeys styrer om cleanup() zeroer password/masterKey/entryKey. One-shot-
+// commands ejer keys; daemon låner dem fra sit ydre setup og må ikke zeroe
+// dem mellem sync-cycles.
 type runEnv struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -39,28 +43,14 @@ type runEnv struct {
 	password  []byte
 	masterKey []byte
 	entryKey  []byte
+	ownsKeys  bool
 }
 
 // setupEnv resolverer config, database-binding, kdbx-cli, password og deriverede
 // nøgler. Argon2id-derivationen tager ~200ms — vi gør det op-front så
 // pull/push/sync alle kan bruge entryKey uden lazy-logik.
 func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, prompt string) (*runEnv, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	if cfg.Server.URL == "" || cfg.Server.DeviceToken == "" {
-		return nil, errors.New("not enrolled — run `keepass-deltasync enroll` first")
-	}
-	db := cfg.FindDatabase(name)
-	if db == nil {
-		return nil, fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", name)
-	}
-	if _, err := os.Stat(db.LocalPath); err != nil {
-		return nil, fmt.Errorf("local kdbx %s: %w", db.LocalPath, err)
-	}
-
-	cli, err := kdbx.NewCLI(cliPath)
+	cfg, db, cli, err := loadDBAndCLI(name, cliPath)
 	if err != nil {
 		return nil, err
 	}
@@ -70,20 +60,65 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 		return nil, err
 	}
 
-	fmt.Fprintln(os.Stderr, "Deriving master key (Argon2id, ~200ms)...")
-	masterKey, err := crypto.DeriveMasterKey(password, db.RemoteID)
+	masterKey, entryKey, err := deriveKeys(password, db.RemoteID)
 	if err != nil {
 		passwd.Zero(password)
-		return nil, fmt.Errorf("derive master key: %w", err)
-	}
-	entryKey, err := crypto.DeriveEntryKey(masterKey, db.RemoteID)
-	if err != nil {
-		passwd.Zero(password)
-		passwd.Zero(masterKey)
-		return nil, fmt.Errorf("derive entry key: %w", err)
+		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	env := newRunEnvBorrowed(context.Background(), cfg, db, cli, password, masterKey, entryKey, timeout)
+	env.ownsKeys = true
+	return env, nil
+}
+
+// loadDBAndCLI udfører den ikke-hemmelighedsbærende del af setup: config-load,
+// db-lookup, path-check og kdbx-cli-detection. Genbruges af daemon, som har
+// behov for at validere disse trin før den prompter masterpassword.
+func loadDBAndCLI(name, cliPath string) (*config.Config, *config.Database, *kdbx.CLI, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if cfg.Server.URL == "" || cfg.Server.DeviceToken == "" {
+		return nil, nil, nil, errors.New("not enrolled — run `keepass-deltasync enroll` first")
+	}
+	db := cfg.FindDatabase(name)
+	if db == nil {
+		return nil, nil, nil, fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", name)
+	}
+	if _, err := os.Stat(db.LocalPath); err != nil {
+		return nil, nil, nil, fmt.Errorf("local kdbx %s: %w", db.LocalPath, err)
+	}
+	cli, err := kdbx.NewCLI(cliPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return cfg, db, cli, nil
+}
+
+// deriveKeys kører Argon2id master-key derivation + HKDF entry-key derivation.
+// Caller ejer både password og de returnerede keys og skal zeroe dem.
+func deriveKeys(password []byte, remoteID string) (masterKey, entryKey []byte, err error) {
+	fmt.Fprintln(os.Stderr, "Deriving master key (Argon2id, ~200ms)...")
+	masterKey, err = crypto.DeriveMasterKey(password, remoteID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("derive master key: %w", err)
+	}
+	entryKey, err = crypto.DeriveEntryKey(masterKey, remoteID)
+	if err != nil {
+		passwd.Zero(masterKey)
+		return nil, nil, fmt.Errorf("derive entry key: %w", err)
+	}
+	return masterKey, entryKey, nil
+}
+
+// newRunEnvBorrowed bygger en runEnv med eksterne keys (caller ejer). Bruges
+// af daemon-loopet, der prompter password én gang og genbruger keys på tværs
+// af mange sync-cycles. cleanup() vil ikke zero keys så længe ownsKeys er
+// false (default). Parent-context lader daemon afbryde igangværende
+// network/cli-calls ved shutdown.
+func newRunEnvBorrowed(parent context.Context, cfg *config.Config, db *config.Database, cli *kdbx.CLI, password, masterKey, entryKey []byte, timeout time.Duration) *runEnv {
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	return &runEnv{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -94,18 +129,21 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 		password:  password,
 		masterKey: masterKey,
 		entryKey:  entryKey,
-	}, nil
+	}
 }
 
-// cleanup zeroer hemmeligheder og frigør context-cancel. Skal kaldes via defer
-// efter setupEnv lykkes.
+// cleanup frigør context-cancel og — hvis runEnv'en ejer sine keys — zeroer
+// password/masterKey/entryKey. Daemon-cycles sætter ownsKeys=false så cleanup
+// kun annullerer context.
 func (e *runEnv) cleanup() {
 	if e.cancel != nil {
 		e.cancel()
 	}
-	passwd.Zero(e.password)
-	passwd.Zero(e.masterKey)
-	passwd.Zero(e.entryKey)
+	if e.ownsKeys {
+		passwd.Zero(e.password)
+		passwd.Zero(e.masterKey)
+		passwd.Zero(e.entryKey)
+	}
 }
 
 // pullChanges henter alle entries fra serveren siden db.LastSeq, dekrypterer

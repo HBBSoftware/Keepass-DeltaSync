@@ -18,6 +18,7 @@ Commands:
   push <name>                 Upload all entries from a local .kdbx
   pull <name>                 Fetch server entries and merge into local .kdbx
   sync <name>                 Pull, then push entries modified since last sync
+  daemon                      Foreground sync loop: fsnotify + polling for all (or --db) databases
   versions <name> <uuid>      List server-stored versions of an entry
   restore <name> <uuid> <n>   Roll an entry back to version n (1, 2 or 3)
   status                      Show current enrollment + last-seen info
@@ -43,6 +44,8 @@ func main() {
 		exitOnError(runPull(os.Args[2:]))
 	case "sync":
 		exitOnError(runSync(os.Args[2:]))
+	case "daemon":
+		exitOnError(runDaemon(os.Args[2:]))
 	case "versions":
 		exitOnError(runVersions(os.Args[2:]))
 	case "restore":
