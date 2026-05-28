@@ -4,7 +4,9 @@ Synkroniseringssystem til KeePass-databaser (.kdbx) på entry-niveau, der genbru
 
 Filformatet (.kdbx) ændres ikke. Synkronisering sker via en let server der kun ser klient-krypterede blobs — masterpassword forlader aldrig klienten.
 
-Se [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md) for fuld specifikation og [`docs/`](docs/) for protokol- og threat-model-detaljer.
+🌐 **Hjemmeside:** [https://deltasync.bjoerck-braun.dk/](https://deltasync.bjoerck-braun.dk/) — visuel introduktion, arkitektur-diagrammer og bruger-guide.
+
+📚 **Detaljer:** [`docs/`](docs/) — threat-model, concurrent-write-semantik, deployment-recipes. Fuld specifikation i [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md).
 
 ## Struktur
 
