@@ -19,7 +19,8 @@ stages:
   - release
 
 variables:
-  GO_VERSION: "1.22"
+  # Match client/go.mod's required version. Bump when go.mod bumps.
+  GO_VERSION: "1.26"
 
 # ----------------------------------------------------------------------
 # Tests
