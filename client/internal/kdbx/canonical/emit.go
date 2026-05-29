@@ -55,7 +55,9 @@ func writeEntryInner(buf *bytes.Buffer, e *Entry) error {
 	fmt.Fprintf(buf, "<ForegroundColor>%s</ForegroundColor>", escapeText(e.ForegroundColor))
 	fmt.Fprintf(buf, "<BackgroundColor>%s</BackgroundColor>", escapeText(e.BackgroundColor))
 	fmt.Fprintf(buf, "<OverrideURL>%s</OverrideURL>", escapeText(e.OverrideURL))
-	fmt.Fprintf(buf, "<Tags>%s</Tags>", escapeText(strings.Join(e.Tags, ";")))
+	// Emit med komma — matcher keepassxc-cli's eget export-format. Parser
+	// accepterer begge separatorer.
+	fmt.Fprintf(buf, "<Tags>%s</Tags>", escapeText(strings.Join(e.Tags, ",")))
 
 	writeTimes(buf, e.Times)
 
@@ -145,8 +147,13 @@ func writeTimes(buf *bytes.Buffer, t Times) {
 func writeString(buf *bytes.Buffer, key string, s String) {
 	buf.WriteString("<String>")
 	fmt.Fprintf(buf, "<Key>%s</Key>", escapeText(key))
+	// ProtectInMemory="True" er det attribut-navn keepassxc-cli's import
+	// accepterer for memory-protection af cleartext-værdier. KDBX-spec'ens
+	// "Protected" er for IN-DATABASE stream-cipher-encryption — sætter vi
+	// den på cleartext crasher cli'en med SIGSEGV (2.7.12). Begge attributter
+	// betyder semantisk det samme i vores canonical-model.
 	if s.Protected {
-		fmt.Fprintf(buf, "<Value Protected=\"True\">%s</Value>", escapeText(s.V))
+		fmt.Fprintf(buf, "<Value ProtectInMemory=\"True\">%s</Value>", escapeText(s.V))
 	} else {
 		fmt.Fprintf(buf, "<Value>%s</Value>", escapeText(s.V))
 	}

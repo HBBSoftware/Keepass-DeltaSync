@@ -89,8 +89,14 @@ type xmlString struct {
 }
 
 type xmlValue struct {
-	Content   string `xml:",chardata"`
-	Protected string `xml:"Protected,attr"`
+	Content string `xml:",chardata"`
+	// ProtectInMemory er det attribut-navn keepassxc-cli's eget export
+	// emitterer for memory-protected felter (Password, custom protected
+	// fields). Protected er KDBX-spec'ens in-database form og indikerer
+	// ciphertext — vi accepterer den for robusthed mod ikke-KeePassXC
+	// eksporter, men foretrækker ProtectInMemory ved tvivl.
+	ProtectInMemory string `xml:"ProtectInMemory,attr"`
+	Protected       string `xml:"Protected,attr"`
 }
 
 type xmlBinary struct {
@@ -186,8 +192,11 @@ func (x *xmlEntry) toCanonical() (*Entry, error) {
 	}
 
 	if tags := strings.TrimSpace(x.Tags); tags != "" {
-		// KeePassXC bruger ; som separator. Tomme segmenter dropper vi.
-		for _, t := range strings.Split(tags, ";") {
+		// KDBX accepterer både komma og semikolon som tag-separator.
+		// KeePassXC emitterer med komma; nogle andre tools (gamle KeePass-
+		// versioner, manuelle eksporter) bruger semikolon. Vi splitter på
+		// begge for robusthed. Tomme segmenter dropper vi.
+		for _, t := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ';' }) {
 			if trimmed := strings.TrimSpace(t); trimmed != "" {
 				e.Tags = append(e.Tags, trimmed)
 			}
@@ -197,9 +206,11 @@ func (x *xmlEntry) toCanonical() (*Entry, error) {
 	if len(x.Strings) > 0 {
 		e.Strings = make(map[string]String, len(x.Strings))
 		for _, s := range x.Strings {
+			protected := strings.EqualFold(strings.TrimSpace(s.Value.ProtectInMemory), "True") ||
+				strings.EqualFold(strings.TrimSpace(s.Value.Protected), "True")
 			e.Strings[s.Key] = String{
 				V:         s.Value.Content,
-				Protected: strings.EqualFold(strings.TrimSpace(s.Value.Protected), "True"),
+				Protected: protected,
 			}
 		}
 	}
