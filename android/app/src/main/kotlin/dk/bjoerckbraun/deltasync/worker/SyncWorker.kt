@@ -13,13 +13,12 @@ import androidx.work.WorkerParameters
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import dk.bjoerckbraun.deltasync.api.ApiClient
+import dk.bjoerckbraun.deltasync.persistence.DatabaseConfigStore
 import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
+import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
-import dk.bjoerckbraun.deltasync.sync.TokenStore
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -45,10 +44,6 @@ class SyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val databaseId = inputData.getString(INPUT_DATABASE_ID)
-            ?: return Result.failure()
-        val kdbxPathStr = inputData.getString(INPUT_KDBX_PATH)
-            ?: return Result.failure()
         val passphrase = inputData.getString(INPUT_PASSPHRASE)
             ?: return Result.failure()
 
@@ -58,7 +53,11 @@ class SyncWorker(
             return Result.failure()
         }
 
-        val kdbxPath: Path = Paths.get(kdbxPathStr)
+        val config = DatabaseConfigStore(applicationContext).load() ?: run {
+            Log.w(TAG, "no database configured — cannot sync")
+            return Result.failure()
+        }
+
         val kdbxCredentials = Credentials.from(EncryptedValue.fromString(passphrase))
 
         val api = ApiClient(
@@ -67,12 +66,12 @@ class SyncWorker(
         )
         val crypto = GomobileCryptoSession.open(
             password = passphrase.toByteArray(),
-            databaseId = databaseId,
+            databaseId = config.databaseId,
         )
 
         val persistence = DataStoreSyncStatePersistence(applicationContext)
         val synchronizer = Synchronizer(
-            kdbxPath = kdbxPath,
+            kdbxFile = SafKdbxFile(applicationContext, config.uri),
             credentials = kdbxCredentials,
             api = api,
             crypto = crypto,
@@ -80,7 +79,7 @@ class SyncWorker(
         )
 
         return try {
-            val result = synchronizer.sync(databaseId)
+            val result = synchronizer.sync(config.databaseId)
             Log.i(TAG, "sync ok: $result")
             crypto.close()
             Result.success()
@@ -93,20 +92,20 @@ class SyncWorker(
 
     companion object {
         private const val TAG = "DeltaSyncWorker"
-        const val INPUT_DATABASE_ID = "database_id"
-        const val INPUT_KDBX_PATH = "kdbx_path"
         const val INPUT_PASSPHRASE = "passphrase"
         const val PERIODIC_WORK_NAME = "deltasync-periodic-sync"
 
         /**
-         * Enqueue (eller opdater) den periodiske sync-worker. Kaldes typisk
-         * fra MainActivity efter enrollment, eller efter brugeren har
-         * tilføjet en kdbx-fil.
+         * Enqueue (eller opdater) den periodiske sync-worker. Worker'en
+         * henter selv enrollment + database-config fra de tilsvarende stores;
+         * caller'en passer kun masterpasswordet ind via Data.
+         *
+         * BEMÆRK: passwordet lagres i WorkManager's database i klartekst.
+         * For en hardened release skal vi i stedet bruge en biometric/PIN-
+         * autentificeret indtastning ved hver kørsel.
          */
         fun enqueuePeriodic(
             context: Context,
-            databaseId: String,
-            kdbxPath: String,
             passphrase: String,
             intervalMinutes: Long = 30,
         ) {
@@ -120,8 +119,6 @@ class SyncWorker(
                 .setConstraints(constraints)
                 .setInputData(
                     androidx.work.Data.Builder()
-                        .putString(INPUT_DATABASE_ID, databaseId)
-                        .putString(INPUT_KDBX_PATH, kdbxPath)
                         .putString(INPUT_PASSPHRASE, passphrase)
                         .build()
                 )

@@ -88,7 +88,7 @@ class SynchronizerTest {
             ]}
         """.trimIndent()))
 
-        val sync = Synchronizer(kdbxPath, credentials, api, crypto, persistence)
+        val sync = Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence)
         val result = sync.sync(dbId)
 
         assertEquals(1, result.pulledEntries)
@@ -120,7 +120,7 @@ class SynchronizerTest {
                      "deleted":false,"seq":5,"created_at":"2026-05-29T10:00:00Z"}}
         """.trimIndent()))
 
-        val sync = Synchronizer(kdbxPath, credentials, api, crypto, persistence)
+        val sync = Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence)
         val result = sync.sync(dbId)
 
         assertEquals(0, result.pulledEntries)
@@ -143,11 +143,11 @@ class SynchronizerTest {
             {"entry":{"uuid":"local-uuid","modified_at":"2026-05-29T10:00:00Z",
                      "deleted":false,"seq":1,"created_at":"2026-05-29T10:00:00Z"}}
         """.trimIndent()))
-        Synchronizer(kdbxPath, credentials, api, crypto, persistence).sync(dbId)
+        Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence).sync(dbId)
 
         // Anden sync: server siger "ingen nye changes" og vi har intet at pushe.
         server.enqueue(jsonResponse("""{"current_seq":1,"entries":[]}"""))
-        val second = Synchronizer(kdbxPath, credentials, api, crypto, persistence).sync(dbId)
+        val second = Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence).sync(dbId)
 
         assertEquals(0, second.pulledEntries)
         assertEquals(0, second.pushedEntries)
@@ -170,7 +170,7 @@ class SynchronizerTest {
         // Lille søvn så vi kan detektere ny mtime hvis filen blev rørt.
         Thread.sleep(50)
 
-        Synchronizer(kdbxPath, credentials, api, crypto, persistence).sync(dbId)
+        Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence).sync(dbId)
 
         val mtimeAfter = Files.getLastModifiedTime(kdbxPath)
         assertEquals(mtimeBefore, mtimeAfter, "kdbx file should not have been rewritten on push-only sync")
@@ -197,7 +197,7 @@ class SynchronizerTest {
             ]}
         """.trimIndent()))
 
-        val sync = Synchronizer(kdbxPath, credentials, api, crypto, persistence)
+        val sync = Synchronizer(PathKdbxFile(kdbxPath), credentials, api, crypto, persistence)
         val result = sync.sync(dbId)
 
         assertEquals(1, result.pulledDeletions)

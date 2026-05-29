@@ -6,10 +6,6 @@ import app.keemobile.kotpass.database.KeePassDatabase
 import app.keemobile.kotpass.database.decode
 import app.keemobile.kotpass.database.encode
 import dk.bjoerckbraun.deltasync.api.ApiClient
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 /**
  * Højniveau-orkestrator der pakker hele sync-pipeline'en i én kaldbar
@@ -31,7 +27,7 @@ import java.nio.file.StandardCopyOption
  * coroutine-dispatcher).
  */
 class Synchronizer(
-    private val kdbxPath: Path,
+    private val kdbxFile: KdbxFile,
     private val credentials: Credentials,
     private val api: ApiClient,
     private val crypto: CryptoSession,
@@ -48,8 +44,8 @@ class Synchronizer(
      * (vi gør det selv først *efter* SyncEngine.sync er sluppet ren).
      */
     fun sync(databaseId: String): SyncResult {
-        // 1. Indlæs .kdbx
-        val db: KeePassDatabase = Files.newInputStream(kdbxPath).use { input ->
+        // 1. Indlæs .kdbx via abstraktionen.
+        val db: KeePassDatabase = kdbxFile.open().use { input ->
             KeePassDatabase.decode(input, credentials)
         }
 
@@ -66,11 +62,10 @@ class Synchronizer(
         val result = engine.sync(state)
 
         // 5. Hvis vi pullede ændringer fra serveren, opdater den lokale
-        // .kdbx atomisk (skriv til temp + rename). Pushed entries krævede
-        // ingen lokale ændringer — de var allerede i state.
+        // .kdbx atomisk (delegeres til KdbxFile-impl).
         if (result.pulledEntries > 0 || result.pulledDeletions > 0) {
             val newDb = KotpassLocalStateAdapter.applyToDatabase(state, db)
-            writeAtomic(newDb)
+            kdbxFile.writeAtomic { out -> newDb.encode(out) }
         }
 
         // 6. Persistér ny sync-state.
@@ -83,24 +78,5 @@ class Synchronizer(
         )
 
         return result
-    }
-
-    /**
-     * Skriv [db] til [kdbxPath] atomisk: encode til en temp-fil i samme
-     * mappe, derefter rename. Det undgår at en interrupt midt i encode
-     * efterlader en korrupt .kdbx — gamle data ligger sikkert indtil
-     * rename'en succeeds.
-     */
-    private fun writeAtomic(db: KeePassDatabase) {
-        val tmp = kdbxPath.resolveSibling("${kdbxPath.fileName}.tmp")
-        try {
-            Files.newOutputStream(tmp).use { out ->
-                db.encode(out)
-            }
-            Files.move(tmp, kdbxPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: IOException) {
-            Files.deleteIfExists(tmp)
-            throw e
-        }
     }
 }

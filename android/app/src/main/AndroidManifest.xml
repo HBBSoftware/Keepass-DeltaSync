@@ -33,6 +33,11 @@
             android:exported="false"
             android:label="Enroll device" />
 
+        <activity
+            android:name=".SetupActivity"
+            android:exported="false"
+            android:label="Set up database" />
+
     </application>
 
 </manifest>

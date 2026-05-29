@@ -38,19 +38,26 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     interface for sikker lagring af device-token + private key
     (in-memory impl til tests; Android impl bruger Keystore).
   - 40 grønne tests i alt på Kotlin-siden.
-  - `:app` Android-modul **bygger som debug-APK** (~18.8 MB inkl. JNI
-    .so for alle 4 ABIs):
-    - `MainActivity` minimal status-skærm der validerer at JNI-laget
-      loader.
-    - `KeystoreTokenStore` — production-impl af `TokenStore` oven på
-      `EncryptedSharedPreferences` + Android Keystore master-key.
-    - `DataStoreSyncStatePersistence` — production-impl oven på
-      Jetpack DataStore.
-    - `SyncWorker` — `CoroutineWorker` der trigges periodisk via
-      WorkManager. Tager `database_id`, `kdbx_path`, `passphrase`
-      som input og kører `Synchronizer.sync()`.
-  - Mangler nu: enrollment-UI flow, kdbx-fil-picker, ikon, F-Droid
-    metadata, og test på emulator/enhed.
+  - `:app` Android-modul **bygger som installerbar debug-APK** (~18.8 MB
+    inkl. JNI .so for alle 4 ABIs) med komplet enroll → setup → sync flow:
+    - `MainActivity` — status-skærm. Viser om enheden er enrolled, om en
+      database er konfigureret, og en "Sync now"-knap når begge er på plads.
+    - `EnrollActivity` — enrollment-formular (server-URL +
+      enrollment-token + valgfrit device-navn). Genererer X25519-keypair
+      via gomobile-laget, POST'er til serveren, gemmer device-token via
+      Keystore.
+    - `SetupActivity` — kdbx-picker via SAF (Storage Access Framework) +
+      database-vælger der lister databases fra serveren.
+    - `KeystoreTokenStore` — `EncryptedSharedPreferences` + Android
+      Keystore master-key.
+    - `DataStoreSyncStatePersistence` — Jetpack DataStore for sync-state
+      (lastSeq + syncedAt) mellem app-starter.
+    - `DatabaseConfigStore` — kdbx-URI + server-database-mapping.
+    - `KdbxFile`-abstraktion: `PathKdbxFile` (tests) / `SafKdbxFile`
+      (production via ContentResolver).
+    - `SyncWorker` — periodisk WorkManager-CoroutineWorker.
+  - Mangler stadig: app-ikon, biometrisk-låst password-cache (i stedet for
+    at prompte hver gang), test på rigtig enhed/emulator, F-Droid-submit.
 
 ## Arkitektur
 
