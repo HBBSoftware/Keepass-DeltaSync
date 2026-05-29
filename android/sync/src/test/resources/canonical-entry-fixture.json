@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "uuid": "00010203-0405-0607-0809-0a0b0c0d0e0f",
+  "times": {
+    "created": "2026-05-01T10:00:00Z",
+    "modified": "2026-05-29T10:00:00Z",
+    "accessed": "2026-05-29T10:00:00Z",
+    "expires": false,
+    "usage_count": 5,
+    "location_changed": "2026-05-01T10:00:00Z"
+  },
+  "strings": {
+    "API-Token": {
+      "v": "tok-12345",
+      "protected": true
+    },
+    "Notes": {
+      "v": ""
+    },
+    "Password": {
+      "v": "s3cr3t",
+      "protected": true
+    },
+    "Title": {
+      "v": "GitLab"
+    },
+    "URL": {
+      "v": "https://gitlab.com"
+    },
+    "UserName": {
+      "v": "hans"
+    }
+  },
+  "binaries": [
+    {
+      "name": "key.pem",
+      "data": "AP9C"
+    }
+  ],
+  "tags": [
+    "work",
+    "important"
+  ],
+  "icon_id": 0,
+  "autotype": {
+    "enabled": true,
+    "default_sequence": "{USERNAME}{TAB}{PASSWORD}{ENTER}"
+  },
+  "quality_check": true,
+  "custom_data": {
+    "KPXC_ext": {
+      "v": "browser-state",
+      "modified": "2026-05-20T14:00:00Z"
+    }
+  }
+}

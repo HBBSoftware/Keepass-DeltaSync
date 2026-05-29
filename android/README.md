@@ -9,9 +9,13 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
 - **Licens:** GPL-3.0-or-later
 - **Distribution:** F-Droid først (reproducible builds, ingen Google Play
   Services), Play-version kan tilføjes senere uden refactor.
-- **Status:** M4 i gang. Go-siden via `mobile`-pakken er på plads
-  (`gomobile bind`-vendt API for crypto + canonical wire-format). Kotlin
-  app-skelet er ikke skrevet endnu.
+- **Status:** M4 i gang.
+  - Go-siden via `mobile`-pakken er på plads (`gomobile bind`-vendt API for
+    crypto + canonical wire-format).
+  - Gradle-skelet + `:sync`-modulet er oppe at køre med canonical Kotlin-
+    typer der parser Go-emitterede fixtures (5 grønne tests, kører på
+    JBR fra Android Studio).
+  - Kotpass-mapper, Android app-modul og WorkManager-service mangler.
 
 ## Arkitektur
 
@@ -48,14 +52,43 @@ Entry-level last-writer-wins merge implementeres i Kotlin oven på kotpass.
 Sammenligning af `times.modified` per UUID; ved konflikt tager den nyeste
 seier — samme semantik som desktop's keepassxc-cli merge på entry-niveau.
 
-## Sådan bygges Go-siden
+## Build
 
-`gomobile bind` producerer en .aar + Kotlin-stubs:
+### Kotlin-siden (`:sync`-modulet)
+
+JVM-only modul med canonical-typer + (senere) kotpass-mapper. Tests kører
+på JBR fra Android Studio, ingen emulator nødvendig:
+
+```sh
+# Sæt JAVA_HOME til Android Studio's bundlede JBR
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+
+# Test
+cd android
+./gradlew :sync:test
+```
+
+### Re-generér Go-fixture (når canonical-skemaet ændres)
+
+Hvis Go-sidens `canonical.Entry` ændres, regenerér Kotlin-test-fixturen:
+
+```sh
+cd client
+go test -tags=emit_fixture -run TestEmitFixture ./internal/kdbx/canonical/
+```
+
+Den producerede `android/sync/src/test/resources/canonical-entry-fixture.json`
+checkes ind og bruges af Kotlin-testen til at fange schema-drift mellem de
+to platforme.
+
+### Go-siden via `gomobile bind` (kræver NDK)
+
+`gomobile bind` producerer en `.aar` + Kotlin-stubs:
 
 ```sh
 # Engangs-setup: installer gomobile + Android NDK
 go install golang.org/x/mobile/cmd/gomobile@latest
-gomobile init  # downloader SDK/NDK eller bruger eksisterende ANDROID_HOME
+gomobile init  # downloader NDK eller bruger eksisterende
 
 # Byg .aar fra mobile/-pakken
 cd client
@@ -63,8 +96,8 @@ gomobile bind -target=android -o ../android/libs/deltasync.aar \
     gitlab.com/Star95/keepass-deltasync/client/mobile
 ```
 
-Resultatet er `deltasync.aar` der lægges i Android-projektets `libs/`-mappe
-og dependes via Gradle.
+`.aar`'en placeres i `android/libs/` (gitignored) og inkluderes som
+`implementation(files("libs/deltasync.aar"))` i `:app`-modulets build.
 
 ## Distribution
 
