@@ -23,11 +23,11 @@ Client and server only communicate over a well-defined HTTP API, so GPL/AGPL doe
 
 ## Status
 
-**v1 and v2 multi-user sharing are feature-complete and in active use** (as of 2026-05-28).
+**v1 and v2 multi-user sharing are feature-complete and in active use** (as of 2026-05-29).
 
 - **Server** (PHP / PostgreSQL): live on shared hosting. Endpoints for enrollment, entries with 3-version history, restore, admin CLI, audit log.
-- **Client** (Go): `enroll`, `init`, `init-shared`, `push`, `pull`, `sync`, `daemon` (fsnotify + polling), `versions`, `restore`, `share` / `unshare` / `shares`. Crypto: Argon2id → HKDF → XChaCha20-Poly1305 for entries; X25519 sealed-box for sharing.
-- **Android client**: not started.
+- **Desktop client** (Go): `enroll`, `init`, `init-shared`, `push`, `pull`, `sync`, `daemon` (fsnotify + polling), `versions`, `restore`, `share` / `unshare` / `shares`. Crypto: Argon2id → HKDF → XChaCha20-Poly1305 for entries; X25519 sealed-box for sharing. v3 canonical wire-format with dual-read of v1 legacy blobs during migration.
+- **Android client**: sync core feature-complete (40 tests green), enrollment UI works, `:app` builds as installable debug APK. Kdbx file picker + actual sync trigger UI still to come — see [`android/README.md`](android/README.md). Built on top of `client/mobile/` via `gomobile bind` + kotpass.
 
 ## How it works
 

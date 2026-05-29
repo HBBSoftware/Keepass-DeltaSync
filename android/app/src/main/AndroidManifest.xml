@@ -28,6 +28,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".EnrollActivity"
+            android:exported="false"
+            android:label="Enroll device" />
+
     </application>
 
 </manifest>
