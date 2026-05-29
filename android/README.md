@@ -26,10 +26,17 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     Kompilerer mod den gomobile-genererede classes.jar (compileOnly);
     JNI-laget aktiveres først på Android-runtime.
   - `KotpassLocalStateAdapter` på plads — læser/skriver mellem kotpass'
-    `KeePassDatabase` og vores `LocalState`. SyncEngine kan nu køre
-    direkte mod en åbnet .kdbx (30 grønne tests i alt).
-  - Android app-modul (`:app`), WorkManager-service, og persistens-
-    laget for sync-state (lastSeq + syncedAt på disk) mangler.
+    `KeePassDatabase` og vores `LocalState`.
+  - `Synchronizer` på plads — high-level orkestrator der pakker hele
+    pipelinen i én `sync(databaseId)`-kald: load .kdbx → adapter →
+    sync-engine → adapter → atomisk-skriv .kdbx tilbage. Persistens af
+    `lastSeq`/`syncedAt` mellem app-starter abstraheret via
+    `SyncStatePersistence` (in-memory impl til tests; Android-impl
+    bruger DataStore).
+  - 35 grønne tests i alt på Kotlin-siden.
+  - Android app-modul (`:app`) — Activity, WorkManager-service, enrollment-
+    flow, DataStore-baseret `SyncStatePersistence` — er det sidste der
+    mangler før appen er installerbar.
 
 ## Arkitektur
 
