@@ -25,8 +25,11 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     wrapper den gomobile-bound `mobile.Session` fra `libs/deltasync.aar`.
     Kompilerer mod den gomobile-genererede classes.jar (compileOnly);
     JNI-laget aktiveres først på Android-runtime.
+  - `KotpassLocalStateAdapter` på plads — læser/skriver mellem kotpass'
+    `KeePassDatabase` og vores `LocalState`. SyncEngine kan nu køre
+    direkte mod en åbnet .kdbx (30 grønne tests i alt).
   - Android app-modul (`:app`), WorkManager-service, og persistens-
-    laget (kdbx-fil + LocalState på disk) mangler.
+    laget for sync-state (lastSeq + syncedAt på disk) mangler.
 
 ## Arkitektur
 
