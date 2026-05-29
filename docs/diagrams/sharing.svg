@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Multi-user sharing: sealed-box wrapping of master_key from Alice to Bob">
+    <defs>
+        <linearGradient id="boxGrad3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1e3a8a"/>
+            <stop offset="1" stop-color="#0f172a"/>
+        </linearGradient>
+        <linearGradient id="boxGrad3b" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#5b21b6"/>
+            <stop offset="1" stop-color="#1e1b4b"/>
+        </linearGradient>
+        <marker id="arrow3" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e40af"/>
+        </marker>
+    </defs>
+
+    <style>
+        .bg-panel { fill: #f8fafc; }
+        .alice { fill: url(#boxGrad3); stroke: #38bdf8; stroke-width: 2; }
+        .bob { fill: url(#boxGrad3b); stroke: #c4b5fd; stroke-width: 2; }
+        .srv { fill: #1a2540; stroke: #475569; stroke-width: 2; }
+        .h { fill: #0f172a; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 700; text-anchor: middle; }
+        .t { fill: #f8fafc; font-family: system-ui, sans-serif; font-size: 12px; font-weight: 600; text-anchor: middle; }
+        .st { fill: #cbd5e1; font-family: system-ui, sans-serif; font-size: 10px; text-anchor: middle; }
+        .la { fill: #1e40af; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; text-anchor: middle; }
+        .arr { stroke: #1e40af; stroke-width: 2; fill: none; marker-end: url(#arrow3); }
+        .note { fill: #475569; font-family: system-ui, sans-serif; font-size: 11px; text-anchor: middle; font-style: italic; }
+    </style>
+
+    <rect class="bg-panel" width="720" height="360"/>
+
+    <text class="h" x="100" y="25">Alice (owner)</text>
+
+    <rect class="alice" x="20" y="40" width="160" height="40" rx="6"/>
+    <text class="t" x="100" y="58">master password</text>
+    <text class="st" x="100" y="73">Argon2id ↓</text>
+
+    <rect class="alice" x="20" y="95" width="160" height="40" rx="6"/>
+    <text class="t" x="100" y="113">master_key (32B)</text>
+    <text class="st" x="100" y="128">can decrypt entries</text>
+
+    <line class="arr" x1="100" y1="140" x2="100" y2="175"/>
+    <text class="la" x="100" y="160">box.SealAnonymous</text>
+
+    <rect x="20" y="180" width="160" height="40" rx="6" fill="#f59e0b" stroke="#fde047" stroke-width="2"/>
+    <text style="fill:#0f172a;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;text-anchor:middle" x="100" y="200">wrapped_master_key</text>
+    <text style="fill:#0f172a;font-family:ui-monospace,monospace;font-size:9px;text-anchor:middle" x="100" y="214">80 bytes sealed-box</text>
+
+    <line class="arr" x1="180" y1="200" x2="270" y2="160"/>
+    <text class="la" x="225" y="180" text-anchor="middle">POST /shares</text>
+
+    <text class="h" x="360" y="25">Server</text>
+
+    <rect class="srv" x="270" y="40" width="180" height="220" rx="8"/>
+    <text class="t" x="360" y="60">database_members</text>
+    <text class="st" x="360" y="80">─────────────</text>
+    <text class="st" x="360" y="100">database_id</text>
+    <text class="st" x="360" y="115">user_id (Bob)</text>
+    <text class="st" x="360" y="135">wrapped_master_key:</text>
+    <text x="360" y="150" style="fill:#fde047;font-family:system-ui,sans-serif;font-size:10px;text-anchor:middle">[opaque sealed-box]</text>
+    <text class="st" x="360" y="170">role = 'member'</text>
+    <text class="st" x="360" y="200">─────────────</text>
+    <text class="st" x="360" y="220">Server CANNOT open</text>
+    <text class="st" x="360" y="235">this. Only Bob's</text>
+    <text class="st" x="360" y="250">private key can.</text>
+
+    <line class="arr" x1="450" y1="160" x2="540" y2="200"/>
+    <text class="la" x="495" y="180" text-anchor="middle">GET /databases</text>
+
+    <text class="h" x="620" y="25">Bob (member)</text>
+
+    <rect x="540" y="180" width="160" height="40" rx="6" fill="#f59e0b" stroke="#fde047" stroke-width="2"/>
+    <text style="fill:#0f172a;font-family:system-ui,sans-serif;font-size:12px;font-weight:700;text-anchor:middle" x="620" y="200">wrapped_master_key</text>
+    <text style="fill:#0f172a;font-family:ui-monospace,monospace;font-size:9px;text-anchor:middle" x="620" y="214">downloaded</text>
+
+    <line class="arr" x1="620" y1="225" x2="620" y2="260"/>
+    <text class="la" x="620" y="245">box.OpenAnonymous</text>
+
+    <rect class="bob" x="540" y="265" width="160" height="40" rx="6"/>
+    <text class="t" x="620" y="283">master_key (32B)</text>
+    <text class="st" x="620" y="298">same as Alice's</text>
+
+    <line class="arr" x1="620" y1="170" x2="620" y2="180"/>
+
+    <rect class="bob" x="540" y="115" width="160" height="50" rx="6"/>
+    <text class="t" x="620" y="133">device private key</text>
+    <text class="st" x="620" y="148">X25519, local only</text>
+    <text class="st" x="620" y="160">on Bob's device</text>
+
+    <text class="note" x="360" y="290">Once Bob has master_key, he can decrypt entry blobs just</text>
+    <text class="note" x="360" y="305">like Alice. His local .kdbx has its own password — independent.</text>
+</svg>

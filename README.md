@@ -1,106 +1,132 @@
 # KeePass Delta-Sync
 
-Synkroniseringssystem til KeePass-databaser (.kdbx) på entry-niveau, der genbruger KeePassXC's merge-logik til at undgå konflikter når flere klienter redigerer samme database samtidigt.
+Entry-level synchronization for KeePass databases (`.kdbx`) that reuses KeePassXC's own merge engine to handle concurrent edits from multiple devices without loss.
 
-Filformatet (.kdbx) ændres ikke. Synkronisering sker via en let server der kun ser klient-krypterede blobs — masterpassword forlader aldrig klienten.
+The file format (`.kdbx`) is unchanged. Sync happens through a small server that only ever sees client-encrypted blobs — your master password never leaves your device.
 
-🌐 **Hjemmeside:** [https://deltasync.bjoerck-braun.dk/](https://deltasync.bjoerck-braun.dk/) — visuel introduktion, arkitektur-diagrammer og bruger-guide.
+- **Website:** [deltasync.bjoerck-braun.dk](https://deltasync.bjoerck-braun.dk/) — visual introduction, architecture diagrams, and user guide.
+- **Pre-built client binaries:** [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — Linux, macOS, Windows; no Go toolchain required.
+- **Deep dive:** [`docs/`](docs/) — threat model, concurrent-write semantics, deployment recipes. Full specification in [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md).
 
-📦 **Pre-built klient-binærer:** [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — download for din OS (Linux/macOS/Windows), ingen Go-installation nødvendig.
+## Repository layout
 
-📚 **Detaljer:** [`docs/`](docs/) — threat-model, concurrent-write-semantik, deployment-recipes. Fuld specifikation i [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md).
+This monorepo contains four components, each with its own license:
 
-## Struktur
+| Directory | Component | License | Language |
+|-----------|-----------|---------|----------|
+| [`server/`](server/) | Sync server | AGPL-3.0-or-later | PHP 8.2 + PostgreSQL |
+| [`client/`](client/) | Desktop sync agent | GPL-3.0-or-later | Go |
+| [`android/`](android/) | Android client | GPL-3.0-or-later | Go (gomobile) + Kotlin |
+| [`docs/`](docs/) | Shared documentation | CC-BY-SA-4.0 | Markdown |
 
-Dette monorepo indeholder fire komponenter, hver med sin egen licens:
-
-| Mappe | Komponent | Licens | Sprog |
-|-------|-----------|--------|-------|
-| [`server/`](server/) | Sync-server | AGPL-3.0-or-later | PHP 8.2 + PostgreSQL |
-| [`client/`](client/) | Desktop sync-agent | GPL-3.0-or-later | Go |
-| [`android/`](android/) | Android-klient | GPL-3.0-or-later | Go (gomobile) + Kotlin |
-| [`docs/`](docs/) | Fælles dokumentation | CC-BY-SA-4.0 | Markdown |
-
-Klient og server kommunikerer kun over et veldefineret HTTP-API, så GPL/AGPL "smitter" ikke på tværs.
+Client and server only communicate over a well-defined HTTP API, so GPL/AGPL does not bleed across the boundary.
 
 ## Status
 
-**v1 + v2 multi-bruger sharing er funktionelt komplet og bruges aktivt** (pr. 2026-05-28).
+**v1 and v2 multi-user sharing are feature-complete and in active use** (as of 2026-05-28).
 
-- **Server** (PHP/PostgreSQL): live på shared hosting. Endpoints for enrollment, entries med 3-versioners historik, restore, admin-CLI, audit-log.
-- **Klient** (Go): `enroll`, `init`, `init-shared`, `push`, `pull`, `sync`, `daemon` (fsnotify + polling), `versions`, `restore`, `share`/`unshare`/`shares`. Krypto: Argon2id → HKDF → XChaCha20-Poly1305 for entries, X25519 sealed-box for sharing.
-- **Android-klient**: ikke påbegyndt.
+- **Server** (PHP / PostgreSQL): live on shared hosting. Endpoints for enrollment, entries with 3-version history, restore, admin CLI, audit log.
+- **Client** (Go): `enroll`, `init`, `init-shared`, `push`, `pull`, `sync`, `daemon` (fsnotify + polling), `versions`, `restore`, `share` / `unshare` / `shares`. Crypto: Argon2id → HKDF → XChaCha20-Poly1305 for entries; X25519 sealed-box for sharing.
+- **Android client**: not started.
 
-## Komme i gang
+## How it works
 
-### Som administrator (server-side)
+### Crypto stack
 
-Se [`server/README.md`](server/README.md) for deployment. Skema-migrationer i [`server/schema/`](server/schema/). Migrationer 001–005 udgør v1; 006–007 er v2.
+The client derives an entry encryption key from your master password and encrypts each entry locally. The server only ever stores the opaque blob.
 
-### Som første-gangs-bruger (klient-side)
+![Crypto stack: master password → master_key → entry_key → encrypted blob](docs/diagrams/crypto-stack.svg)
 
-**Option A: Download præ-bygget binær** fra [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — vælg din OS, udpak, og brug binæren direkte. Ingen Go-installation.
+- **Argon2id** raises the cost of brute-forcing the master password (~200 ms, 64 MiB RAM per attempt).
+- **HKDF-SHA256** gives a clean, deterministic separation between the master key and per-use-case subkeys.
+- **XChaCha20-Poly1305** provides authenticated encryption — the server cannot tamper with blobs undetected.
+- **24-byte random nonces** make nonce reuse practically impossible.
 
-**Option B: Byg selv fra source** (kræver Go 1.22+):
+### Bidirectional sync
+
+The daemon reacts to two triggers: *fsnotify* (you saved in KeePassXC) and *polling* (changes from other devices). Merges happen on the client via `keepassxc-cli`, field-level, last-writer-wins on `LastModificationTime`.
+
+![Bidirectional sync between two devices via the server](docs/diagrams/sync-flow.svg)
+
+Both devices derive the same `master_key` from the same master password. The server only serializes writes via a monotonic `database_seq`; it cannot decrypt anything.
+
+### Multi-user sharing
+
+To share a database with another user, the owner wraps `master_key` with the recipient's device public key using NaCl's anonymous sealed-box. The server stores the opaque wrap but cannot open it.
+
+![Sealed-box wrapping: Alice → server → Bob](docs/diagrams/sharing.svg)
+
+Once Bob has `master_key`, he can decrypt entries just like Alice. His local `.kdbx` has its own password, independent of Alice's. See [`docs/v2-concurrent-write-semantics.md`](docs/v2-concurrent-write-semantics.md) for how concurrent edits are handled.
+
+## Getting started
+
+### As an administrator (server side)
+
+See [`server/README.md`](server/README.md) for deployment. Schema migrations live in [`server/schema/`](server/schema/) — `001`–`005` make up v1; `006`–`007` are v2.
+
+### As a first-time user (client side)
+
+**Option A — download a pre-built binary** from [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases): pick your OS, extract, run. No Go toolchain.
+
+**Option B — build from source** (requires Go 1.22+):
+
 ```sh
 cd client && go build -o keepass-deltasync ./cmd/keepass-deltasync
 ```
 
-Derefter (begge options):
+Then (either option):
 
 ```sh
-# Administrator har givet dig en enrollment-token
+# Your administrator gave you an enrollment token
 ./keepass-deltasync enroll --server https://your-server.example.com <token>
 
-# Registrér en lokal .kdbx
+# Register a local .kdbx
 ./keepass-deltasync init mypasswords ~/keepass/my.kdbx
 
-# Synkronisér
+# Sync once
 ./keepass-deltasync sync mypasswords
 
-# Lad daemon synke automatisk (fsnotify + polling)
+# Let the daemon sync automatically (fsnotify + polling)
 ./keepass-deltasync daemon --store-keyring
 ```
 
-### Som modtager af en delt database (v2)
+### As the recipient of a shared database (v2)
 
 ```sh
-# Alice har delt sin database med dig. Du ser den i din liste:
+# Alice has shared her database with you. It shows up in your list:
 ./keepass-deltasync databases
-# adgangskoder  ...  role=member
+# passwords  ...  role=member
 
-# Bootstrap en lokal kopi:
-./keepass-deltasync init-shared adgangskoder ~/keepass/shared.kdbx
-# Prompt: vælg et nyt lokalt password for din kopi
+# Bootstrap a local copy:
+./keepass-deltasync init-shared passwords ~/keepass/shared.kdbx
+# Prompt: pick a new local password for your copy
 ```
 
-Derefter er sharing transparent — `sync`/`daemon` virker som for owned databases.
+After that, sharing is transparent — `sync` / `daemon` behave the same as for owned databases.
 
-### Som deler af en database (v2)
+### As the owner sharing a database (v2)
 
 ```sh
-# Del din database med en anden bruger (de skal være enrollet og have brugt klienten mindst én gang)
-./keepass-deltasync share adgangskoder bob
+# Share with another user (they must be enrolled and have used the client at least once)
+./keepass-deltasync share passwords bob
 
-# Liste medlemmer
-./keepass-deltasync shares adgangskoder
+# List members
+./keepass-deltasync shares passwords
 
-# Fjern et medlem (eller forlad selv en delt database)
-./keepass-deltasync unshare adgangskoder bob
+# Remove a member (or leave a database you don't own)
+./keepass-deltasync unshare passwords bob
 ```
 
-Se [`docs/v2-concurrent-write-semantics.md`](docs/v2-concurrent-write-semantics.md) for hvordan samtidige edits håndteres.
+## Trust model in brief
 
-## Trust-model i korthed
+- **The server sees:** encrypted entry blobs, mtimes, deletions, user and device metadata, an audit log with IP and user-agent.
+- **The server does not see:** entry content (titles, usernames, passwords), master passwords, or database master keys.
+- **Multi-user sharing:** when Alice shares with Bob, the database `master_key` is sealed-box-encrypted to Bob's device public key. The server only sees the opaque sealed-box blob; only Bob's device private key can unwrap it.
 
-- **Serveren ser:** krypterede entry-blobs, mtime, sletninger, bruger- og enhedsmetadata, audit-log med ip+useragent.
-- **Serveren ser IKKE:** entry-indhold (titler, brugernavne, passwords), masterpasswords, database master_keys.
-- **Multi-bruger sharing:** når Alice deler en database med Bob, krypteres database master_key med sealed-box til Bob's enheds public-key. Serveren ser det opaque sealed-box-blob; kun Bob's enheds private-key kan unwrappe.
+See [`docs/threat-model.md`](docs/threat-model.md) for the full trust model.
 
-Se [`docs/threat-model.md`](docs/threat-model.md) for fuld trust-model.
+## Contributing
 
-## Bidrag
-
-- DCO sign-off påkrævet på commits (`git commit -s`).
-- Sikkerhedshul rapporteres via privat kanal (security-mail / GitHub Security Advisory), ikke offentlige issues.
-- Mindst to maintainere skal godkende ændringer i krypto eller auth.
+- DCO sign-off required on commits (`git commit -s`).
+- Security issues go through a private channel (security mail / GitLab security advisory), not public issues.
+- At least two maintainers must approve changes to crypto or auth code.
