@@ -1,0 +1,6 @@
+Initial scaffold release.
+
+• Compiling Android app with the sync core in place.
+• KeyStore-backed credential storage and DataStore-backed sync state.
+• Periodic background sync via WorkManager.
+• No UI for enrollment yet — use the desktop client to enroll.

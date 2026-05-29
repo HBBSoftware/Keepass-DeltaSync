@@ -1,0 +1,59 @@
+Categories:
+  - Security
+License: GPL-3.0-or-later
+AuthorName: Hans Bjørck-Braun
+AuthorWebSite: https://deltasync.bjoerck-braun.dk
+WebSite: https://deltasync.bjoerck-braun.dk
+SourceCode: https://gitlab.com/Star95/keepass-deltasync
+IssueTracker: https://gitlab.com/Star95/keepass-deltasync/-/issues
+Changelog: https://gitlab.com/Star95/keepass-deltasync/-/blob/HEAD/CHANGELOG.md
+
+AutoName: DeltaSync
+
+# Description peges normalt af F-Droid hen til fastlane/metadata/.../full_description.txt;
+# yml-feltet er fallback hvis fastlane-strukturen ikke findes endnu.
+Description: |-
+    End-to-end encrypted entry-level sync for KeePass databases. Pair with
+    KeePass2Android or KeePassDX as the editor; this app runs in the
+    background and keeps your .kdbx in sync with a self-hosted server
+    via per-entry XChaCha20-Poly1305 ciphertext. The server cannot read
+    titles, usernames, or passwords — even if compromised.
+
+RepoType: git
+Repo: https://gitlab.com/Star95/keepass-deltasync.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: android/app
+    sudo:
+      # F-Droid's standard build-container har Go + Android SDK, men NDK
+      # version skal pinnes for at gomobile bind virker (vi har testet
+      # r25c).
+      - apt-get update
+      - apt-get install -y unzip curl
+      - mkdir -p $$NDK_HOME
+      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
+      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
+      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
+    prebuild: |-
+        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
+        export GOPATH=/tmp/go
+        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        cd ../../client
+        go get -tool golang.org/x/mobile/cmd/gobind
+        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
+            -o ../android/libs/deltasync.aar \
+            gitlab.com/Star95/keepass-deltasync/client/mobile
+        cd ../android/libs
+        unzip -o deltasync.aar classes.jar
+        mv classes.jar deltasync-classes.jar
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

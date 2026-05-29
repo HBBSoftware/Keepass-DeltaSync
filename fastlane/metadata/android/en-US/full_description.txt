@@ -1,0 +1,36 @@
+DeltaSync keeps a KeePass (.kdbx) database synchronised across your devices
+through a server that only ever sees encrypted blobs. Your master password
+never leaves the device, and the server cannot read entry titles, usernames,
+passwords, notes or attachments — even if it is compromised.
+
+How it differs from other KeePass sync solutions:
+
+• Entry-level deltas: only changed entries cross the wire, not the whole
+  .kdbx file. Fewer bytes uploaded, fewer wholesale conflicts.
+
+• Real end-to-end encryption: per-entry XChaCha20-Poly1305 with a key
+  derived from your master password via Argon2id and HKDF-SHA256. The
+  server stores opaque ciphertext.
+
+• Concurrent edits merge: two devices editing different entries (or even
+  different fields of the same entry) merge cleanly. Field-level
+  last-writer-wins on conflicts.
+
+• Multi-user sharing without key escrow: NaCl sealed-box wraps the
+  database master key to each recipient's device public key. The server
+  sees who has access, not what they can decrypt.
+
+• Open source from end to end: the AGPL-3.0 server (PHP/PostgreSQL),
+  GPL-3.0 desktop client (Go), and this GPL-3.0 Android client are all
+  published. You can self-host the server, or use someone else's.
+
+This app pairs with KeePass2Android or KeePassDX as your editor — DeltaSync
+itself is a background sync service and does not display your passwords.
+You point it at a .kdbx file on the device, supply the master password
+once, and it keeps the file in sync with the server through WorkManager.
+
+Project: https://gitlab.com/Star95/keepass-deltasync
+Website: https://deltasync.bjoerck-braun.dk
+
+Status: this is v0.1 — the sync layer is feature-complete and tested,
+the UI is minimal. Treat as alpha.
