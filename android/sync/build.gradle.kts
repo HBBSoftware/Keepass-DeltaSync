@@ -17,8 +17,13 @@ dependencies {
     // mellem kotpass' typed Entry og vores canonical wire-format.
     implementation("app.keemobile:kotpass:0.13.0")
 
+    // OkHttp er den valgte HTTP-klient. Den deler okio (som kotpass også
+    // bruger) — én transitiv dep, ingen extra-vægt.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     // okio er en transitiv dep af kotpass, men dens types optræder kun
     // i nogle få kotpass-signaturer — eksplicit på testklassepathen så
     // vores fake binary store kan konstruere ByteString'er.

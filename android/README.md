@@ -16,8 +16,13 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     typer der parser Go-emitterede fixtures.
   - Kotpass-mapper på plads — `Mapper.toCanonical()` /
     `Mapper.toKotpass()` konverterer mellem kotpass' typed Entry og vores
-    wire-format. 14 tests grønne på JBR fra Android Studio.
-  - Android app-modul og WorkManager-service mangler.
+    wire-format.
+  - `SyncEngine` på plads — orkestrerer pull+push mod serverens REST-API
+    (via OkHttp) med entry-level last-writer-wins merge. Tests via
+    MockWebServer dækker pull-only, push-only, konfliktscenarier, og
+    tombstones (24 grønne tests i alt).
+  - Android app-modul (`:app`), WorkManager-service, og den faktiske
+    `CryptoSession`-implementation oven på gomobile-bound `.aar` mangler.
 
 ## Arkitektur
 
