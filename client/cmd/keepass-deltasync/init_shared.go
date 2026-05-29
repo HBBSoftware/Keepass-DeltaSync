@@ -234,14 +234,10 @@ func decryptChangesForImport(changes *api.ChangesResponse, entryKey []byte) ([]k
 			deletions = append(deletions, kdbx.StagingDeletion{UUID: c.UUID, DeletedAt: modAt})
 			continue
 		}
-		fragment, err := crypto.DecryptBlob(entryKey, blob)
+		fragment, err := decryptToFragment(entryKey, blob, c.UUID, modAt)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("entry %s: decrypt failed (wrong master key?): %w", c.UUID, err)
+			return nil, nil, nil, err
 		}
-		// Sync entry's internal <LastModificationTime> til server's modified_at
-		// så fremtidig merge picker den rette version (samme rationale som i
-		// pullChanges).
-		fragment = rewriteLastModificationTime(fragment, modAt)
 		entries = append(entries, kdbx.StagingEntry{
 			UUID:       c.UUID,
 			Fragment:   fragment,

@@ -17,6 +17,7 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/crypto"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/kdbx"
+	"gitlab.com/Star95/keepass-deltasync/client/internal/kdbx/canonical"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/passwd"
 )
 
@@ -273,16 +274,10 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 			deletions = append(deletions, kdbx.StagingDeletion{UUID: c.UUID, DeletedAt: modAt})
 			continue
 		}
-		fragment, derr := crypto.DecryptBlob(e.entryKey, blob)
+		fragment, derr := decryptToFragment(e.entryKey, blob, c.UUID, modAt)
 		if derr != nil {
-			return 0, 0, 0, fmt.Errorf("entry %s: decrypt failed — wrong masterpassword? %w", c.UUID, derr)
+			return 0, 0, 0, derr
 		}
-		// Server's metadata modified_at er sandheden — den interne
-		// <LastModificationTime> i blob'en kan være ældre (sker ved
-		// restore: server kopierer en gammel blob men sætter ny mtime
-		// for at vinde merge). Synk altid feltet til server's værdi så
-		// KeePassXC's merge picker den rigtige version.
-		fragment = rewriteLastModificationTime(fragment, modAt)
 		entries = append(entries, kdbx.StagingEntry{
 			UUID:       c.UUID,
 			Fragment:   fragment,
@@ -382,9 +377,9 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		if !force && !shouldPush(e.db.EntryStates, en.UUID, en.ModifiedAt) {
 			continue
 		}
-		blob, eerr := crypto.EncryptBlob(e.entryKey, en.Fragment)
+		blob, eerr := encodeFragmentToBlob(e.entryKey, en.UUID, en.Fragment)
 		if eerr != nil {
-			return pushed, deleted, maxSeq, fmt.Errorf("encrypt entry %s: %w", en.UUID, eerr)
+			return pushed, deleted, maxSeq, eerr
 		}
 		resp, perr := e.client.PutEntry(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, en.UUID, blob, en.ModifiedAt)
 		if perr != nil {
@@ -432,10 +427,73 @@ func shouldPush(states map[string]string, uuid string, currentMtime time.Time) b
 	return recordedT.Before(currentMtime)
 }
 
+// encodeFragmentToBlob konverterer et keepassxc-cli InnerXML-fragment til en
+// krypteret canonical-blob klar til upload (v3 wire-format). Parser fragmentet
+// til canonical.Entry, marshaller til JSON med format-byte-prefix, og krypterer
+// resultatet. Fejlmeddelelser inkluderer entry-UUID for at gøre push-fejl
+// debugbare.
+func encodeFragmentToBlob(entryKey []byte, uuid string, fragment []byte) ([]byte, error) {
+	ce, err := canonical.FromInnerXML(fragment)
+	if err != nil {
+		return nil, fmt.Errorf("entry %s: parse fragment: %w", uuid, err)
+	}
+	plaintext, err := canonical.EncodeCanonical(ce)
+	if err != nil {
+		return nil, fmt.Errorf("entry %s: encode canonical: %w", uuid, err)
+	}
+	blob, err := crypto.EncryptBlob(entryKey, plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("entry %s: encrypt: %w", uuid, err)
+	}
+	return blob, nil
+}
+
+// decryptToFragment dekrypterer en server-blob og returnerer InnerXML-fragmentet
+// klar til staging. Håndterer dual-read mellem legacy XML (v1, byte 0 == '<') og
+// canonical (v3, byte 0 == 0x01) under migrations-perioden.
+//
+// modAt er server's mtime for denne entry-version — vi forcerer altid entry'ens
+// interne LastModificationTime til denne værdi så keepassxc-cli's merge picker
+// den rigtige version (server's mtime stiger ved restore selv om indholdet er
+// gammelt; uden override ville merge afvise det).
+func decryptToFragment(entryKey, blob []byte, uuid string, modAt time.Time) ([]byte, error) {
+	plaintext, err := crypto.DecryptBlob(entryKey, blob)
+	if err != nil {
+		return nil, fmt.Errorf("entry %s: decrypt failed — wrong masterpassword? %w", uuid, err)
+	}
+
+	switch canonical.DetectFormat(plaintext) {
+	case canonical.FormatCanonical:
+		ce, err := canonical.DecodeCanonical(plaintext)
+		if err != nil {
+			return nil, fmt.Errorf("entry %s: decode canonical: %w", uuid, err)
+		}
+		ce.Times.Modified = modAt
+		fragment, err := canonical.ToInnerXML(ce)
+		if err != nil {
+			return nil, fmt.Errorf("entry %s: emit innerxml: %w", uuid, err)
+		}
+		return fragment, nil
+
+	case canonical.FormatLegacyXML:
+		return rewriteLastModificationTime(plaintext, modAt), nil
+
+	default:
+		if len(plaintext) == 0 {
+			return nil, fmt.Errorf("entry %s: empty plaintext after decrypt", uuid)
+		}
+		return nil, fmt.Errorf("entry %s: unrecognized blob format byte 0x%02x", uuid, plaintext[0])
+	}
+}
+
 // rewriteLastModificationTime erstatter den første forekomst af
 // <LastModificationTime>...</LastModificationTime> i fragmentet med en frisk
 // ISO-tidsstempel. Den første forekomst er entry'ens egen Times — historiske
 // versioner ligger i <History> bagefter og forbliver uændret.
+//
+// Bruges kun på legacy-XML-stien i decryptToFragment; canonical-pull-stien
+// sætter Modified direkte på Entry.Times før ToInnerXML. Funktionen kan
+// fjernes når legacy-blobs er udfaset (E1 i v3-canonical-entry-format.md).
 func rewriteLastModificationTime(fragment []byte, t time.Time) []byte {
 	loc := lastModificationTimeRe.FindIndex(fragment)
 	if loc == nil {
