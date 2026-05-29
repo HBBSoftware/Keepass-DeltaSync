@@ -67,7 +67,11 @@ func NewSession(password []byte, databaseID string) (*Session, error) {
 // NewSessionFromMasterKey opretter en Session direkte fra et allerede-
 // kendt master_key — bruges når Bob har unwrapped en wrapped_master_key
 // fra en delt database (rolle = member).
-func NewSessionFromMasterKey(masterKey []byte, databaseID string) (*Session, error) {
+//
+// Parametre-orden er bevidst (string, []byte) i stedet for ([]byte, string)
+// for at undgå at gomobile-bind genererer to Session-constructors med
+// identisk Java-signatur (kollision med NewSession).
+func NewSessionFromMasterKey(databaseID string, masterKey []byte) (*Session, error) {
 	if len(masterKey) != 32 {
 		return nil, fmt.Errorf("master key must be 32 bytes, got %d", len(masterKey))
 	}
@@ -165,12 +169,24 @@ func (s *Session) DecryptEntry(blob []byte) ([]byte, error) {
 	}
 }
 
+// DeviceKeypair returnerer fra GenerateDeviceKeypair. Pakket som struct så
+// gomobile bind kan generere en stabil Kotlin-class med to byte[]-gettere
+// — multi-return-non-error funcs har dårlig support i gomobile.
+type DeviceKeypair struct {
+	PublicKey  []byte
+	PrivateKey []byte
+}
+
 // GenerateDeviceKeypair producerer en X25519-keypair brugt til v2 sharing.
 // Public-delen postes til serveren ved enrollment; private-delen gemmes
 // lokalt (Android EncryptedSharedPreferences / Keystore). Begge slices er
 // 32 bytes.
-func GenerateDeviceKeypair() (publicKey, privateKey []byte, err error) {
-	return crypto.GenerateBoxKeypair()
+func GenerateDeviceKeypair() (*DeviceKeypair, error) {
+	pub, priv, err := crypto.GenerateBoxKeypair()
+	if err != nil {
+		return nil, err
+	}
+	return &DeviceKeypair{PublicKey: pub, PrivateKey: priv}, nil
 }
 
 // UnwrapSharedMasterKey er medlems-side af v2 sharing: når Bob henter

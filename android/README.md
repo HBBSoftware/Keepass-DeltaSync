@@ -21,8 +21,12 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     (via OkHttp) med entry-level last-writer-wins merge. Tests via
     MockWebServer dækker pull-only, push-only, konfliktscenarier, og
     tombstones (24 grønne tests i alt).
-  - Android app-modul (`:app`), WorkManager-service, og den faktiske
-    `CryptoSession`-implementation oven på gomobile-bound `.aar` mangler.
+  - `GomobileCryptoSession` på plads — production-implementation der
+    wrapper den gomobile-bound `mobile.Session` fra `libs/deltasync.aar`.
+    Kompilerer mod den gomobile-genererede classes.jar (compileOnly);
+    JNI-laget aktiveres først på Android-runtime.
+  - Android app-modul (`:app`), WorkManager-service, og persistens-
+    laget (kdbx-fil + LocalState på disk) mangler.
 
 ## Arkitektur
 
@@ -90,21 +94,42 @@ to platforme.
 
 ### Go-siden via `gomobile bind` (kræver NDK)
 
-`gomobile bind` producerer en `.aar` + Kotlin-stubs:
+Engangs-setup:
 
 ```sh
-# Engangs-setup: installer gomobile + Android NDK
+# 1. gomobile + gobind
 go install golang.org/x/mobile/cmd/gomobile@latest
-gomobile init  # downloader NDK eller bruger eksisterende
-
-# Byg .aar fra mobile/-pakken
 cd client
-gomobile bind -target=android -o ../android/libs/deltasync.aar \
-    gitlab.com/Star95/keepass-deltasync/client/mobile
+go get -tool golang.org/x/mobile/cmd/gobind   # registrér i go.mod
+
+# 2. NDK r25c (gomobile er pt. konservativ overfor nyere NDK's; r25c er
+#    valideret). Download fra https://dl.google.com/android/repository/
+#    android-ndk-r25c-<os>.zip og udpak til $ANDROID_HOME/ndk/25.2.9519653/
 ```
 
-`.aar`'en placeres i `android/libs/` (gitignored) og inkluderes som
-`implementation(files("libs/deltasync.aar"))` i `:app`-modulets build.
+Byg `.aar`:
+
+```sh
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+export ANDROID_HOME="$HOME/AppData/Local/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/25.2.9519653"
+export PATH="$JAVA_HOME/bin:$PATH"
+
+cd client
+gomobile bind -androidapi 21 -target=android \
+    -o ../android/libs/deltasync.aar \
+    gitlab.com/Star95/keepass-deltasync/client/mobile
+
+# Til :sync's compileOnly-classpath: udpak classes.jar
+cd ../android/libs
+unzip -o deltasync.aar classes.jar && mv classes.jar deltasync-classes.jar
+```
+
+`libs/`-filerne er gitignored. `:app`-modulet (når det skrives) vil
+inkludere `.aar`'en med `implementation(files("../libs/deltasync.aar"))` —
+inkl. JNI-`.so`-filerne. `:sync` bruger kun `deltasync-classes.jar` som
+`compileOnly`-dep så `GomobileCryptoSession.kt` kan kompilere uden at
+trække JNI-laget med ind i ren-JVM-tests.
 
 ## Distribution
 

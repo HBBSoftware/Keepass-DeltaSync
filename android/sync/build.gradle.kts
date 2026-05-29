@@ -17,6 +17,16 @@ dependencies {
     // mellem kotpass' typed Entry og vores canonical wire-format.
     implementation("app.keemobile:kotpass:0.13.0")
 
+    // gomobile-bound Go-bro (compileOnly fordi JNI-libsene kun virker på
+    // Android-runtime, ikke pure JVM — kun klasse-stubs trækkes ind til
+    // compile-time så GomobileCryptoSession kan kompilere). Faktisk
+    // runtime-binding sker når .aar'en inkluderes i :app-modulet.
+    //
+    // Genereres af `gomobile bind` (se ../README.md). Hvis filen mangler
+    // fejler kompilation af GomobileCryptoSession; resten af :sync er
+    // upåvirket.
+    compileOnly(files("../libs/deltasync-classes.jar"))
+
     // OkHttp er den valgte HTTP-klient. Den deler okio (som kotpass også
     // bruger) — én transitiv dep, ingen extra-vægt.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

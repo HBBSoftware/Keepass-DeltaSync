@@ -60,7 +60,7 @@ func TestNewSession_RejectsEmptyInputs(t *testing.T) {
 
 func TestNewSessionFromMasterKey(t *testing.T) {
 	masterKey := bytes.Repeat([]byte{0x42}, 32)
-	s, err := NewSessionFromMasterKey(masterKey, testDBID)
+	s, err := NewSessionFromMasterKey(testDBID, masterKey)
 	if err != nil {
 		t.Fatalf("NewSessionFromMasterKey: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestNewSessionFromMasterKey(t *testing.T) {
 }
 
 func TestNewSessionFromMasterKey_RejectsBadSize(t *testing.T) {
-	if _, err := NewSessionFromMasterKey(make([]byte, 16), testDBID); err == nil {
+	if _, err := NewSessionFromMasterKey(testDBID, make([]byte, 16)); err == nil {
 		t.Error("expected error for 16-byte master key")
 	}
 }
@@ -237,7 +237,7 @@ func TestEncryptEntry_BadJSON(t *testing.T) {
 
 func TestSharingFlow_WrapUnwrap(t *testing.T) {
 	// Aliceside: et master_key skal wrappes til Bob's device public-key.
-	bobPub, bobPriv, err := GenerateDeviceKeypair()
+	bobKp, err := GenerateDeviceKeypair()
 	if err != nil {
 		t.Fatalf("generate bob keypair: %v", err)
 	}
@@ -245,21 +245,21 @@ func TestSharingFlow_WrapUnwrap(t *testing.T) {
 	aliceMasterKey := bytes.Repeat([]byte{0xab}, 32)
 
 	// Wrap (server-side store dette opaque blob).
-	wrapped, err := crypto.WrapKey(aliceMasterKey, bobPub)
+	wrapped, err := crypto.WrapKey(aliceMasterKey, bobKp.PublicKey)
 	if err != nil {
 		t.Fatalf("WrapKey: %v", err)
 	}
 
 	// Bob-side: download wrapped, derive pub fra priv, unwrap.
-	derivedPub, err := PublicKeyFromPrivate(bobPriv)
+	derivedPub, err := PublicKeyFromPrivate(bobKp.PrivateKey)
 	if err != nil {
 		t.Fatalf("PublicKeyFromPrivate: %v", err)
 	}
-	if !bytes.Equal(derivedPub, bobPub) {
-		t.Fatal("derivedPub != bobPub")
+	if !bytes.Equal(derivedPub, bobKp.PublicKey) {
+		t.Fatal("derivedPub != bobKp.PublicKey")
 	}
 
-	unwrapped, err := UnwrapSharedMasterKey(wrapped, derivedPub, bobPriv)
+	unwrapped, err := UnwrapSharedMasterKey(wrapped, derivedPub, bobKp.PrivateKey)
 	if err != nil {
 		t.Fatalf("UnwrapSharedMasterKey: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestSharingFlow_WrapUnwrap(t *testing.T) {
 	}
 
 	// Bob bootstrapper en Session med den unwrapped master_key.
-	s, err := NewSessionFromMasterKey(unwrapped, testDBID)
+	s, err := NewSessionFromMasterKey(testDBID, unwrapped)
 	if err != nil {
 		t.Fatalf("NewSessionFromMasterKey: %v", err)
 	}
