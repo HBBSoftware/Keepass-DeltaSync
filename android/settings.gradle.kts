@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 rootProject.name = "deltasync"
 
 include(":sync")
+include(":app")

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DeltaSync</string>
+    <string name="status_not_enrolled">Not enrolled. Open settings to enroll a device.</string>
+    <string name="status_enrolled">Enrolled as %1$s. Last sync: %2$s.</string>
+    <string name="sync_now">Sync now</string>
+</resources>

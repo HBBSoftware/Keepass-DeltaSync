@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand-farver matcher hjemmesiden (deltasync.bjoerck-braun.dk). -->
+    <color name="brand_blue">#1E40AF</color>
+    <color name="brand_gold">#F59E0B</color>
+</resources>

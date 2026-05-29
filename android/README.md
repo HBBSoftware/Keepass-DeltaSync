@@ -38,9 +38,19 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     interface for sikker lagring af device-token + private key
     (in-memory impl til tests; Android impl bruger Keystore).
   - 40 grønne tests i alt på Kotlin-siden.
-  - Android app-modul (`:app`) — Activity, WorkManager-service, DataStore-
-    impl af `SyncStatePersistence`, Keystore-impl af `TokenStore` — er det
-    sidste der mangler før appen er installerbar.
+  - `:app` Android-modul **bygger som debug-APK** (~18.8 MB inkl. JNI
+    .so for alle 4 ABIs):
+    - `MainActivity` minimal status-skærm der validerer at JNI-laget
+      loader.
+    - `KeystoreTokenStore` — production-impl af `TokenStore` oven på
+      `EncryptedSharedPreferences` + Android Keystore master-key.
+    - `DataStoreSyncStatePersistence` — production-impl oven på
+      Jetpack DataStore.
+    - `SyncWorker` — `CoroutineWorker` der trigges periodisk via
+      WorkManager. Tager `database_id`, `kdbx_path`, `passphrase`
+      som input og kører `Synchronizer.sync()`.
+  - Mangler nu: enrollment-UI flow, kdbx-fil-picker, ikon, F-Droid
+    metadata, og test på emulator/enhed.
 
 ## Arkitektur
 
