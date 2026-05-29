@@ -33,10 +33,14 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     `lastSeq`/`syncedAt` mellem app-starter abstraheret via
     `SyncStatePersistence` (in-memory impl til tests; Android-impl
     bruger DataStore).
-  - 35 grønne tests i alt på Kotlin-siden.
-  - Android app-modul (`:app`) — Activity, WorkManager-service, enrollment-
-    flow, DataStore-baseret `SyncStatePersistence` — er det sidste der
-    mangler før appen er installerbar.
+  - `EnrollmentClient` på plads — bytter éngangs enrollment-token for
+    permanent device-token via POST `/api/v1/devices/enroll`. `TokenStore`-
+    interface for sikker lagring af device-token + private key
+    (in-memory impl til tests; Android impl bruger Keystore).
+  - 40 grønne tests i alt på Kotlin-siden.
+  - Android app-modul (`:app`) — Activity, WorkManager-service, DataStore-
+    impl af `SyncStatePersistence`, Keystore-impl af `TokenStore` — er det
+    sidste der mangler før appen er installerbar.
 
 ## Arkitektur
 
