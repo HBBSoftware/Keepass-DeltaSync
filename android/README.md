@@ -13,9 +13,11 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
   - Go-siden via `mobile`-pakken er på plads (`gomobile bind`-vendt API for
     crypto + canonical wire-format).
   - Gradle-skelet + `:sync`-modulet er oppe at køre med canonical Kotlin-
-    typer der parser Go-emitterede fixtures (5 grønne tests, kører på
-    JBR fra Android Studio).
-  - Kotpass-mapper, Android app-modul og WorkManager-service mangler.
+    typer der parser Go-emitterede fixtures.
+  - Kotpass-mapper på plads — `Mapper.toCanonical()` /
+    `Mapper.toKotpass()` konverterer mellem kotpass' typed Entry og vores
+    wire-format. 14 tests grønne på JBR fra Android Studio.
+  - Android app-modul og WorkManager-service mangler.
 
 ## Arkitektur
 
