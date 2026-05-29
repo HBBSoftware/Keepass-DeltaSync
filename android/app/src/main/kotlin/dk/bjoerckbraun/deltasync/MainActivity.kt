@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var setupButton: MaterialButton
     private lateinit var syncNowButton: MaterialButton
     private lateinit var unenrollButton: MaterialButton
+    private lateinit var serverRequiredCard: MaterialCardView
 
     private val enrollLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -64,6 +66,7 @@ class MainActivity : ComponentActivity() {
         setupButton = findViewById(R.id.setupButton)
         syncNowButton = findViewById(R.id.syncNowButton)
         unenrollButton = findViewById(R.id.unenrollButton)
+        serverRequiredCard = findViewById(R.id.serverRequiredCard)
 
         versionText.text = buildString {
             append("v0.1.0 · canonical schema v")
@@ -105,6 +108,10 @@ class MainActivity : ComponentActivity() {
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.GONE
                 unenrollButton.visibility = View.GONE
+                // Vis "server required"-card kun når man ikke er enrolled —
+                // det er der brugeren har brug for at vide at app'en ikke
+                // virker uden en server.
+                serverRequiredCard.visibility = View.VISIBLE
             }
 
             config == null -> {
@@ -118,6 +125,7 @@ class MainActivity : ComponentActivity() {
                 setupButton.visibility = View.VISIBLE
                 syncNowButton.visibility = View.GONE
                 unenrollButton.visibility = View.VISIBLE
+                serverRequiredCard.visibility = View.GONE
             }
 
             else -> {
@@ -133,6 +141,7 @@ class MainActivity : ComponentActivity() {
                 syncNowButton.visibility = View.VISIBLE
                 syncNowButton.isEnabled = true
                 unenrollButton.visibility = View.VISIBLE
+                serverRequiredCard.visibility = View.GONE
             }
         }
     }

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later
+     Adaptive-icon foreground der spejler logo.svg fra hjemmesiden.
+     Viewport er 256 (matcher original SVG) så koordinaterne kan kopieres
+     direkte; Android skalerer til 108dp-canvassen.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+
+    <!-- Sync arc 1 — top from (44,128) curving up to (196,80) -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="14"
+        android:strokeLineCap="round"
+        android:pathData="M 44,128 A 84,84 0 0 1 196,80" />
+
+    <!-- Sync arc 2 — bottom from (212,128) curving down to (60,176) -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="14"
+        android:strokeLineCap="round"
+        android:pathData="M 212,128 A 84,84 0 0 1 60,176" />
+
+    <!-- Delta-shaped arrowheads (top-right + bottom-left) -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M 196,60 L 220,86 L 184,98 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M 60,196 L 36,170 L 72,158 Z" />
+
+    <!-- Key bow (circle at 100,128 r=30) -->
+    <path android:pathData="M 100,128 m -30,0 a 30,30 0 1,0 60,0 a 30,30 0 1,0 -60,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="100" android:startY="98"
+                android:endX="100" android:endY="158"
+                android:type="linear">
+                <item android:offset="0" android:color="#FDE047"/>
+                <item android:offset="1" android:color="#F59E0B"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Key shaft (rect 124,119 w=64 h=18) -->
+    <path android:pathData="M 124,119 h 64 v 18 h -64 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="156" android:startY="119"
+                android:endX="156" android:endY="137"
+                android:type="linear">
+                <item android:offset="0" android:color="#FDE047"/>
+                <item android:offset="1" android:color="#F59E0B"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Key teeth -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 156,137 h 10 v 16 h -10 z" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M 174,137 h 8 v 12 h -8 z" />
+
+    <!-- Bow hole (dark circle inside key bow) -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M 100,128 m -12,0 a 12,12 0 1,0 24,0 a 12,12 0 1,0 -24,0" />
+
+</vector>

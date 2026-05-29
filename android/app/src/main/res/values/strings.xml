@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DeltaSync</string>
-    <string name="status_not_enrolled">Not enrolled. Open settings to enroll a device.</string>
-    <string name="status_enrolled">Enrolled as %1$s. Last sync: %2$s.</string>
+    <string name="status_not_enrolled">Not enrolled. Tap Enroll device below to bind this device to a DeltaSync server.</string>
     <string name="sync_now">Sync now</string>
+    <string name="server_required_note">DeltaSync kræver en server. Du eller din administrator skal have sat én op (PHP + PostgreSQL), genereret et enrollment-token via admin-CLI, og udleveret server-URL\'en til dig. App\'en virker ikke alene — den er en klient til en allerede-fungerende server.\n\nSe https://gitlab.com/Star95/keepass-deltasync for opsætnings-instruktioner.</string>
 </resources>
