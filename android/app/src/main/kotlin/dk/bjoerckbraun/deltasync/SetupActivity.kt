@@ -102,12 +102,14 @@ class SetupActivity : ComponentActivity() {
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) {
                 val credentials = KeystoreTokenStore(applicationContext).load()
-                    ?: return@withContext DatabaseListOutcome.Failure("Not enrolled.")
+                    ?: return@withContext DatabaseListOutcome.Failure(
+                        getString(R.string.setup_error_not_enrolled))
                 try {
                     val api = ApiClient(credentials.serverUrl, credentials.deviceToken)
                     DatabaseListOutcome.Success(api.listDatabases())
                 } catch (e: ApiException) {
-                    DatabaseListOutcome.Failure("Server: ${e.statusCode} ${e.code} ${e.detail}")
+                    DatabaseListOutcome.Failure(getString(R.string.setup_error_server_format,
+                        e.statusCode, e.code, e.detail))
                 } catch (e: Exception) {
                     DatabaseListOutcome.Failure(e.message ?: e::class.simpleName ?: "unknown error")
                 }
@@ -123,13 +125,14 @@ class SetupActivity : ComponentActivity() {
                 is DatabaseListOutcome.Success -> {
                     availableDatabases = outcome.databases
                     if (outcome.databases.isEmpty()) {
-                        errorText.text = "Ingen databases på serveren. Opret én via desktop-klienten først."
+                        errorText.setText(R.string.setup_error_no_databases)
                         errorText.visibility = View.VISIBLE
                     } else {
                         outcome.databases.forEachIndexed { index, db ->
                             val radio = RadioButton(this@SetupActivity).apply {
                                 id = index
-                                text = "${db.name} (${db.role}) — ${db.id.take(8)}…"
+                                text = getString(R.string.setup_database_radio_format,
+                                    db.name, db.role, db.id.take(8))
                                 textSize = 14f
                             }
                             databaseRadios.addView(radio)

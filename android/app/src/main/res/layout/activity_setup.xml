@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -14,7 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Configure database"
+            android:text="@string/setup_title"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -23,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="24dp"
-            android:text="Vælg din lokale .kdbx-fil og match den til en database på serveren. App'en husker konfigurationen og kører periodisk sync i baggrunden."
+            android:text="@string/setup_description"
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary" />
 
@@ -31,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="1. Vælg .kdbx-fil"
+            android:text="@string/setup_step_pick_file"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -41,7 +43,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Choose file…" />
+            android:text="@string/setup_action_pick_file" />
 
         <TextView
             android:id="@+id/pickedFileText"
@@ -51,14 +53,13 @@
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary"
             android:visibility="gone"
-            tools:text="my-passwords.kdbx"
-            xmlns:tools="http://schemas.android.com/tools" />
+            tools:text="my-passwords.kdbx" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="2. Match til server-database"
+            android:text="@string/setup_step_match_database"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -68,7 +69,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="List databases on server" />
+            android:text="@string/setup_action_list_databases" />
 
         <RadioGroup
             android:id="@+id/databaseRadios"
@@ -82,7 +83,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Save configuration"
+            android:text="@string/setup_action_save"
             android:enabled="false" />
 
         <ProgressBar
@@ -100,8 +101,7 @@
             android:layout_marginTop="16dp"
             android:textColor="?attr/colorError"
             android:textSize="14sp"
-            android:visibility="gone"
-            xmlns:app="http://schemas.android.com/apk/res-auto" />
+            android:visibility="gone" />
 
     </LinearLayout>
 

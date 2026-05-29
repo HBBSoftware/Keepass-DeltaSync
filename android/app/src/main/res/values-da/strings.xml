@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app_name forbliver "DeltaSync" — brand-navnet oversættes ikke. -->
+
+    <!-- MainActivity -->
+    <string name="status_label">Status</string>
+    <string name="status_not_enrolled">Ikke enrolled. Tryk på Enroll-knappen for at binde denne enhed til en DeltaSync-server.</string>
+    <string name="status_enrolled_no_db_format">Enrolled.\n\nServer: %1$s\nEnhed: %2$s…\n\nDatabase ikke konfigureret. Tryk nedenfor for at vælge en .kdbx og matche den til en database på serveren.</string>
+    <string name="status_ready_format">Klar til at synkronisere.\n\nServer: %1$s\nEnhed: %2$s…\nLokal kdbx: %3$s\nServer-db: %4$s…</string>
+
+    <string name="action_enroll_device">Enroll enhed</string>
+    <string name="action_setup_database">Konfigurer database</string>
+    <string name="action_sync_now">Synk nu</string>
+    <string name="action_unenroll">Glem enheds-credentials</string>
+
+    <string name="server_required_label">Server påkrævet</string>
+    <string name="server_required_note">DeltaSync kræver en server. Du eller din administrator skal have sat én op (PHP + PostgreSQL), genereret et enrollment-token via admin-CLI, og udleveret server-URL\'en til dig. App\'en virker ikke alene — den er en klient til en allerede-fungerende server.\n\nSe https://gitlab.com/Star95/keepass-deltasync for opsætnings-instruktioner.</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_dialog_title">Synk nu</string>
+    <string name="sync_dialog_message">Indtast din .kdbx-master-password for at dekryptere lokalt.</string>
+    <string name="sync_dialog_hint">kdbx-master-password</string>
+    <string name="sync_dialog_action">Synk</string>
+    <string name="sync_result_ok_title">Synk OK</string>
+    <string name="sync_result_format">Pullet: %1$d entries, %2$d sletninger\nPushet: %3$d entries, %4$d sletninger\nServer-seq: %5$d</string>
+    <string name="sync_result_failed_title">Synk fejlede</string>
+
+    <!-- EnrollActivity -->
+    <string name="enroll_title">Enroll enhed</string>
+    <string name="enroll_description">Bytter et éngangs enrollment-token (udleveret af serverens administrator) for et permanent device-token. App\'en genererer en lokal X25519-nøgle der gemmes i Android Keystore.</string>
+    <string name="enroll_label_server_url">Server-URL</string>
+    <string name="enroll_label_token">Enrollment-token</string>
+    <string name="enroll_label_device_name">Enheds-navn (valgfrit)</string>
+    <string name="enroll_action">Enroll</string>
+    <string name="enroll_error_required_fields">Server-URL og enrollment-token er påkrævet.</string>
+    <string name="enroll_error_url_scheme">Server-URL skal starte med https:// eller http://</string>
+    <string name="enroll_error_server_format">Server afviste: %1$d %2$s %3$s</string>
+    <string name="enroll_error_generic_format">Enrollment fejlede: %1$s</string>
+
+    <!-- SetupActivity -->
+    <string name="setup_title">Konfigurer database</string>
+    <string name="setup_description">Vælg din lokale .kdbx-fil og match den til en database på serveren. App\'en husker konfigurationen og kører periodisk sync i baggrunden.</string>
+    <string name="setup_step_pick_file">1. Vælg .kdbx-fil</string>
+    <string name="setup_action_pick_file">Vælg fil…</string>
+    <string name="setup_step_match_database">2. Match til server-database</string>
+    <string name="setup_action_list_databases">List databases på serveren</string>
+    <string name="setup_action_save">Gem konfiguration</string>
+    <string name="setup_error_not_enrolled">Ikke enrolled.</string>
+    <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>
+    <string name="setup_error_no_databases">Ingen databases på serveren. Opret én via desktop-klienten først.</string>
+    <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
+</resources>

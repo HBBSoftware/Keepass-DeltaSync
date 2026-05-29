@@ -38,7 +38,7 @@
             android:id="@+id/statusLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Status"
+            android:text="@string/status_label"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textAllCaps="true"
@@ -74,7 +74,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Server required"
+                    android:text="@string/server_required_label"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textAllCaps="true"
@@ -98,14 +98,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Enroll device" />
+            android:text="@string/action_enroll_device" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/setupButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Set up database"
+            android:text="@string/action_setup_database"
             android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
@@ -114,7 +114,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="@string/sync_now"
+            android:text="@string/action_sync_now"
             android:enabled="false"
             android:visibility="gone" />
 
@@ -124,7 +124,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Forget device credentials"
+            android:text="@string/action_unenroll"
             android:visibility="gone" />
 
     </LinearLayout>

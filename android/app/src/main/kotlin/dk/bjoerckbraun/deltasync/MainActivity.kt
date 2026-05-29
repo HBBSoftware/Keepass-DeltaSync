@@ -31,6 +31,9 @@ import kotlinx.coroutines.withContext
  * Hovedindgangs-Activity. Viser nuværende status (enrolled, konfigureret),
  * tilbyder enrollment + setup-flow ved første kørsel, og når begge dele
  * er på plads: en "Sync now"-knap der prompter for masterpassword.
+ *
+ * Alle bruger-synlige strenge ligger i strings.xml så UI'en kan vises
+ * på engelsk (default) eller dansk (values-da/) afhængig af enheds-sproget.
  */
 class MainActivity : ComponentActivity() {
 
@@ -68,10 +71,8 @@ class MainActivity : ComponentActivity() {
         unenrollButton = findViewById(R.id.unenrollButton)
         serverRequiredCard = findViewById(R.id.serverRequiredCard)
 
-        versionText.text = buildString {
-            append("v0.1.0 · canonical schema v")
-            append(runCatching { mobile.Mobile.SchemaVersion }.getOrElse { "?" })
-        }
+        val schemaVersion = runCatching { mobile.Mobile.SchemaVersion.toInt() }.getOrElse { 0 }
+        versionText.text = getString(R.string.version_footer, BuildConfig.VERSION_NAME, schemaVersion)
 
         enrollButton.setOnClickListener {
             enrollLauncher.launch(Intent(this, EnrollActivity::class.java))
@@ -108,19 +109,15 @@ class MainActivity : ComponentActivity() {
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.GONE
                 unenrollButton.visibility = View.GONE
-                // Vis "server required"-card kun når man ikke er enrolled —
-                // det er der brugeren har brug for at vide at app'en ikke
-                // virker uden en server.
                 serverRequiredCard.visibility = View.VISIBLE
             }
 
             config == null -> {
-                statusText.text = buildString {
-                    append("Enrolled.\n\n")
-                    append("Server: ").append(credentials.serverUrl).append('\n')
-                    append("Device: ").append(credentials.deviceId.take(8)).append("…\n\n")
-                    append("Database not configured. Tap below to pick a .kdbx and match it to a server database.")
-                }
+                statusText.text = getString(
+                    R.string.status_enrolled_no_db_format,
+                    credentials.serverUrl,
+                    credentials.deviceId.take(8),
+                )
                 enrollButton.visibility = View.GONE
                 setupButton.visibility = View.VISIBLE
                 syncNowButton.visibility = View.GONE
@@ -129,13 +126,13 @@ class MainActivity : ComponentActivity() {
             }
 
             else -> {
-                statusText.text = buildString {
-                    append("Ready to sync.\n\n")
-                    append("Server: ").append(credentials.serverUrl).append('\n')
-                    append("Device: ").append(credentials.deviceId.take(8)).append("…\n")
-                    append("Local kdbx: ").append(config.kdbxName).append('\n')
-                    append("Server db: ").append(config.databaseId.take(8)).append('…')
-                }
+                statusText.text = getString(
+                    R.string.status_ready_format,
+                    credentials.serverUrl,
+                    credentials.deviceId.take(8),
+                    config.kdbxName,
+                    config.databaseId.take(8),
+                )
                 enrollButton.visibility = View.GONE
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.VISIBLE
@@ -150,7 +147,7 @@ class MainActivity : ComponentActivity() {
         val input = TextInputEditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                 android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            hint = "kdbx master password"
+            hint = getString(R.string.sync_dialog_hint)
         }
         val layout = TextInputLayout(this).apply {
             setPadding(48, 24, 48, 0)
@@ -158,11 +155,11 @@ class MainActivity : ComponentActivity() {
         }
 
         MaterialAlertDialogBuilder(this)
-            .setTitle("Sync now")
-            .setMessage("Indtast .kdbx-master-password for at dekryptere lokalt.")
+            .setTitle(R.string.sync_dialog_title)
+            .setMessage(R.string.sync_dialog_message)
             .setView(layout)
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("Sync") { _, _ ->
+            .setPositiveButton(R.string.sync_dialog_action) { _, _ ->
                 val passphrase = input.text?.toString().orEmpty()
                 if (passphrase.isNotEmpty()) runSync(passphrase)
             }
@@ -201,20 +198,21 @@ class MainActivity : ComponentActivity() {
             outcome.fold(
                 onSuccess = { result ->
                     MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle("Sync OK")
-                        .setMessage(buildString {
-                            append("Pulled: ").append(result.pulledEntries).append(" entries, ")
-                            append(result.pulledDeletions).append(" deletions\n")
-                            append("Pushed: ").append(result.pushedEntries).append(" entries, ")
-                            append(result.pushedDeletions).append(" deletions\n")
-                            append("Server seq: ").append(result.newLastSeq)
-                        })
+                        .setTitle(R.string.sync_result_ok_title)
+                        .setMessage(getString(
+                            R.string.sync_result_format,
+                            result.pulledEntries,
+                            result.pulledDeletions,
+                            result.pushedEntries,
+                            result.pushedDeletions,
+                            result.newLastSeq,
+                        ))
                         .setPositiveButton(android.R.string.ok, null)
                         .show()
                 },
                 onFailure = { e ->
                     MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle("Sync failed")
+                        .setTitle(R.string.sync_result_failed_title)
                         .setMessage(e.message ?: e::class.simpleName ?: "unknown error")
                         .setPositiveButton(android.R.string.ok, null)
                         .show()

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -15,7 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Enroll device"
+            android:text="@string/enroll_title"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -24,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="24dp"
-            android:text="Bytter et éngangs enrollment-token (udleveret af serverens administrator) for et permanent device-token. App'en genererer en lokal X25519-nøgle der gemmes i Android Keystore."
+            android:text="@string/enroll_description"
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary" />
 
@@ -32,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="Server URL">
+            android:hint="@string/enroll_label_server_url">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/serverUrlInput"
@@ -48,9 +49,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Enrollment token"
-            app:passwordToggleEnabled="true"
-            xmlns:app="http://schemas.android.com/apk/res-auto">
+            android:hint="@string/enroll_label_token"
+            app:passwordToggleEnabled="true">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/tokenInput"
@@ -65,7 +65,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Device name (valgfrit)">
+            android:hint="@string/enroll_label_device_name">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/deviceNameInput"
@@ -81,7 +81,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Enroll" />
+            android:text="@string/enroll_action" />
 
         <ProgressBar
             android:id="@+id/enrollProgress"
@@ -98,8 +98,7 @@
             android:layout_marginTop="16dp"
             android:textColor="?attr/colorError"
             android:textSize="14sp"
-            android:visibility="gone"
-            xmlns:app="http://schemas.android.com/apk/res-auto" />
+            android:visibility="gone" />
 
     </LinearLayout>
 

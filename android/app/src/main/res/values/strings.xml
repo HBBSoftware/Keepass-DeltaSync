@@ -1,7 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DeltaSync</string>
+
+    <!-- MainActivity -->
+    <string name="version_footer">v%1$s · canonical schema v%2$d</string>
+    <string name="status_label">Status</string>
     <string name="status_not_enrolled">Not enrolled. Tap Enroll device below to bind this device to a DeltaSync server.</string>
-    <string name="sync_now">Sync now</string>
-    <string name="server_required_note">DeltaSync kræver en server. Du eller din administrator skal have sat én op (PHP + PostgreSQL), genereret et enrollment-token via admin-CLI, og udleveret server-URL\'en til dig. App\'en virker ikke alene — den er en klient til en allerede-fungerende server.\n\nSe https://gitlab.com/Star95/keepass-deltasync for opsætnings-instruktioner.</string>
+    <string name="status_enrolled_no_db_format">Enrolled.\n\nServer: %1$s\nDevice: %2$s…\n\nDatabase not configured. Tap below to pick a .kdbx and match it to a server database.</string>
+    <string name="status_ready_format">Ready to sync.\n\nServer: %1$s\nDevice: %2$s…\nLocal kdbx: %3$s\nServer db: %4$s…</string>
+
+    <string name="action_enroll_device">Enroll device</string>
+    <string name="action_setup_database">Set up database</string>
+    <string name="action_sync_now">Sync now</string>
+    <string name="action_unenroll">Forget device credentials</string>
+
+    <string name="server_required_label">Server required</string>
+    <string name="server_required_note">DeltaSync requires a server. You or your administrator must have set one up (PHP + PostgreSQL), generated an enrollment token via the admin CLI, and given you the server URL. This app does not work standalone — it is a client to an already-running server.\n\nSee https://gitlab.com/Star95/keepass-deltasync for setup instructions.</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_dialog_title">Sync now</string>
+    <string name="sync_dialog_message">Enter your .kdbx master password to decrypt locally.</string>
+    <string name="sync_dialog_hint">kdbx master password</string>
+    <string name="sync_dialog_action">Sync</string>
+    <string name="sync_result_ok_title">Sync OK</string>
+    <string name="sync_result_format">Pulled: %1$d entries, %2$d deletions\nPushed: %3$d entries, %4$d deletions\nServer seq: %5$d</string>
+    <string name="sync_result_failed_title">Sync failed</string>
+
+    <!-- EnrollActivity -->
+    <string name="enroll_title">Enroll device</string>
+    <string name="enroll_description">Trades a one-time enrollment token (issued by the server\'s administrator) for a permanent device token. The app generates a local X25519 keypair stored in Android Keystore.</string>
+    <string name="enroll_label_server_url">Server URL</string>
+    <string name="enroll_label_token">Enrollment token</string>
+    <string name="enroll_label_device_name">Device name (optional)</string>
+    <string name="enroll_action">Enroll</string>
+    <string name="enroll_error_required_fields">Server URL and enrollment token are required.</string>
+    <string name="enroll_error_url_scheme">Server URL must start with https:// or http://</string>
+    <string name="enroll_error_server_format">Server rejected: %1$d %2$s %3$s</string>
+    <string name="enroll_error_generic_format">Enrollment failed: %1$s</string>
+
+    <!-- SetupActivity -->
+    <string name="setup_title">Configure database</string>
+    <string name="setup_description">Pick your local .kdbx file and match it to a database on the server. The app remembers the configuration and runs periodic background sync.</string>
+    <string name="setup_step_pick_file">1. Pick .kdbx file</string>
+    <string name="setup_action_pick_file">Choose file…</string>
+    <string name="setup_step_match_database">2. Match to server database</string>
+    <string name="setup_action_list_databases">List databases on server</string>
+    <string name="setup_action_save">Save configuration</string>
+    <string name="setup_error_not_enrolled">Not enrolled.</string>
+    <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>
+    <string name="setup_error_no_databases">No databases on the server. Create one via the desktop client first.</string>
+    <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
 </resources>

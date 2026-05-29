@@ -50,12 +50,12 @@ class EnrollActivity : ComponentActivity() {
             val deviceName = deviceNameInput.text?.toString()?.trim().orEmpty()
 
             if (serverUrl.isEmpty() || token.isEmpty()) {
-                errorText.text = "Server URL og enrollment token er påkrævet."
+                errorText.setText(R.string.enroll_error_required_fields)
                 errorText.visibility = View.VISIBLE
                 return@setOnClickListener
             }
             if (!serverUrl.startsWith("http://") && !serverUrl.startsWith("https://")) {
-                errorText.text = "Server URL skal starte med https:// eller http://"
+                errorText.setText(R.string.enroll_error_url_scheme)
                 errorText.visibility = View.VISIBLE
                 return@setOnClickListener
             }
@@ -116,9 +116,11 @@ class EnrollActivity : ComponentActivity() {
 
             EnrollmentOutcome.Success
         } catch (e: ApiException) {
-            EnrollmentOutcome.Failure("Server afviste: ${e.statusCode} ${e.code} ${e.detail}")
+            EnrollmentOutcome.Failure(getString(R.string.enroll_error_server_format,
+                e.statusCode, e.code, e.detail))
         } catch (e: Exception) {
-            EnrollmentOutcome.Failure("Enrollment fejlede: ${e.message ?: e::class.simpleName}")
+            EnrollmentOutcome.Failure(getString(R.string.enroll_error_generic_format,
+                e.message ?: e::class.simpleName ?: ""))
         }
     }
 
