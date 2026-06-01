@@ -6,6 +6,36 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Desktop client `tui` subcommand** — an interactive full-screen menu
+  (tview) that runs the common commands without having to remember
+  command names, flags or database names. It is a thin command-selector:
+  reads `config.toml` for state + the database list and shells out to
+  the same binary so password prompts work unchanged.
+- **Android: "remember password while the app is running"** — optional
+  checkbox in the sync dialog; the passphrase is held in memory for the
+  process lifetime only (never persisted), and cleared on sync failure
+  or when device credentials are forgotten.
+- **Android: live sync progress** — progress bar + label showing
+  Opening / Pulling x/total / Pushing x/total / Saving during a sync.
+
+### Fixed
+
+- **Server returned newline-wrapped base64** — PostgreSQL's
+  `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
+  decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)
+  rejected the embedded `\n` with "Illegal base64 character a". The
+  entry changes/versions endpoints now strip the newlines.
+
+### Changed
+
+- **Per-component release versioning** — release tags are now namespaced
+  (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
+  components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
+  tags are legacy and no longer trigger CI. See
+  [`VERSIONING.md`](VERSIONING.md).
+
 ## [0.1.0] — 2026-05-29
 
 First tagged release. Brings the server, desktop client, and a working
