@@ -73,7 +73,7 @@ final class EntryController
 
         $entries = array_map(fn(array $r): array => [
             'uuid'               => $r['entry_uuid'],
-            'blob'               => $r['blob'],
+            'blob'               => self::cleanBase64($r['blob']),
             'modified_at'        => self::isoUtc($r['modified_at']),
             'deleted'            => (bool) $r['deleted'],
             'seq'                => (int)  $r['server_seq'],
@@ -183,7 +183,7 @@ final class EntryController
             'modified_at' => self::isoUtc($r['modified_at']),
             'created_at'  => self::isoUtc($r['created_at']),
             'deleted'     => (bool) $r['deleted'],
-            'blob'        => $r['blob'],
+            'blob'        => self::cleanBase64($r['blob']),
         ], $rows);
 
         $log->debug(EventType::EntryVersionsListed, [
@@ -234,7 +234,7 @@ final class EntryController
             'modified_at' => self::isoUtc($row['modified_at']),
             'created_at'  => self::isoUtc($row['created_at']),
             'deleted'     => (bool) $row['deleted'],
-            'blob'        => $row['blob'],
+            'blob'        => self::cleanBase64($row['blob']),
         ]);
     }
 
@@ -476,6 +476,18 @@ final class EntryController
             }
             throw $e;
         }
+    }
+
+    /**
+     * PG's encode(…, 'base64') wrapper outputtet hvert 76. tegn med \n
+     * (RFC 2045/MIME). Strip dem, så klienter med strikte base64-decodere
+     * (Android's java.util.Base64.getDecoder(), Go's base64.StdEncoding) ikke
+     * fejler med "Illegal base64 character a" (0x0a = newline). Samme fix som
+     * DatabaseController allerede gør for wrapped_master_key.
+     */
+    private static function cleanBase64(string $b64): string
+    {
+        return str_replace("\n", '', $b64);
     }
 
     /** Konverter PG-timestamp til ISO 8601 UTC (Z-suffix). */
