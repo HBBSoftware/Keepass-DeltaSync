@@ -36,6 +36,7 @@ Commands:
   devices                     List all enrolled devices for this user
   databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
+  tui                         Interactive full-screen menu for the commands above
   admin <subcommand>          Admin commands (token-sql, user-create, user-list, ...)
 `
 
@@ -78,6 +79,8 @@ func main() {
 		exitOnError(runDatabases(os.Args[2:]))
 	case "log":
 		exitOnError(runLog(os.Args[2:]))
+	case "tui", "menu":
+		exitOnError(runTui(os.Args[2:]))
 	case "admin":
 		exitOnError(runAdmin(os.Args[2:]))
 	case "sync-test":
