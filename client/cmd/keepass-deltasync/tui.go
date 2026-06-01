@@ -120,6 +120,7 @@ func (t *tui) showMain() {
 			t.runSelf("daemon", "--store-keyring")
 			t.showMain()
 		})
+		list.AddItem("Skift konto (guided)", "Skift hvilken konto denne enhed synker fra", 'k', func() { t.switchAccountWizard() })
 		list.AddItem("Avanceret …", "Versioner, gendan, deling", 'a', func() { t.showAdvanced() })
 	}
 
@@ -199,6 +200,12 @@ func (t *tui) showAdvanced() {
 
 	list.AddItem("Enrollment-token til ny enhed", "Generér token til fx Android-appen (kræver admin-token)", 't', func() {
 		t.enrollmentTokenFlow()
+	})
+	list.AddItem("Glem database", "Fjern en lokal binding fra config (rører ikke server/fil)", 'x', func() {
+		t.pickDatabaseThen("Glem database", t.showAdvanced, func(name string) {
+			t.runSelf("forget", name)
+			t.showAdvanced()
+		})
 	})
 
 	list.AddItem("‹ Tilbage", "", 'q', t.showMain)
@@ -372,4 +379,115 @@ func (t *tui) enrollmentTokenFlow() {
 		t.runSelfEnv(extraEnv, "admin", "user-enrollment", user)
 		t.showAdvanced()
 	})
+}
+
+// ============================================================
+// Skift konto-wizard
+// ============================================================
+
+// switchAccountWizard guider gennem at skifte hvilken konto denne enhed synker
+// fra — på samme server. Den kæder de eksisterende kommandoer:
+// enroll → databases → init --bind → sync. Hvert trin udføres ved at shelle ud
+// (runSelf), så master-password-prompten i sync virker uændret.
+func (t *tui) switchAccountWizard() {
+	cfg, err := config.Load()
+	if err != nil || cfg.Server.URL == "" {
+		t.showNotice("Skift konto",
+			"Ingen server i config endnu. Brug 'Enroll enhed' først.", t.showMain)
+		return
+	}
+	server := cfg.Server.URL
+
+	intro := "Dette skifter hvilken konto denne enhed synker fra — på SAMME server:\n\n" +
+		"  " + server + "\n\n" +
+		"Trin:\n" +
+		"  1) Enroll mod den anden konto (indsæt et enrollment-token)\n" +
+		"  2) Se kontoens databaser + UUID\n" +
+		"  3) Bind en lokal .kdbx til den database\n" +
+		"  4) Synk alt ned\n\n" +
+		"Vigtigt:\n" +
+		"  • Din nuværende server-blok bliver OVERSKREVET (ny enhed-identitet).\n" +
+		"  • Den lokale .kdbx skal bruge SAMME master-password som databasen.\n" +
+		"    Har du ingen lokal kopi, så lav en tom .kdbx i KeePassXC med det\n" +
+		"    rigtige password — sync fylder resten i.\n" +
+		"  • Den gamle binding bliver forældet; ryd op bagefter med\n" +
+		"    Avanceret → Glem database."
+	t.showNotice("Skift konto — sådan virker det", intro, func() {
+		t.switchStepEnroll()
+	})
+}
+
+func (t *tui) switchStepEnroll() {
+	t.collectInputs("Skift konto · 1/3 — enroll mod den anden konto", []inputField{
+		{label: "Enrollment-token"},
+	}, func(v []string) {
+		token := strings.TrimSpace(v[0])
+		if token == "" {
+			t.showMain()
+			return
+		}
+		// Server-URL'en ligger allerede i config (samme server) → ingen --server.
+		t.runSelf("enroll", token)
+		t.switchStepDatabases()
+	})
+}
+
+func (t *tui) switchStepDatabases() {
+	t.showNotice("Skift konto · 2/3 — find databasen",
+		"Nu vises den nye kontos databaser.\n\nNotér UUID'et på den database du vil binde til — du skal indsætte det i næste trin.",
+		func() {
+			t.runSelf("databases")
+			t.switchStepBind()
+		})
+}
+
+func (t *tui) switchStepBind() {
+	t.collectInputs("Skift konto · 3/3 — bind lokal .kdbx", []inputField{
+		{label: "Lokalt navn (fx 'adgangskoder')"},
+		{label: "Sti til lokal .kdbx"},
+		{label: "Remote database-UUID"},
+	}, func(v []string) {
+		name := strings.TrimSpace(v[0])
+		path := strings.TrimSpace(v[1])
+		uuid := strings.TrimSpace(v[2])
+		if name == "" || path == "" || uuid == "" {
+			t.showMain()
+			return
+		}
+		t.runSelf("init", name, path, "--bind", uuid)
+		t.switchStepSync(name)
+	})
+}
+
+func (t *tui) switchStepSync(name string) {
+	t.showNotice("Skift konto — næsten færdig",
+		"Bindingen '"+name+"' er sat op.\n\n"+
+			"Vælg Fortsæt for at synke nu (du bliver bedt om master-passwordet),\n"+
+			"eller Annullér for at vende tilbage og synke senere.\n\n"+
+			"Husk: den gamle binding kan fjernes med Avanceret → Glem database.",
+		func() {
+			t.runSelf("sync", name)
+			t.showMain()
+		})
+}
+
+// showNotice viser en informations-/bekræftelses-skærm med rulbar tekst og
+// to valg: Fortsæt (onContinue) eller Annullér (tilbage til hovedmenuen).
+func (t *tui) showNotice(title, body string, onContinue func()) {
+	tv := tview.NewTextView().SetWrap(true)
+	tv.SetText(body)
+	tv.SetBorder(true)
+	tv.SetTitle(" " + title + " ")
+	tv.SetTitleAlign(tview.AlignLeft)
+
+	choices := tview.NewList()
+	choices.ShowSecondaryText(false)
+	choices.AddItem("Fortsæt", "", 0, onContinue)
+	choices.AddItem("Annullér", "", 0, t.showMain)
+	choices.SetDoneFunc(t.showMain) // Esc
+
+	layout := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tv, 0, 1, false).
+		AddItem(choices, 4, 0, true)
+	t.app.SetRoot(layout, true)
 }
