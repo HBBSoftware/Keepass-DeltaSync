@@ -197,6 +197,10 @@ func (t *tui) showAdvanced() {
 		})
 	})
 
+	list.AddItem("Enrollment-token til ny enhed", "Generér token til fx Android-appen (kræver admin-token)", 't', func() {
+		t.enrollmentTokenFlow()
+	})
+
 	list.AddItem("‹ Tilbage", "", 'q', t.showMain)
 	list.SetDoneFunc(t.showMain) // Esc
 	t.setRoot(list)
@@ -311,6 +315,14 @@ func (t *tui) headerView() *tview.TextView {
 // rigtige terminal (så password-prompts virker), og vender tilbage til menuen
 // på et Enter-tryk. Dette er det eneste sted TUI'en faktisk udfører noget.
 func (t *tui) runSelf(args ...string) {
+	t.runSelfEnv(nil, args...)
+}
+
+// runSelfEnv er som runSelf men tilføjer extraEnv ("KEY=value") til
+// subprocessens miljø — bruges til at give admin-kommandoer en admin-token
+// uden at lægge hemmeligheden i argv (synlig i procesliste) eller kræve at
+// brugeren selv har eksporteret env-var'en før TUI'en blev startet.
+func (t *tui) runSelfEnv(extraEnv []string, args ...string) {
 	t.app.Suspend(func() {
 		fmt.Printf("\n› %s %s\n\n", filepath.Base(t.self), strings.Join(args, " "))
 
@@ -318,11 +330,46 @@ func (t *tui) runSelf(args ...string) {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		if len(extraEnv) > 0 {
+			cmd.Env = append(os.Environ(), extraEnv...)
+		}
 		if err := cmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "\n[fejl] %v\n", err)
 		}
 
 		fmt.Print("\nTryk Enter for at vende tilbage til menuen … ")
 		bufio.NewReader(os.Stdin).ReadString('\n')
+	})
+}
+
+// enrollmentTokenFlow genererer et enrollment-token til en ny enhed (fx
+// Android-appen) via `admin user-enrollment <username>`. Admin-token tages fra
+// $KEEPASS_DELTASYNC_ADMIN_TOKEN hvis sat; ellers spørger vi (maskeret) og
+// injicerer den i subprocessens miljø.
+func (t *tui) enrollmentTokenFlow() {
+	hasAdminEnv := os.Getenv(adminTokenEnvVar) != ""
+
+	fields := []inputField{{label: "Brugernavn (fx 'hans')"}}
+	if !hasAdminEnv {
+		fields = append(fields, inputField{label: "Admin-token", password: true})
+	}
+
+	t.collectInputs("Enrollment-token til ny enhed", fields, func(v []string) {
+		user := strings.TrimSpace(v[0])
+		if user == "" {
+			t.showAdvanced()
+			return
+		}
+		var extraEnv []string
+		if !hasAdminEnv {
+			adminTok := strings.TrimSpace(v[1])
+			if adminTok == "" {
+				t.showAdvanced()
+				return
+			}
+			extraEnv = []string{adminTokenEnvVar + "=" + adminTok}
+		}
+		t.runSelfEnv(extraEnv, "admin", "user-enrollment", user)
+		t.showAdvanced()
 	})
 }
