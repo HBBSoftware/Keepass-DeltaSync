@@ -32,6 +32,7 @@ class Synchronizer(
     private val api: ApiClient,
     private val crypto: CryptoSession,
     private val persistence: SyncStatePersistence,
+    private val progress: SyncProgressListener = SyncProgressListener {},
 ) {
 
     /**
@@ -45,6 +46,7 @@ class Synchronizer(
      */
     fun sync(databaseId: String): SyncResult {
         // 1. Indlæs .kdbx via abstraktionen.
+        progress.onProgress(SyncProgressEvent.Loading)
         val db: KeePassDatabase = kdbxFile.open().use { input ->
             KeePassDatabase.decode(input, credentials)
         }
@@ -58,12 +60,13 @@ class Synchronizer(
         state.syncedAt.putAll(persisted.syncedAt)
 
         // 4. Kør sync-engine
-        val engine = SyncEngine(api, crypto, databaseId)
+        val engine = SyncEngine(api, crypto, databaseId, progress)
         val result = engine.sync(state)
 
         // 5. Hvis vi pullede ændringer fra serveren, opdater den lokale
         // .kdbx atomisk (delegeres til KdbxFile-impl).
         if (result.pulledEntries > 0 || result.pulledDeletions > 0) {
+            progress.onProgress(SyncProgressEvent.Writing)
             val newDb = KotpassLocalStateAdapter.applyToDatabase(state, db)
             kdbxFile.writeAtomic { out -> newDb.encode(out) }
         }
@@ -77,6 +80,7 @@ class Synchronizer(
             ),
         )
 
+        progress.onProgress(SyncProgressEvent.Done)
         return result
     }
 }

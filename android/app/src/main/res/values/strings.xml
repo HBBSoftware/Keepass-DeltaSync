@@ -22,6 +22,13 @@
     <string name="sync_dialog_message">Enter your .kdbx master password to decrypt locally.</string>
     <string name="sync_dialog_hint">kdbx master password</string>
     <string name="sync_dialog_action">Sync</string>
+    <string name="sync_remember_password">Remember password while the app is running</string>
+    <string name="sync_progress_starting">Starting…</string>
+    <string name="sync_progress_opening">Opening database…</string>
+    <string name="sync_progress_pulling">Pulling changes… %1$d/%2$d</string>
+    <string name="sync_progress_saving">Saving database…</string>
+    <string name="sync_progress_pushing">Pushing changes… %1$d/%2$d</string>
+    <string name="sync_progress_finishing">Finishing…</string>
     <string name="sync_result_ok_title">Sync OK</string>
     <string name="sync_result_format">Pulled: %1$d entries, %2$d deletions\nPushed: %3$d entries, %4$d deletions\nServer seq: %5$d</string>
     <string name="sync_result_failed_title">Sync failed</string>

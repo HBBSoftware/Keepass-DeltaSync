@@ -30,6 +30,7 @@ class SyncEngine(
     private val api: ApiClient,
     private val crypto: CryptoSession,
     private val databaseId: String,
+    private val progress: SyncProgressListener = SyncProgressListener {},
 ) {
     /**
      * Kør én fuld sync-cyklus (pull + push). Returnerer en sammenfatning af
@@ -52,11 +53,13 @@ class SyncEngine(
 
     private fun pull(state: LocalState): PullResult {
         val changes = api.getChanges(databaseId, state.lastSeq)
+        val total = changes.entries.size
         var applied = 0
         var deleted = 0
         var kept = 0
 
-        for (change in changes.entries) {
+        for ((i, change) in changes.entries.withIndex()) {
+            progress.onProgress(SyncProgressEvent.Pulling(i + 1, total))
             val serverMtime = parseIso(change.modifiedAt)
 
             if (change.deleted) {
@@ -106,11 +109,22 @@ class SyncEngine(
         var pushedDeletions = 0
         var maxSeq = state.lastSeq
 
-        for ((uuid, entry) in state.entries) {
-            val mtime = entry.times.modified
+        // Forud-beregn hvad der skal sendes, så progress kan rapportere en
+        // meningsfuld total i stedet for at vi tæller med en `continue`-skip.
+        val entriesToPush = state.entries.filter { (uuid, entry) ->
             val syncedAt = state.syncedAt[uuid]
-            if (syncedAt != null && !syncedAt.isStrictlyBefore(mtime)) continue
+            syncedAt == null || syncedAt.isStrictlyBefore(entry.times.modified)
+        }
+        val tombstonesToPush = state.tombstones.filter { (uuid, at) ->
+            val syncedAt = state.syncedAt[uuid]
+            syncedAt == null || syncedAt.isStrictlyBefore(at)
+        }
+        val total = entriesToPush.size + tombstonesToPush.size
+        var done = 0
 
+        for ((uuid, entry) in entriesToPush) {
+            progress.onProgress(SyncProgressEvent.Pushing(++done, total))
+            val mtime = entry.times.modified
             val canonical = if (entry.v == SchemaVersion) entry else entry.copy(v = SchemaVersion)
             val jsonBytes = CanonicalJson.encodeToString(Entry.serializer(), canonical).toByteArray()
             val blob = crypto.encryptEntry(jsonBytes)
@@ -120,10 +134,8 @@ class SyncEngine(
             pushedEntries++
         }
 
-        for ((uuid, at) in state.tombstones) {
-            val syncedAt = state.syncedAt[uuid]
-            if (syncedAt != null && !syncedAt.isStrictlyBefore(at)) continue
-
+        for ((uuid, at) in tombstonesToPush) {
+            progress.onProgress(SyncProgressEvent.Pushing(++done, total))
             val resp = api.deleteEntry(databaseId, uuid, at.toJavaInstant())
             state.syncedAt[uuid] = at
             if (resp.seq > maxSeq) maxSeq = resp.seq

@@ -4,6 +4,8 @@ package dk.bjoerckbraun.deltasync
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +14,7 @@ import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -21,6 +24,8 @@ import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
+import dk.bjoerckbraun.deltasync.sync.SyncProgressEvent
+import dk.bjoerckbraun.deltasync.sync.SyncProgressListener
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
 import dk.bjoerckbraun.deltasync.sync.TokenStore
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +52,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var syncNowButton: MaterialButton
     private lateinit var unenrollButton: MaterialButton
     private lateinit var serverRequiredCard: MaterialCardView
+    private lateinit var syncProgressBar: ProgressBar
+    private lateinit var syncProgressText: TextView
 
     private val enrollLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -70,6 +77,8 @@ class MainActivity : ComponentActivity() {
         syncNowButton = findViewById(R.id.syncNowButton)
         unenrollButton = findViewById(R.id.unenrollButton)
         serverRequiredCard = findViewById(R.id.serverRequiredCard)
+        syncProgressBar = findViewById(R.id.syncProgressBar)
+        syncProgressText = findViewById(R.id.syncProgressText)
 
         val schemaVersion = runCatching { mobile.Mobile.SchemaVersion.toInt() }.getOrElse { 0 }
         versionText.text = getString(R.string.version_footer, BuildConfig.VERSION_NAME, schemaVersion)
@@ -89,6 +98,7 @@ class MainActivity : ComponentActivity() {
         unenrollButton.setOnClickListener {
             tokenStore.clear()
             configStore.clear()
+            SessionPassphrase.clear()
             refreshStatus()
         }
     }
@@ -144,32 +154,51 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun promptPassphraseAndSync() {
+        // Husket fra en tidligere sync i samme session → spring dialogen over.
+        SessionPassphrase.get()?.let { runSync(it); return }
+
         val input = TextInputEditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                 android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
             hint = getString(R.string.sync_dialog_hint)
         }
-        val layout = TextInputLayout(this).apply {
+        val inputLayout = TextInputLayout(this).apply { addView(input) }
+        val rememberCheckbox = MaterialCheckBox(this).apply {
+            text = getString(R.string.sync_remember_password)
+            setPadding(0, 24, 0, 0)
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
-            addView(input)
+            addView(inputLayout)
+            addView(rememberCheckbox)
         }
 
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.sync_dialog_title)
             .setMessage(R.string.sync_dialog_message)
-            .setView(layout)
+            .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.sync_dialog_action) { _, _ ->
                 val passphrase = input.text?.toString().orEmpty()
-                if (passphrase.isNotEmpty()) runSync(passphrase)
+                if (passphrase.isNotEmpty()) {
+                    if (rememberCheckbox.isChecked) SessionPassphrase.remember(passphrase)
+                    runSync(passphrase)
+                }
             }
             .show()
     }
 
     private fun runSync(passphrase: String) {
-        syncNowButton.isEnabled = false
         val credentials = tokenStore.load() ?: return
         val config = configStore.load() ?: return
+        syncNowButton.isEnabled = false
+        showProgress()
+
+        // Listener kaldes fra IO-tråden — marshallér til UI-tråden.
+        val progress = SyncProgressListener { event ->
+            runOnUiThread { renderProgress(event) }
+        }
 
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) {
@@ -184,6 +213,7 @@ class MainActivity : ComponentActivity() {
                         api = api,
                         crypto = crypto,
                         persistence = DataStoreSyncStatePersistence(applicationContext),
+                        progress = progress,
                     )
                     try {
                         sync.sync(config.databaseId)
@@ -194,6 +224,7 @@ class MainActivity : ComponentActivity() {
             }
 
             syncNowButton.isEnabled = true
+            hideProgress()
 
             outcome.fold(
                 onSuccess = { result ->
@@ -211,6 +242,10 @@ class MainActivity : ComponentActivity() {
                         .show()
                 },
                 onFailure = { e ->
+                    // Et husket password må ikke blive hængende efter en fejl —
+                    // var det forkert (eller filen ændret), skal næste forsøg
+                    // prompte igen i stedet for at fejle i en løkke.
+                    SessionPassphrase.clear()
                     MaterialAlertDialogBuilder(this@MainActivity)
                         .setTitle(R.string.sync_result_failed_title)
                         .setMessage(e.message ?: e::class.simpleName ?: "unknown error")
@@ -218,6 +253,49 @@ class MainActivity : ComponentActivity() {
                         .show()
                 },
             )
+        }
+    }
+
+    private fun showProgress() {
+        syncProgressBar.visibility = View.VISIBLE
+        syncProgressText.visibility = View.VISIBLE
+        syncProgressBar.isIndeterminate = true
+        syncProgressText.text = getString(R.string.sync_progress_starting)
+    }
+
+    private fun hideProgress() {
+        syncProgressBar.visibility = View.GONE
+        syncProgressText.visibility = View.GONE
+    }
+
+    private fun renderProgress(event: SyncProgressEvent) {
+        when (event) {
+            is SyncProgressEvent.Loading -> {
+                syncProgressBar.isIndeterminate = true
+                syncProgressText.text = getString(R.string.sync_progress_opening)
+            }
+            is SyncProgressEvent.Pulling -> {
+                syncProgressBar.isIndeterminate = false
+                syncProgressBar.max = event.total
+                syncProgressBar.progress = event.current
+                syncProgressText.text =
+                    getString(R.string.sync_progress_pulling, event.current, event.total)
+            }
+            is SyncProgressEvent.Writing -> {
+                syncProgressBar.isIndeterminate = true
+                syncProgressText.text = getString(R.string.sync_progress_saving)
+            }
+            is SyncProgressEvent.Pushing -> {
+                syncProgressBar.isIndeterminate = false
+                syncProgressBar.max = event.total
+                syncProgressBar.progress = event.current
+                syncProgressText.text =
+                    getString(R.string.sync_progress_pushing, event.current, event.total)
+            }
+            is SyncProgressEvent.Done -> {
+                syncProgressBar.isIndeterminate = true
+                syncProgressText.text = getString(R.string.sync_progress_finishing)
+            }
         }
     }
 }
