@@ -12,7 +12,9 @@ android {
 
     defaultConfig {
         applicationId = "dk.bjoerckbraun.deltasync"
-        minSdk = 21
+        // 23 (Android 6.0) er nedre grænse: androidx.biometric kræver 23, og
+        // Keystore-forankret EncryptedSharedPreferences er mere robust dér.
+        minSdk = 23
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
@@ -79,6 +81,10 @@ dependencies {
 
     // WorkManager — periodisk sync.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // BiometricPrompt — gater opt-in til at huske kdbx-passwordet til
+    // baggrunds-sync (se EncryptedPassphraseStore).
+    implementation("androidx.biometric:biometric:1.1.0")
 
     // Coroutines — bruges af DataStore + WorkManager
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

@@ -13,15 +13,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
   command names, flags or database names. It is a thin command-selector:
   reads `config.toml` for state + the database list and shells out to
   the same binary so password prompts work unchanged.
-- **Android: "remember password while the app is running"** — optional
-  checkbox in the sync dialog; the passphrase is held in memory for the
-  process lifetime only (never persisted), and cleared on sync failure
-  or when device credentials are forgotten.
 - **Android: live sync progress** — progress bar + label showing
   Opening / Pulling x/total / Pushing x/total / Saving during a sync.
+- **Android: opt-in background sync with a securely stored password** —
+  ticking "Remember password & sync in the background" now confirms your
+  identity with `BiometricPrompt` (biometric or device PIN/pattern) and,
+  after the next successful sync, stores the kdbx master password in a
+  new `EncryptedPassphraseStore` (Keystore-backed
+  `EncryptedSharedPreferences`, bound to the database UUID) and enables
+  the periodic `SyncWorker`. The Keystore key intentionally requires no
+  per-use authentication so the background worker can decrypt it without
+  the user present — biometrics gate the *opt-in*, not each read. A
+  failed sync (wrong password, revoked access) clears the stored
+  password and cancels background sync so it can't loop. "Forget device
+  credentials" also clears it.
 
 ### Fixed
 
+- **Android: master password no longer stored in plaintext** — the
+  previous `SyncWorker` received the password through WorkManager's
+  `Data`, which persists unencrypted in WorkManager's database. The
+  worker now reads it from the Keystore-encrypted `EncryptedPassphraseStore`
+  instead, and the in-memory-only `SessionPassphrase` is gone.
 - **Android: local deletions now propagate** — `read()` previously
   ignored both KDBX' `DeletedObjects` list and entries the user had
   moved to the recycle bin, so deleting an entry on Android never
@@ -42,6 +55,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Android: `minSdk` raised 21 → 23** (Android 6.0) — required by
+  `androidx.biometric` and gives stronger Keystore guarantees. Covers
+  essentially all active devices.
 - **Per-component release versioning** — release tags are now namespaced
   (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`

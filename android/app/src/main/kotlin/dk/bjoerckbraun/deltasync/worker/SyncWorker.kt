@@ -15,28 +15,35 @@ import app.keemobile.kotpass.database.Credentials
 import dk.bjoerckbraun.deltasync.api.ApiClient
 import dk.bjoerckbraun.deltasync.persistence.DatabaseConfigStore
 import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
+import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
  * Baggrunds-worker der kører periodisk sync mod serveren. Trigges af
- * [WorkManager] med en minimum-interval på 15 minutter (Android's
- * lavest tilladte periode for PeriodicWork).
+ * [WorkManager] med en interval på 30 minutter (Android's lavest tilladte
+ * periode er 15 min).
  *
- * Worker'en kører på en baggrunds-coroutine og er IDLE-sikker:
- * SyncEngine'en muterer ikke disk uden netværket har leveret det.
+ * Worker'en henter selv alt den behøver fra de tre stores — der sendes
+ * INGEN hemmeligheder gennem WorkManagers `Data` (den ville ligge i
+ * klartekst i WorkManagers DB):
+ *   - device-credentials fra [KeystoreTokenStore]
+ *   - database-config fra [DatabaseConfigStore]
+ *   - kdbx-master-passwordet fra [EncryptedPassphraseStore] (Keystore-
+ *     krypteret; lagt der da brugeren slog "husk password" til)
  *
- * Required input data (Data):
- *   - "database_id" : String — server-side database UUID
- *   - "kdbx_path"   : String — absolut sti til den lokale .kdbx-fil
- *   - "passphrase"  : String — kdbx-master-passwordet (KeePassXC's eget)
+ * Er ingen af de tre på plads (ikke enrolled, ingen database, eller intet
+ * husket password), er der intet at gøre i baggrunden → [Result.failure].
  *
- * Tabt sync er ikke katastrofisk — næste tick retrier. Vi returnerer
- * Result.retry() ved netværks-fejl og Result.failure() kun ved
- * permanente fejl (revoked token, korrupt kdbx).
+ * Fejl-klassificering: netværks-fejl ([IOException]) → [Result.retry] (næste
+ * tick prøver igen). Alt andet (forkert password, korrupt kdbx, trukket
+ * adgang) er permanent → vi rydder det gemte password, aflyser den
+ * periodiske sync, og returnerer [Result.failure] så vi ikke looper på en
+ * fejl brugeren skal gribe ind i.
  */
 class SyncWorker(
     appContext: Context,
@@ -44,9 +51,6 @@ class SyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val passphrase = inputData.getString(INPUT_PASSPHRASE)
-            ?: return Result.failure()
-
         val tokenStore = KeystoreTokenStore(applicationContext)
         val credentials = tokenStore.load() ?: run {
             Log.w(TAG, "no enrolled device — cannot sync")
@@ -55,6 +59,12 @@ class SyncWorker(
 
         val config = DatabaseConfigStore(applicationContext).load() ?: run {
             Log.w(TAG, "no database configured — cannot sync")
+            return Result.failure()
+        }
+
+        val passphraseStore = EncryptedPassphraseStore(applicationContext)
+        val passphrase = passphraseStore.load(config.databaseId) ?: run {
+            Log.w(TAG, "no remembered passphrase — background sync not enabled")
             return Result.failure()
         }
 
@@ -81,32 +91,38 @@ class SyncWorker(
         return try {
             val result = synchronizer.sync(config.databaseId)
             Log.i(TAG, "sync ok: $result")
-            crypto.close()
             Result.success()
-        } catch (e: Exception) {
-            crypto.close()
-            Log.w(TAG, "sync failed; will retry", e)
+        } catch (e: IOException) {
+            // Netværk nede / server midlertidigt utilgængelig — prøv igen.
+            Log.w(TAG, "sync failed (network); will retry", e)
             Result.retry()
+        } catch (e: Exception) {
+            // Permanent: forkert password, korrupt fil, eller trukket adgang.
+            // Et husket-men-forkert password må ikke loope i baggrunden —
+            // ryd det og stop den periodiske sync. Brugeren slår den til igen
+            // (og taster password på ny) fra app'en.
+            Log.w(TAG, "sync failed (permanent); clearing remembered passphrase", e)
+            passphraseStore.clear()
+            cancelPeriodic(applicationContext)
+            Result.failure()
+        } finally {
+            crypto.close()
         }
     }
 
     companion object {
         private const val TAG = "DeltaSyncWorker"
-        const val INPUT_PASSPHRASE = "passphrase"
         const val PERIODIC_WORK_NAME = "deltasync-periodic-sync"
 
         /**
-         * Enqueue (eller opdater) den periodiske sync-worker. Worker'en
-         * henter selv enrollment + database-config fra de tilsvarende stores;
-         * caller'en passer kun masterpasswordet ind via Data.
+         * Enqueue (eller opdater) den periodiske sync-worker. Worker'en henter
+         * selv enrollment, database-config og det gemte password fra de
+         * tilsvarende stores — caller'en passer ingen hemmeligheder ind.
          *
-         * BEMÆRK: passwordet lagres i WorkManager's database i klartekst.
-         * For en hardened release skal vi i stedet bruge en biometric/PIN-
-         * autentificeret indtastning ved hver kørsel.
+         * Kald [cancelPeriodic] for at slå baggrunds-sync fra igen.
          */
         fun enqueuePeriodic(
             context: Context,
-            passphrase: String,
             intervalMinutes: Long = 30,
         ) {
             val constraints = Constraints.Builder()
@@ -117,11 +133,6 @@ class SyncWorker(
                 intervalMinutes, TimeUnit.MINUTES,
             )
                 .setConstraints(constraints)
-                .setInputData(
-                    androidx.work.Data.Builder()
-                        .putString(INPUT_PASSPHRASE, passphrase)
-                        .build()
-                )
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -129,6 +140,11 @@ class SyncWorker(
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
+        }
+
+        /** Aflys den periodiske baggrunds-sync. */
+        fun cancelPeriodic(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
         }
     }
 }

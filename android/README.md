@@ -60,10 +60,16 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     - `KdbxFile`-abstraktion: `PathKdbxFile` (tests) / `SafKdbxFile`
       (production via ContentResolver).
     - `SyncWorker` — periodisk WorkManager-CoroutineWorker.
-  - Mangler stadig: biometrisk-låst password-cache (så baggrunds-sync
-    via WorkManager kan køre uden manuel password-indtastning),
-    "share database"-UI (ejere deler pt. kun fra desktop-klienten),
-    F-Droid-submit.
+  - `EncryptedPassphraseStore` + biometrisk opt-in på plads — krydser
+    brugeren "husk password & synk i baggrunden" bekræftes identiteten
+    med `BiometricPrompt`, og efter en vellykket sync gemmes
+    masterpasswordet Keystore-krypteret (ikke længere klartekst i
+    WorkManager) og den periodiske `SyncWorker` tændes. Keystore-nøglen
+    kræver bevidst ikke per-brug-auth, så baggrunds-worker'en kan
+    dekryptere uden bruger til stede; biometri gater opt-in'en, ikke
+    hver læsning.
+  - Mangler stadig: "share database"-UI (ejere deler pt. kun fra
+    desktop-klienten), F-Droid-submit.
 
 ## Arkitektur
 

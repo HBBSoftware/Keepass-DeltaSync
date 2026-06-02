@@ -21,7 +21,11 @@
     <string name="sync_dialog_message">Indtast din .kdbx-master-password for at dekryptere lokalt.</string>
     <string name="sync_dialog_hint">kdbx-master-password</string>
     <string name="sync_dialog_action">Synk</string>
-    <string name="sync_remember_password">Husk password så længe app\'en kører</string>
+    <string name="sync_remember_password">Husk password &amp; synk i baggrunden</string>
+    <string name="biometric_title">Bekræft at det er dig</string>
+    <string name="biometric_subtitle">Godkend for at gemme dit master-password til baggrunds-sync.</string>
+    <string name="remember_not_confirmed">Ikke bekræftet — passwordet huskes ikke.</string>
+    <string name="background_sync_enabled">Baggrunds-sync er slået til. Dit password gemmes krypteret og bruges til at synke automatisk.</string>
     <string name="sync_progress_starting">Starter…</string>
     <string name="sync_progress_opening">Åbner database…</string>
     <string name="sync_progress_pulling">Henter ændringer… %1$d/%2$d</string>

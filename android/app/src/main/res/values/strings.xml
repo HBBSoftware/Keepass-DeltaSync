@@ -22,7 +22,11 @@
     <string name="sync_dialog_message">Enter your .kdbx master password to decrypt locally.</string>
     <string name="sync_dialog_hint">kdbx master password</string>
     <string name="sync_dialog_action">Sync</string>
-    <string name="sync_remember_password">Remember password while the app is running</string>
+    <string name="sync_remember_password">Remember password &amp; sync in the background</string>
+    <string name="biometric_title">Confirm it\'s you</string>
+    <string name="biometric_subtitle">Authenticate to store your master password for background sync.</string>
+    <string name="remember_not_confirmed">Not confirmed — password will not be remembered.</string>
+    <string name="background_sync_enabled">Background sync is on. Your password is stored encrypted and used to sync automatically.</string>
     <string name="sync_progress_starting">Starting…</string>
     <string name="sync_progress_opening">Opening database…</string>
     <string name="sync_progress_pulling">Pulling changes… %1$d/%2$d</string>
