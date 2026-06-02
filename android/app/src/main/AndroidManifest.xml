@@ -39,6 +39,11 @@
             android:exported="false"
             android:label="Set up database" />
 
+        <activity
+            android:name=".ShareActivity"
+            android:exported="false"
+            android:label="@string/share_title" />
+
     </application>
 
 </manifest>

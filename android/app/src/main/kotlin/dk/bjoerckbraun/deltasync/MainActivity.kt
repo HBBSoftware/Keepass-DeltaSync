@@ -57,6 +57,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var enrollButton: MaterialButton
     private lateinit var setupButton: MaterialButton
     private lateinit var syncNowButton: MaterialButton
+    private lateinit var shareButton: MaterialButton
     private lateinit var unenrollButton: MaterialButton
     private lateinit var serverRequiredCard: MaterialCardView
     private lateinit var syncProgressBar: ProgressBar
@@ -83,6 +84,7 @@ class MainActivity : FragmentActivity() {
         enrollButton = findViewById(R.id.enrollButton)
         setupButton = findViewById(R.id.setupButton)
         syncNowButton = findViewById(R.id.syncNowButton)
+        shareButton = findViewById(R.id.shareButton)
         unenrollButton = findViewById(R.id.unenrollButton)
         serverRequiredCard = findViewById(R.id.serverRequiredCard)
         syncProgressBar = findViewById(R.id.syncProgressBar)
@@ -101,6 +103,10 @@ class MainActivity : FragmentActivity() {
 
         syncNowButton.setOnClickListener {
             promptPassphraseAndSync()
+        }
+
+        shareButton.setOnClickListener {
+            startActivity(Intent(this, ShareActivity::class.java))
         }
 
         unenrollButton.setOnClickListener {
@@ -127,6 +133,7 @@ class MainActivity : FragmentActivity() {
                 enrollButton.visibility = View.VISIBLE
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.GONE
+                shareButton.visibility = View.GONE
                 unenrollButton.visibility = View.GONE
                 serverRequiredCard.visibility = View.VISIBLE
             }
@@ -140,6 +147,7 @@ class MainActivity : FragmentActivity() {
                 enrollButton.visibility = View.GONE
                 setupButton.visibility = View.VISIBLE
                 syncNowButton.visibility = View.GONE
+                shareButton.visibility = View.GONE
                 unenrollButton.visibility = View.VISIBLE
                 serverRequiredCard.visibility = View.GONE
             }
@@ -156,6 +164,7 @@ class MainActivity : FragmentActivity() {
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.VISIBLE
                 syncNowButton.isEnabled = true
+                shareButton.visibility = View.VISIBLE
                 unenrollButton.visibility = View.VISIBLE
                 serverRequiredCard.visibility = View.GONE
             }

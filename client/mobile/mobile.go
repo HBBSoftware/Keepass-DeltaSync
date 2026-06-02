@@ -209,6 +209,33 @@ func PublicKeyFromPrivate(privateKey []byte) ([]byte, error) {
 	return crypto.PublicKeyFromPrivate(privateKey)
 }
 
+// WrapMasterKeyForShare er ejer-side af v2 sharing — modstykket til
+// UnwrapSharedMasterKey. Alice (owner) deriverer database master_key fra sit
+// masterpassword (Argon2id, ~200ms) og wrap'er det som sealed-box til
+// target-enhedens public-key. Resultatet POST'es til
+// /databases/{id}/shares som det opaque `wrapped_master_key`; kun
+// target-enhedens private-key kan unwrappe det igen.
+//
+// Spejler desktop-klientens `runShare` (DeriveMasterKey → crypto.WrapKey).
+// Caller'en skal zero'e password-bytes efter kaldet returnerer.
+func WrapMasterKeyForShare(password []byte, databaseID string, targetPublicKey []byte) ([]byte, error) {
+	if len(password) == 0 {
+		return nil, errors.New("empty password")
+	}
+	if databaseID == "" {
+		return nil, errors.New("empty databaseID")
+	}
+	if len(targetPublicKey) != crypto.BoxPublicKeySize {
+		return nil, fmt.Errorf("target public key must be %d bytes, got %d", crypto.BoxPublicKeySize, len(targetPublicKey))
+	}
+	masterKey, err := crypto.DeriveMasterKey(password, databaseID)
+	if err != nil {
+		return nil, fmt.Errorf("derive master key: %w", err)
+	}
+	defer zero(masterKey)
+	return crypto.WrapKey(masterKey, targetPublicKey)
+}
+
 // SchemaVersion eksponerer canonical-skemaets aktuelle version som en
 // konstant Kotlin kan tjekke. Brug den i tests for at fange schema-drift
 // mellem Go og Kotlin sider.

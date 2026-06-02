@@ -278,6 +278,60 @@ func TestSharingFlow_WrapUnwrap(t *testing.T) {
 	}
 }
 
+// TestWrapMasterKeyForShare_EndToEnd verificerer ejer→medlem-stien gennem
+// mobile-API'et: Alice wrapper sit (Argon2id-deriverede) master_key til Bob,
+// Bob unwrapper, og de to ender med IDENTISKE entry-keys — dvs. Bob kan
+// dekryptere det Alice krypterer.
+func TestWrapMasterKeyForShare_EndToEnd(t *testing.T) {
+	const password = "alice-master-password"
+
+	bobKp, err := GenerateDeviceKeypair()
+	if err != nil {
+		t.Fatalf("generate bob keypair: %v", err)
+	}
+
+	// Alice (owner): wrap master_key til Bob's device public-key.
+	wrapped, err := WrapMasterKeyForShare([]byte(password), testDBID, bobKp.PublicKey)
+	if err != nil {
+		t.Fatalf("WrapMasterKeyForShare: %v", err)
+	}
+
+	// Bob (member): unwrap → Session.
+	unwrapped, err := UnwrapSharedMasterKey(wrapped, bobKp.PublicKey, bobKp.PrivateKey)
+	if err != nil {
+		t.Fatalf("UnwrapSharedMasterKey: %v", err)
+	}
+	bobSession, err := NewSessionFromMasterKey(testDBID, unwrapped)
+	if err != nil {
+		t.Fatalf("NewSessionFromMasterKey: %v", err)
+	}
+	defer bobSession.Close()
+
+	// Alice's egen Session deriveret fra password skal have samme entry-key.
+	aliceSession, err := NewSession([]byte(password), testDBID)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	defer aliceSession.Close()
+
+	if !bytes.Equal(aliceSession.entryKey, bobSession.entryKey) {
+		t.Error("entry keys differ — Bob cannot decrypt Alice's entries")
+	}
+}
+
+func TestWrapMasterKeyForShare_RejectsBadInputs(t *testing.T) {
+	good, _ := GenerateDeviceKeypair()
+	if _, err := WrapMasterKeyForShare(nil, testDBID, good.PublicKey); err == nil {
+		t.Error("expected error for empty password")
+	}
+	if _, err := WrapMasterKeyForShare([]byte("pw"), "", good.PublicKey); err == nil {
+		t.Error("expected error for empty databaseID")
+	}
+	if _, err := WrapMasterKeyForShare([]byte("pw"), testDBID, make([]byte, 16)); err == nil {
+		t.Error("expected error for wrong-size public key")
+	}
+}
+
 func TestSchemaVersion_Exposed(t *testing.T) {
 	if SchemaVersion != canonical.SchemaVersion {
 		t.Errorf("mobile.SchemaVersion = %d, canonical.SchemaVersion = %d — must match",

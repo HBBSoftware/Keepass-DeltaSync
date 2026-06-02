@@ -12,6 +12,7 @@
     <string name="action_enroll_device">Enroll device</string>
     <string name="action_setup_database">Set up database</string>
     <string name="action_sync_now">Sync now</string>
+    <string name="action_share_database">Share database</string>
     <string name="action_unenroll">Forget device credentials</string>
 
     <string name="server_required_label">Server required</string>
@@ -36,6 +37,27 @@
     <string name="sync_result_ok_title">Sync OK</string>
     <string name="sync_result_format">Pulled: %1$d entries, %2$d deletions\nPushed: %3$d entries, %4$d deletions\nServer seq: %5$d</string>
     <string name="sync_result_failed_title">Sync failed</string>
+
+    <!-- ShareActivity -->
+    <string name="share_title">Share database</string>
+    <string name="share_description">Share this database with another DeltaSync user. They get read-write access and can sync it on their own devices. You need your master password to wrap the key for them.</string>
+    <string name="share_add_label">Add member</string>
+    <string name="share_username_hint">Username to share with</string>
+    <string name="share_username_required">Enter a username.</string>
+    <string name="share_action">Share with user</string>
+    <string name="share_members_label">Current members</string>
+    <string name="share_no_members">No members yet. Add someone above.</string>
+    <string name="share_member_line">%1$s — %2$s</string>
+    <string name="share_member_line_named">%1$s (%2$s) — %3$s</string>
+    <string name="share_remove">Remove</string>
+    <string name="share_remove_title">Remove member</string>
+    <string name="share_remove_confirm">Remove %1$s\'s access to this database? They will no longer be able to sync it.</string>
+    <string name="share_removed">Removed %1$s.</string>
+    <string name="share_shared_with">Shared with %1$s.</string>
+    <string name="share_not_owner">Only the database owner can manage sharing. Share it from the device that created it.</string>
+    <string name="share_password_title">Master password</string>
+    <string name="share_password_message">Enter your .kdbx master password to wrap the key for the new member.</string>
+    <string name="share_error_format">Server: %1$d — %2$s</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Enroll device</string>

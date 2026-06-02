@@ -68,8 +68,14 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     kræver bevidst ikke per-brug-auth, så baggrunds-worker'en kan
     dekryptere uden bruger til stede; biometri gater opt-in'en, ikke
     hver læsning.
-  - Mangler stadig: "share database"-UI (ejere deler pt. kun fra
-    desktop-klienten), F-Droid-submit.
+  - `ShareActivity` på plads — ejer-side v2 sharing fra app'en: list
+    medlemmer, del med brugernavn, fjern medlem. Bruger den nye
+    `mobile.WrapMasterKeyForShare`-binding (Argon2id → sealed-box til
+    target-enhedens public-key) + `ApiClient.lookupUser/listShares/
+    shareDatabase/unshareDatabase`. Server håndhæver owner-only (403 →
+    pæn besked).
+  - Mangler stadig: F-Droid-submit (metadata findes; reproducible build
+    skal valideres + opdateres for minSdk 23 og nye deps).
 
 ## Arkitektur
 

@@ -92,6 +92,20 @@ class GomobileCryptoSession internal constructor(
             Mobile.publicKeyFromPrivate(privateKey)
 
         /**
+         * Owner-side af sealed-box (modstykket til [unwrapSharedMasterKey]):
+         * derive database master_key fra masterpassword (Argon2id ~200ms) og
+         * wrap det til [targetPublicKey] (modtagerens device public-key). Det
+         * resulterende opaque blob uploades som `wrapped_master_key`. Kald fra
+         * en baggrunds-dispatcher pga. Argon2id-omkostningen. Password-bytes
+         * ejes af caller'en.
+         */
+        fun wrapMasterKeyForShare(
+            password: ByteArray,
+            databaseId: String,
+            targetPublicKey: ByteArray,
+        ): ByteArray = Mobile.wrapMasterKeyForShare(password, databaseId, targetPublicKey)
+
+        /**
          * Det canonical-skema-version Go-siden emitterer i nye blobs.
          * Bør matche `dk.bjoerckbraun.deltasync.canonical.SchemaVersion`;
          * en mismatch indikerer at .aar'en og :sync-modulet er ude af sync.

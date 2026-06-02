@@ -15,6 +15,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
   the same binary so password prompts work unchanged.
 - **Android: live sync progress** — progress bar + label showing
   Opening / Pulling x/total / Pushing x/total / Saving during a sync.
+- **Android: share a database from the app** — a new Share screen
+  (owner only) lists current members, adds a member by username, and
+  removes one. Mirrors the desktop `share`/`unshare`/`shares` commands:
+  it looks the user up (`/users/lookup`), wraps the database master key
+  to their device public key with a sealed box, and POSTs it as
+  `wrapped_master_key`. A new `mobile.WrapMasterKeyForShare` Go binding
+  (the owner-side counterpart to `UnwrapSharedMasterKey`) derives the
+  master key via Argon2id and seals it; `ApiClient` gained
+  `lookupUser` / `listShares` / `shareDatabase` / `unshareDatabase`. The
+  master password comes from the Keystore store if remembered, otherwise
+  it is prompted (and not persisted). Non-owners get a clear "only the
+  owner can manage sharing" message (server returns 403).
 - **Android: opt-in background sync with a securely stored password** —
   ticking "Remember password & sync in the background" now confirms your
   identity with `BiometricPrompt` (biometric or device PIN/pattern) and,

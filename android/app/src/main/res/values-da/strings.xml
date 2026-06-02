@@ -11,6 +11,7 @@
     <string name="action_enroll_device">Enroll enhed</string>
     <string name="action_setup_database">Konfigurer database</string>
     <string name="action_sync_now">Synk nu</string>
+    <string name="action_share_database">Del database</string>
     <string name="action_unenroll">Glem enheds-credentials</string>
 
     <string name="server_required_label">Server påkrævet</string>
@@ -35,6 +36,27 @@
     <string name="sync_result_ok_title">Synk OK</string>
     <string name="sync_result_format">Pullet: %1$d entries, %2$d sletninger\nPushet: %3$d entries, %4$d sletninger\nServer-seq: %5$d</string>
     <string name="sync_result_failed_title">Synk fejlede</string>
+
+    <!-- ShareActivity -->
+    <string name="share_title">Del database</string>
+    <string name="share_description">Del denne database med en anden DeltaSync-bruger. De får læse/skrive-adgang og kan synke den på deres egne enheder. Du skal bruge dit master-password for at pakke nøglen til dem.</string>
+    <string name="share_add_label">Tilføj medlem</string>
+    <string name="share_username_hint">Brugernavn at dele med</string>
+    <string name="share_username_required">Indtast et brugernavn.</string>
+    <string name="share_action">Del med bruger</string>
+    <string name="share_members_label">Nuværende medlemmer</string>
+    <string name="share_no_members">Ingen medlemmer endnu. Tilføj nogen ovenfor.</string>
+    <string name="share_member_line">%1$s — %2$s</string>
+    <string name="share_member_line_named">%1$s (%2$s) — %3$s</string>
+    <string name="share_remove">Fjern</string>
+    <string name="share_remove_title">Fjern medlem</string>
+    <string name="share_remove_confirm">Fjern %1$s\'s adgang til denne database? De vil ikke længere kunne synke den.</string>
+    <string name="share_removed">Fjernede %1$s.</string>
+    <string name="share_shared_with">Delt med %1$s.</string>
+    <string name="share_not_owner">Kun databasens ejer kan administrere deling. Del den fra den enhed der oprettede den.</string>
+    <string name="share_password_title">Master-password</string>
+    <string name="share_password_message">Indtast dit .kdbx-master-password for at pakke nøglen til det nye medlem.</string>
+    <string name="share_error_format">Server: %1$d — %2$s</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Enroll enhed</string>

@@ -98,6 +98,51 @@ class ApiClient(
         }
     }
 
+    /** GET `/api/v1/users/lookup?username=X`. */
+    @Throws(ApiException::class, IOException::class)
+    fun lookupUser(username: String): UserLookup {
+        val url = "${baseUrl.trimEnd('/')}/api/v1/users/lookup".toHttpUrl()
+            .newBuilder()
+            .addQueryParameter("username", username)
+            .build()
+        val req = Request.Builder().url(url).get().authed().build()
+        return httpClient.newCall(req).execute().use { resp ->
+            ensureSuccess(resp)
+            json.decodeFromString(UserLookup.serializer(), resp.bodyString())
+        }
+    }
+
+    /** GET `/api/v1/databases/{id}/shares` — owner-only på serveren. */
+    @Throws(ApiException::class, IOException::class)
+    fun listShares(databaseId: String): List<ShareMember> {
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/shares".toHttpUrl()
+        val req = Request.Builder().url(url).get().authed().build()
+        return httpClient.newCall(req).execute().use { resp ->
+            ensureSuccess(resp)
+            json.decodeFromString(ShareListResponse.serializer(), resp.bodyString()).members
+        }
+    }
+
+    /** POST `/api/v1/databases/{id}/shares` — tilføj/rotér en members wrapped key. */
+    @Throws(ApiException::class, IOException::class)
+    fun shareDatabase(databaseId: String, targetUserId: String, wrappedKey: ByteArray) {
+        val body = json.encodeToString(
+            ShareRequest.serializer(),
+            ShareRequest(userId = targetUserId, wrappedMasterKey = wrappedKey.toBase64()),
+        )
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/shares".toHttpUrl()
+        val req = Request.Builder().url(url).post(body.toRequestBody(JSON_MEDIA)).authed().build()
+        httpClient.newCall(req).execute().use { resp -> ensureSuccess(resp) }
+    }
+
+    /** DELETE `/api/v1/databases/{id}/shares/{user_id}`. */
+    @Throws(ApiException::class, IOException::class)
+    fun unshareDatabase(databaseId: String, targetUserId: String) {
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/shares/$targetUserId".toHttpUrl()
+        val req = Request.Builder().url(url).delete().authed().build()
+        httpClient.newCall(req).execute().use { resp -> ensureSuccess(resp) }
+    }
+
     private fun Request.Builder.authed(): Request.Builder = this
         .header("Authorization", "Bearer $deviceToken")
         .header("User-Agent", USER_AGENT)
