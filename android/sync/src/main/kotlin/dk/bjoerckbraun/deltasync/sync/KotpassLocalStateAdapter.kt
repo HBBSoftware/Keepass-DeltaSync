@@ -7,9 +7,14 @@ import app.keemobile.kotpass.database.modifiers.binaries
 import app.keemobile.kotpass.database.modifiers.modifyEntry
 import app.keemobile.kotpass.database.modifiers.modifyParentGroup
 import app.keemobile.kotpass.database.modifiers.removeEntry
+import app.keemobile.kotpass.models.BinaryData
 import app.keemobile.kotpass.models.BinaryReference
+import app.keemobile.kotpass.models.Group
 import dk.bjoerckbraun.deltasync.canonical.Binary
 import dk.bjoerckbraun.deltasync.canonical.Mapper
+import kotlinx.datetime.Instant
+import kotlinx.datetime.toKotlinInstant
+import okio.ByteString
 import java.util.UUID
 
 /**
@@ -35,35 +40,106 @@ import java.util.UUID
  */
 object KotpassLocalStateAdapter {
 
+    /** Null-UUID (00000000-…) — KDBX' sentinel for "ingen recycle-bin udpeget". */
+    private val ZERO_UUID = UUID(0L, 0L)
+
+    /** Sidste-udvej deletion-time når et tombstone mangler tidsstempler. */
+    private val EPOCH = Instant.fromEpochMilliseconds(0)
+
     /**
      * Læs alle aktive entries fra [db] og konverter til canonical-format
      * via [Mapper.toCanonical]. Returnerer en frisk [LocalState] med
      * `lastSeq=0` og tom `syncedAt` — caller'en restorer disse fra
      * vedvarende lager efter loaden (eller starter første sync med
      * `lastSeq=0` for at få fuld pull).
+     *
+     * Sletninger materialiseres som tombstones på to måder, identisk med
+     * desktop-klientens `ParseExport` (`client/internal/kdbx/xml.go`):
+     *
+     *  1. **Recycle-bin-synthesis:** hvis recycle bin er aktiveret og en
+     *     gruppe er udpeget, behandles entries der ligger DIREKTE i den
+     *     gruppe som sletninger med `DeletedAt = LocationChanged` (det
+     *     tidspunkt entry'en blev flyttet i papirkurven). Det er den
+     *     almindelige sti — KeePass' standard er at "slet" flytter til
+     *     papirkurven frem for at fjerne entry'en helt.
+     *  2. **DeletedObjects:** permanente sletninger (papirkurv tømt, eller
+     *     papirkurv deaktiveret) lever i KDBX' `<DeletedObjects>`-liste med
+     *     UUID + deletion-time.
+     *
+     * Trade-off (samme som desktop): undelete — at flytte en entry UD af
+     * papirkurven igen — propagerer ikke, da entry'en allerede er slettet på
+     * serveren. Entries i UNDERgrupper af papirkurven behandles som aktive
+     * (kun direkte børn synthesizes), igen for paritet med desktop.
      */
     fun read(db: KeePassDatabase): LocalState {
         val state = LocalState()
         val binaryPool = db.binaries
+        val recycleBinUuid = activeRecycleBinUuid(db)
 
-        // findEntries returnerer en List<Pair<Group, List<Entry>>> — vi
-        // flatten'er til en simpel List<Entry> da vi ikke skal bevare
-        // gruppe-tilhørsforhold i LocalState (sync er entry-niveau).
-        db.findEntries { true }.flatMap { (_, entries) -> entries }.forEach { entry ->
+        // Vi traverserer gruppe-træet selv frem for at bruge kotpass'
+        // findEntries: den filtrerer recycle-bin-entries fra baseret på
+        // meta.recycleBinUuid, så vi ville aldrig se dem og kunne ikke
+        // synthesize tombstones. Egen rekursion giver fuld kontrol og
+        // matcher desktop'ens collectEntries 1:1.
+        collectEntries(db.content.group, recycleBinUuid, binaryPool, state)
+
+        // DeletedObjects: permanente sletninger. En aktiv entry vinder over
+        // et stale tombstone (resurrection), så vi springer UUIDs over der
+        // allerede optræder som levende entry.
+        for (deleted in db.content.deletedObjects) {
+            val uuid = deleted.id.toString()
+            if (state.entries.containsKey(uuid)) continue
+            state.tombstones[uuid] = deleted.deletionTime.toKotlinInstant()
+        }
+
+        return state
+    }
+
+    /**
+     * Walk'er [group]-træet rekursivt. Entries i den gruppe hvis UUID matcher
+     * [recycleBinUuid] synthesizes som tombstones (`DeletedAt =
+     * LocationChanged`); alle øvrige bliver aktive entries. Bemærk at
+     * `inRecycleBin` genberegnes pr. gruppe, så entries i UNDERgrupper af
+     * papirkurven IKKE synthesizes — kun direkte børn — identisk med desktop.
+     */
+    private fun collectEntries(
+        group: Group,
+        recycleBinUuid: UUID?,
+        binaryPool: Map<ByteString, BinaryData>,
+        state: LocalState,
+    ) {
+        val inRecycleBin = recycleBinUuid != null && group.uuid == recycleBinUuid
+        for (entry in group.entries) {
+            if (inRecycleBin) {
+                // LocationChanged = tidspunktet entry'en blev flyttet i
+                // papirkurven; fallback til LastModificationTime, derefter
+                // epoch (defensivt — kotpass udfylder normalt begge).
+                val deletedAt = (entry.times?.locationChanged
+                    ?: entry.times?.lastModificationTime)
+                    ?.toKotlinInstant() ?: EPOCH
+                state.tombstones[entry.uuid.toString()] = deletedAt
+                continue
+            }
             val canonical = Mapper.toCanonical(entry) { ref ->
                 binaryPool[ref.hash]?.getContent()
             }
             state.entries[canonical.uuid] = canonical
         }
+        for (child in group.groups) {
+            collectEntries(child, recycleBinUuid, binaryPool, state)
+        }
+    }
 
-        // KDBX' DeletedObjects-liste materialiseres ikke i LocalState's
-        // tombstones — vi har ikke en kotpass-API til at læse dem direkte.
-        // Det betyder: hvis brugeren har slettet en entry lokalt og
-        // databasen ikke endnu er synket, vil sletning ikke propagere før
-        // brugeren genåbner med en frisk klient-state. Acceptabelt for v1;
-        // tracking via DeletedObjects tilføjes når kotpass eksponerer dem.
-
-        return state
+    /**
+     * Recycle-bin-gruppens UUID hvis papirkurven er aktiveret OG en gruppe
+     * faktisk er udpeget; ellers null (ingen synthesis). Spejler desktop's
+     * `activeRecycleBinUUID`.
+     */
+    private fun activeRecycleBinUuid(db: KeePassDatabase): UUID? {
+        val meta = db.content.meta
+        if (!meta.recycleBinEnabled) return null
+        val uuid = meta.recycleBinUuid ?: return null
+        return if (uuid == ZERO_UUID) null else uuid
     }
 
     /**

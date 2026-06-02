@@ -5,9 +5,13 @@ import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import app.keemobile.kotpass.database.KeePassDatabase
 import app.keemobile.kotpass.database.findEntries
+import app.keemobile.kotpass.database.modifiers.modifyContent
+import app.keemobile.kotpass.database.modifiers.modifyMeta
 import app.keemobile.kotpass.database.modifiers.modifyParentGroup
+import app.keemobile.kotpass.models.DeletedObject
 import app.keemobile.kotpass.models.EntryFields
 import app.keemobile.kotpass.models.EntryValue
+import app.keemobile.kotpass.models.Group
 import app.keemobile.kotpass.models.Meta
 import app.keemobile.kotpass.models.TimeData
 import kotlinx.datetime.Instant
@@ -15,6 +19,7 @@ import kotlinx.datetime.toJavaInstant
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import app.keemobile.kotpass.models.Entry as KotpassEntry
@@ -139,6 +144,104 @@ class KotpassLocalStateAdapterTest {
             "RoundTripTitle",
             state2.entries[uuid.toString()]?.strings?.get("Title")?.v,
         )
+    }
+
+    @Test
+    fun `read materializes DeletedObjects as tombstones`() {
+        val liveUuid = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        val deletedUuid = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        val deletionTime = Instant.parse("2026-05-30T12:00:00Z")
+
+        val db = freshDatabase()
+            .modifyParentGroup { copy(entries = entries + kotpassEntry(liveUuid, "Live")) }
+            .modifyContent {
+                copy(deletedObjects = deletedObjects + DeletedObject(
+                    id = deletedUuid,
+                    deletionTime = deletionTime.toJavaInstant(),
+                ))
+            }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        assertEquals(1, state.entries.size)
+        assertTrue(state.entries.containsKey(liveUuid.toString()))
+        assertEquals(1, state.tombstones.size)
+        assertEquals(deletionTime, state.tombstones[deletedUuid.toString()])
+    }
+
+    @Test
+    fun `read synthesizes recycle-bin entries as tombstones`() {
+        val liveUuid = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc")
+        val trashedUuid = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd")
+        val recycleBinId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+        val movedAt = Instant.parse("2026-05-31T08:00:00Z")
+
+        val trashed = kotpassEntry(trashedUuid, "Trashed").let {
+            it.copy(times = it.times!!.copy(locationChanged = movedAt.toJavaInstant()))
+        }
+        val db = freshDatabase()
+            .modifyParentGroup {
+                copy(
+                    entries = entries + kotpassEntry(liveUuid, "Live"),
+                    groups = groups + Group(
+                        uuid = recycleBinId,
+                        name = "Recycle Bin",
+                        entries = listOf(trashed),
+                    ),
+                )
+            }
+            .modifyMeta { copy(recycleBinEnabled = true, recycleBinUuid = recycleBinId) }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        // Den levende entry forbliver aktiv; papirkurv-entry'en bliver et tombstone.
+        assertEquals(1, state.entries.size)
+        assertTrue(state.entries.containsKey(liveUuid.toString()))
+        assertFalse(state.entries.containsKey(trashedUuid.toString()))
+        assertEquals(movedAt, state.tombstones[trashedUuid.toString()])
+    }
+
+    @Test
+    fun `read keeps recycle-bin entries active when recycle bin disabled`() {
+        val trashedUuid = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd")
+        val recycleBinId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+
+        // Recycle bin udpeget men IKKE aktiveret → entries skal forblive aktive.
+        val db = freshDatabase()
+            .modifyParentGroup {
+                copy(groups = groups + Group(
+                    uuid = recycleBinId,
+                    name = "Recycle Bin",
+                    entries = listOf(kotpassEntry(trashedUuid, "NotReallyTrashed")),
+                ))
+            }
+            .modifyMeta { copy(recycleBinEnabled = false, recycleBinUuid = recycleBinId) }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        assertEquals(1, state.entries.size)
+        assertTrue(state.entries.containsKey(trashedUuid.toString()))
+        assertTrue(state.tombstones.isEmpty())
+    }
+
+    @Test
+    fun `read lets a live entry win over a stale DeletedObject`() {
+        val uuid = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+        val db = freshDatabase()
+            .modifyParentGroup { copy(entries = entries + kotpassEntry(uuid, "Resurrected")) }
+            .modifyContent {
+                copy(deletedObjects = deletedObjects + DeletedObject(
+                    id = uuid,
+                    deletionTime = Instant.parse("2026-05-01T00:00:00Z").toJavaInstant(),
+                ))
+            }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        assertEquals(1, state.entries.size)
+        assertTrue(state.entries.containsKey(uuid.toString()))
+        assertTrue(state.tombstones.isEmpty())
     }
 
     // --- Helpers ---

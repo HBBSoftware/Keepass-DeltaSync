@@ -22,6 +22,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Android: local deletions now propagate** — `read()` previously
+  ignored both KDBX' `DeletedObjects` list and entries the user had
+  moved to the recycle bin, so deleting an entry on Android never
+  removed it on the server or on other devices. The
+  `KotpassLocalStateAdapter` now mirrors the desktop client's
+  `ParseExport`: it walks the group tree itself (kotpass' `findEntries`
+  silently drops recycle-bin entries), synthesizes a tombstone for each
+  direct child of the recycle-bin group (`DeletedAt = LocationChanged`),
+  and adds a tombstone for every `DeletedObject`. A live entry still
+  wins over a stale tombstone of the same UUID. Trade-off, same as
+  desktop: moving an entry back out of the recycle bin does not
+  resurrect it on other devices.
 - **Server returned newline-wrapped base64** — PostgreSQL's
   `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
   decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)

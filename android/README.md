@@ -26,7 +26,11 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     Kompilerer mod den gomobile-genererede classes.jar (compileOnly);
     JNI-laget aktiveres først på Android-runtime.
   - `KotpassLocalStateAdapter` på plads — læser/skriver mellem kotpass'
-    `KeePassDatabase` og vores `LocalState`.
+    `KeePassDatabase` og vores `LocalState`. Sletninger propagerer nu:
+    den walker selv gruppe-træet (kotpass' `findEntries` filtrerer
+    recycle-bin-entries fra) og materialiserer tombstones fra både
+    `DeletedObjects` og recycle-bin-entries (`DeletedAt =
+    LocationChanged`) — 1:1 med desktop'ens `ParseExport`.
   - `Synchronizer` på plads — high-level orkestrator der pakker hele
     pipelinen i én `sync(databaseId)`-kald: load .kdbx → adapter →
     sync-engine → adapter → atomisk-skriv .kdbx tilbage. Persistens af
@@ -56,8 +60,10 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     - `KdbxFile`-abstraktion: `PathKdbxFile` (tests) / `SafKdbxFile`
       (production via ContentResolver).
     - `SyncWorker` — periodisk WorkManager-CoroutineWorker.
-  - Mangler stadig: app-ikon, biometrisk-låst password-cache (i stedet for
-    at prompte hver gang), test på rigtig enhed/emulator, F-Droid-submit.
+  - Mangler stadig: biometrisk-låst password-cache (så baggrunds-sync
+    via WorkManager kan køre uden manuel password-indtastning),
+    "share database"-UI (ejere deler pt. kun fra desktop-klienten),
+    F-Droid-submit.
 
 ## Arkitektur
 
