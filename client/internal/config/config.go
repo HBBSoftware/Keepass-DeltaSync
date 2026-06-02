@@ -58,7 +58,13 @@ const (
 )
 
 // Config repræsenterer hele config-filen.
+//
+// Language SKAL stå før tabel-felterne (Server/Databases): TOML's encoder
+// skriver felter i struct-rækkefølge, og en bar nøgle efter en [tabel] ville
+// fejlagtigt blive parset som hørende til den tabel. Tom værdi (eller "en")
+// betyder engelsk (default); "da" vælger dansk. Bruges pt. kun af `tui`.
 type Config struct {
+	Language  string     `toml:"language,omitempty"`
 	Server    Server     `toml:"server"`
 	Databases []Database `toml:"database"`
 }

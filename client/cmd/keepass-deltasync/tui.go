@@ -20,14 +20,24 @@ import (
 // database-navne. Menuen er bevidst en TYND kommando-vælger: den læser kun
 // config for at vise state + prefille database-listen, og udfører alt ved at
 // kalde denne samme binær som en subproces (os/exec). Den taler aldrig selv
-// med serveren og rører hverken crypto eller config-skrivning — så der findes
-// kun én kodesti, og password-prompts virker uændret på den rigtige terminal.
+// med serveren og rører hverken crypto eller config-skrivning — undtagen det
+// ene UI-præference-felt cfg.Language som sprog-skifteren persisterer.
+//
+// Sproget er engelsk som default; brugeren kan skifte til dansk via
+// menupunktet "Language / Sprog", og valget huskes i config.
 func runTui(args []string) error {
 	self, err := os.Executable()
 	if err != nil || self == "" {
 		self = os.Args[0]
 	}
-	t := &tui{app: tview.NewApplication(), self: self}
+
+	lang := ""
+	if cfg, err := config.Load(); err == nil && cfg != nil {
+		lang = cfg.Language
+	}
+	m, resolved := messagesFor(lang)
+
+	t := &tui{app: tview.NewApplication(), self: self, m: m, lang: resolved}
 	t.app.EnableMouse(true)
 	t.showMain()
 	return t.app.Run()
@@ -36,12 +46,34 @@ func runTui(args []string) error {
 type tui struct {
 	app  *tview.Application
 	self string
+	m    *msgs  // aktivt sprogs strenge
+	lang string // normaliseret sprogkode ("en"/"da")
 }
 
 // inputField beskriver ét felt i en collectInputs-formular.
 type inputField struct {
 	label    string
 	password bool
+}
+
+// ============================================================
+// Sprog
+// ============================================================
+
+// toggleLanguage skifter mellem engelsk og dansk, persisterer valget i config
+// (best-effort — UI'en skifter for denne session uanset om skrivningen
+// lykkes), genindlæser strengsættet og gentegner hovedmenuen.
+func (t *tui) toggleLanguage() {
+	next := langDA
+	if t.lang == langDA {
+		next = langEN
+	}
+	if cfg, err := config.Load(); err == nil && cfg != nil {
+		cfg.Language = next
+		_ = config.Save(cfg)
+	}
+	t.m, t.lang = messagesFor(next)
+	t.showMain()
 }
 
 // ============================================================
@@ -55,8 +87,8 @@ func (t *tui) showMain() {
 	cfg, err := config.Load()
 	if err != nil {
 		modal := tview.NewModal().
-			SetText("Kunne ikke læse config:\n\n" + err.Error()).
-			AddButtons([]string{"Afslut"}).
+			SetText(t.m.cfgReadErr + err.Error()).
+			AddButtons([]string{t.m.btnExit}).
 			SetDoneFunc(func(int, string) { t.app.Stop() })
 		t.app.SetRoot(modal, true)
 		return
@@ -72,8 +104,8 @@ func (t *tui) showMain() {
 
 	switch {
 	case !enrolled:
-		list.AddItem("Enroll enhed", "Registrér denne enhed med en enrollment-token", 'e', func() {
-			t.collectInputs("Enroll enhed", []inputField{{label: "Enrollment-token"}}, func(v []string) {
+		list.AddItem(t.m.miEnroll, t.m.miEnrollDesc, 'e', func() {
+			t.collectInputs(t.m.miEnroll, []inputField{{label: t.m.fldEnrollToken}}, func(v []string) {
 				token := strings.TrimSpace(v[0])
 				if token == "" {
 					t.showMain()
@@ -85,10 +117,10 @@ func (t *tui) showMain() {
 		})
 
 	case !hasDB:
-		list.AddItem("Init database", "Knyt en lokal .kdbx til en server-database", 'i', func() {
-			t.collectInputs("Init database", []inputField{
-				{label: "Navn (kort id, fx 'privat')"},
-				{label: "Sti til lokal .kdbx"},
+		list.AddItem(t.m.miInit, t.m.miInitDesc, 'i', func() {
+			t.collectInputs(t.m.miInit, []inputField{
+				{label: t.m.fldInitName},
+				{label: t.m.fldInitPath},
 			}, func(v []string) {
 				name, path := strings.TrimSpace(v[0]), strings.TrimSpace(v[1])
 				if name == "" || path == "" {
@@ -99,32 +131,33 @@ func (t *tui) showMain() {
 				t.showMain()
 			})
 		})
-		list.AddItem("Status", "Vis enrollment-info", 's', func() { t.runSelf("status"); t.showMain() })
-		list.AddItem("Databaser", "List server-databaser", 'd', func() { t.runSelf("databases"); t.showMain() })
+		list.AddItem(t.m.miStatus, t.m.miStatusDescNoDb, 's', func() { t.runSelf("status"); t.showMain() })
+		list.AddItem(t.m.miDatabases, t.m.miDatabasesDescSrv, 'd', func() { t.runSelf("databases"); t.showMain() })
 
 	default:
-		list.AddItem("Synk nu", "Pull + push for en database", 'y', func() {
-			t.pickDatabase("Synk", func(name string) { t.runSelf("sync", name); t.showMain() })
+		list.AddItem(t.m.miSyncNow, t.m.miSyncNowDesc, 'y', func() {
+			t.pickDatabase(t.m.pkSync, func(name string) { t.runSelf("sync", name); t.showMain() })
 		})
-		list.AddItem("Pull (hent)", "Hent server-ændringer ind i lokal .kdbx", 'l', func() {
-			t.pickDatabase("Pull", func(name string) { t.runSelf("pull", name); t.showMain() })
+		list.AddItem(t.m.miPull, t.m.miPullDesc, 'l', func() {
+			t.pickDatabase(t.m.pkPull, func(name string) { t.runSelf("pull", name); t.showMain() })
 		})
-		list.AddItem("Push (send)", "Send lokale ændringer til serveren", 'u', func() {
-			t.pickDatabase("Push", func(name string) { t.runSelf("push", name); t.showMain() })
+		list.AddItem(t.m.miPush, t.m.miPushDesc, 'u', func() {
+			t.pickDatabase(t.m.pkPush, func(name string) { t.runSelf("push", name); t.showMain() })
 		})
-		list.AddItem("Status", "Vis enrollment + last-seen", 's', func() { t.runSelf("status"); t.showMain() })
-		list.AddItem("Databaser", "List lokale + server-databaser", 'd', func() { t.runSelf("databases"); t.showMain() })
-		list.AddItem("Enheder", "List enrollede enheder", 'n', func() { t.runSelf("devices"); t.showMain() })
-		list.AddItem("Log", "Vis seneste audit-log", 'g', func() { t.runSelf("log"); t.showMain() })
-		list.AddItem("Daemon", "Kør kontinuerlig sync (Ctrl-C stopper)", 'm', func() {
+		list.AddItem(t.m.miStatus, t.m.miStatusDesc, 's', func() { t.runSelf("status"); t.showMain() })
+		list.AddItem(t.m.miDatabases, t.m.miDatabasesDesc, 'd', func() { t.runSelf("databases"); t.showMain() })
+		list.AddItem(t.m.miDevices, t.m.miDevicesDesc, 'n', func() { t.runSelf("devices"); t.showMain() })
+		list.AddItem(t.m.miLog, t.m.miLogDesc, 'g', func() { t.runSelf("log"); t.showMain() })
+		list.AddItem(t.m.miDaemon, t.m.miDaemonDesc, 'm', func() {
 			t.runSelf("daemon", "--store-keyring")
 			t.showMain()
 		})
-		list.AddItem("Skift konto (guided)", "Skift hvilken konto denne enhed synker fra", 'k', func() { t.switchAccountWizard() })
-		list.AddItem("Avanceret …", "Versioner, gendan, deling", 'a', func() { t.showAdvanced() })
+		list.AddItem(t.m.miSwitch, t.m.miSwitchDesc, 'k', func() { t.switchAccountWizard() })
+		list.AddItem(t.m.miAdvanced, t.m.miAdvancedDesc, 'a', func() { t.showAdvanced() })
 	}
 
-	list.AddItem("Afslut", "Luk menuen", 'q', func() { t.app.Stop() })
+	list.AddItem(t.m.miLanguage, fmt.Sprintf(t.m.miLanguageDescFmt, t.m.langDisplayName(t.lang)), 'o', t.toggleLanguage)
+	list.AddItem(t.m.miQuit, t.m.miQuitDesc, 'q', func() { t.app.Stop() })
 	t.setRoot(list)
 }
 
@@ -133,12 +166,12 @@ func (t *tui) showMain() {
 func (t *tui) showAdvanced() {
 	list := tview.NewList()
 	list.SetBorder(true)
-	list.SetTitle(" Avanceret ")
+	list.SetTitle(t.m.advTitle)
 	list.SetTitleAlign(tview.AlignLeft)
 
-	list.AddItem("Versioner", "List server-versioner af en entry", 'v', func() {
-		t.pickDatabaseThen("Versioner", t.showAdvanced, func(name string) {
-			t.collectInputs("Versioner — "+name, []inputField{{label: "Entry-UUID"}}, func(v []string) {
+	list.AddItem(t.m.miVersions, t.m.miVersionsDesc, 'v', func() {
+		t.pickDatabaseThen(t.m.pkVersions, t.showAdvanced, func(name string) {
+			t.collectInputs(fmt.Sprintf("%s — %s", t.m.pkVersions, name), []inputField{{label: t.m.fldEntryUUID}}, func(v []string) {
 				u := strings.TrimSpace(v[0])
 				if u == "" {
 					t.showAdvanced()
@@ -149,11 +182,11 @@ func (t *tui) showAdvanced() {
 			})
 		})
 	})
-	list.AddItem("Gendan version", "Rul en entry tilbage til version 1-3", 'r', func() {
-		t.pickDatabaseThen("Gendan", t.showAdvanced, func(name string) {
-			t.collectInputs("Gendan — "+name, []inputField{
-				{label: "Entry-UUID"},
-				{label: "Version (1-3)"},
+	list.AddItem(t.m.miRestore, t.m.miRestoreDesc, 'r', func() {
+		t.pickDatabaseThen(t.m.pkRestore, t.showAdvanced, func(name string) {
+			t.collectInputs(fmt.Sprintf("%s — %s", t.m.pkRestore, name), []inputField{
+				{label: t.m.fldEntryUUID},
+				{label: t.m.fldVersion},
 			}, func(v []string) {
 				u, n := strings.TrimSpace(v[0]), strings.TrimSpace(v[1])
 				if u == "" || n == "" {
@@ -165,15 +198,15 @@ func (t *tui) showAdvanced() {
 			})
 		})
 	})
-	list.AddItem("Medlemmer", "List medlemmer af en database (kun owner)", 'p', func() {
-		t.pickDatabaseThen("Medlemmer", t.showAdvanced, func(name string) {
+	list.AddItem(t.m.miMembers, t.m.miMembersDesc, 'p', func() {
+		t.pickDatabaseThen(t.m.pkMembers, t.showAdvanced, func(name string) {
 			t.runSelf("shares", name)
 			t.showAdvanced()
 		})
 	})
-	list.AddItem("Del database", "Giv en anden bruger adgang", 'd', func() {
-		t.pickDatabaseThen("Del", t.showAdvanced, func(name string) {
-			t.collectInputs("Del — "+name, []inputField{{label: "Brugernavn"}}, func(v []string) {
+	list.AddItem(t.m.miShare, t.m.miShareDesc, 'd', func() {
+		t.pickDatabaseThen(t.m.pkShare, t.showAdvanced, func(name string) {
+			t.collectInputs(fmt.Sprintf("%s — %s", t.m.pkShare, name), []inputField{{label: t.m.fldUsername}}, func(v []string) {
 				user := strings.TrimSpace(v[0])
 				if user == "" {
 					t.showAdvanced()
@@ -184,9 +217,9 @@ func (t *tui) showAdvanced() {
 			})
 		})
 	})
-	list.AddItem("Fjern medlem", "Fjern en bruger (eller dig selv)", 'f', func() {
-		t.pickDatabaseThen("Fjern", t.showAdvanced, func(name string) {
-			t.collectInputs("Fjern — "+name, []inputField{{label: "Brugernavn"}}, func(v []string) {
+	list.AddItem(t.m.miUnshare, t.m.miUnshareDesc, 'f', func() {
+		t.pickDatabaseThen(t.m.pkUnshare, t.showAdvanced, func(name string) {
+			t.collectInputs(fmt.Sprintf("%s — %s", t.m.pkUnshare, name), []inputField{{label: t.m.fldUsername}}, func(v []string) {
 				user := strings.TrimSpace(v[0])
 				if user == "" {
 					t.showAdvanced()
@@ -198,17 +231,17 @@ func (t *tui) showAdvanced() {
 		})
 	})
 
-	list.AddItem("Enrollment-token til ny enhed", "Generér token til fx Android-appen (kræver admin-token)", 't', func() {
+	list.AddItem(t.m.miEnrollTok, t.m.miEnrollTokDesc, 't', func() {
 		t.enrollmentTokenFlow()
 	})
-	list.AddItem("Glem database", "Fjern en lokal binding fra config (rører ikke server/fil)", 'x', func() {
-		t.pickDatabaseThen("Glem database", t.showAdvanced, func(name string) {
+	list.AddItem(t.m.miForget, t.m.miForgetDesc, 'x', func() {
+		t.pickDatabaseThen(t.m.pkForget, t.showAdvanced, func(name string) {
 			t.runSelf("forget", name)
 			t.showAdvanced()
 		})
 	})
 
-	list.AddItem("‹ Tilbage", "", 'q', t.showMain)
+	list.AddItem(t.m.btnBack, "", 'q', t.showMain)
 	list.SetDoneFunc(t.showMain) // Esc
 	t.setRoot(list)
 }
@@ -234,7 +267,7 @@ func (t *tui) pickDatabaseThen(title string, back func(), onPick func(name strin
 
 	list := tview.NewList()
 	list.SetBorder(true)
-	list.SetTitle(fmt.Sprintf(" %s — vælg database ", title))
+	list.SetTitle(fmt.Sprintf(" %s — %s ", title, t.m.selectDbSuffix))
 	list.SetTitleAlign(tview.AlignLeft)
 
 	for i, d := range cfg.Databases {
@@ -245,7 +278,7 @@ func (t *tui) pickDatabaseThen(title string, back func(), onPick func(name strin
 		}
 		list.AddItem(name, d.LocalPath, shortcut, func() { onPick(name) })
 	}
-	list.AddItem("‹ Tilbage", "", 'q', back)
+	list.AddItem(t.m.btnBack, "", 'q', back)
 	list.SetDoneFunc(back) // Esc
 	t.setRoot(list)
 }
@@ -267,14 +300,14 @@ func (t *tui) collectInputs(title string, fields []inputField, onSubmit func(val
 		form.AddFormItem(in)
 		inputs[i] = in
 	}
-	form.AddButton("OK", func() {
+	form.AddButton(t.m.btnOK, func() {
 		vals := make([]string, len(inputs))
 		for i, in := range inputs {
 			vals[i] = in.GetText()
 		}
 		onSubmit(vals)
 	})
-	form.AddButton("Annullér", t.showMain)
+	form.AddButton(t.m.btnCancel, t.showMain)
 	form.SetCancelFunc(t.showMain) // Esc
 	t.setRoot(form)
 }
@@ -291,15 +324,15 @@ func (t *tui) setRoot(body tview.Primitive) {
 func (t *tui) headerView() *tview.TextView {
 	cfg, _ := config.Load()
 
-	server := "(ikke sat)"
-	state := "[red]ikke enrolled[-]"
-	dbs := "(ingen)"
+	server := t.m.hNotSet
+	state := t.m.hNotEnrolled
+	dbs := t.m.hNone
 	if cfg != nil {
 		if cfg.Server.URL != "" {
 			server = cfg.Server.URL
 		}
 		if cfg.Server.DeviceToken != "" {
-			state = "[green]enrolled[-]"
+			state = t.m.hEnrolled
 		}
 		if len(cfg.Databases) > 0 {
 			names := make([]string, 0, len(cfg.Databases))
@@ -312,9 +345,9 @@ func (t *tui) headerView() *tview.TextView {
 
 	tv := tview.NewTextView().SetDynamicColors(true)
 	tv.SetBorder(true)
-	tv.SetTitle(" Status ")
+	tv.SetTitle(t.m.statusTitle)
 	tv.SetTitleAlign(tview.AlignLeft)
-	fmt.Fprintf(tv, "Server    : %s\nEnhed     : %s\nDatabaser : %s", server, state, dbs)
+	fmt.Fprintf(tv, t.m.hdrFmt, server, state, dbs)
 	return tv
 }
 
@@ -341,10 +374,10 @@ func (t *tui) runSelfEnv(extraEnv []string, args ...string) {
 			cmd.Env = append(os.Environ(), extraEnv...)
 		}
 		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "\n[fejl] %v\n", err)
+			fmt.Fprintf(os.Stderr, t.m.errFmt, err)
 		}
 
-		fmt.Print("\nTryk Enter for at vende tilbage til menuen … ")
+		fmt.Print(t.m.pressEnter)
 		bufio.NewReader(os.Stdin).ReadString('\n')
 	})
 }
@@ -356,12 +389,12 @@ func (t *tui) runSelfEnv(extraEnv []string, args ...string) {
 func (t *tui) enrollmentTokenFlow() {
 	hasAdminEnv := os.Getenv(adminTokenEnvVar) != ""
 
-	fields := []inputField{{label: "Brugernavn (fx 'hans')"}}
+	fields := []inputField{{label: t.m.fldEtUsername}}
 	if !hasAdminEnv {
-		fields = append(fields, inputField{label: "Admin-token", password: true})
+		fields = append(fields, inputField{label: t.m.fldAdminToken, password: true})
 	}
 
-	t.collectInputs("Enrollment-token til ny enhed", fields, func(v []string) {
+	t.collectInputs(t.m.miEnrollTok, fields, func(v []string) {
 		user := strings.TrimSpace(v[0])
 		if user == "" {
 			t.showAdvanced()
@@ -392,34 +425,19 @@ func (t *tui) enrollmentTokenFlow() {
 func (t *tui) switchAccountWizard() {
 	cfg, err := config.Load()
 	if err != nil || cfg.Server.URL == "" {
-		t.showNotice("Skift konto",
-			"Ingen server i config endnu. Brug 'Enroll enhed' først.", t.showMain)
+		t.showNotice(t.m.saNoServerTitle, t.m.saNoServerBody, t.showMain)
 		return
 	}
 	server := cfg.Server.URL
 
-	intro := "Dette skifter hvilken konto denne enhed synker fra — på SAMME server:\n\n" +
-		"  " + server + "\n\n" +
-		"Trin:\n" +
-		"  1) Enroll mod den anden konto (indsæt et enrollment-token)\n" +
-		"  2) Se kontoens databaser + UUID\n" +
-		"  3) Bind en lokal .kdbx til den database\n" +
-		"  4) Synk alt ned\n\n" +
-		"Vigtigt:\n" +
-		"  • Din nuværende server-blok bliver OVERSKREVET (ny enhed-identitet).\n" +
-		"  • Den lokale .kdbx skal bruge SAMME master-password som databasen.\n" +
-		"    Har du ingen lokal kopi, så lav en tom .kdbx i KeePassXC med det\n" +
-		"    rigtige password — sync fylder resten i.\n" +
-		"  • Den gamle binding bliver forældet; ryd op bagefter med\n" +
-		"    Avanceret → Glem database."
-	t.showNotice("Skift konto — sådan virker det", intro, func() {
+	t.showNotice(t.m.saIntroTitle, fmt.Sprintf(t.m.saIntroFmt, server), func() {
 		t.switchStepEnroll()
 	})
 }
 
 func (t *tui) switchStepEnroll() {
-	t.collectInputs("Skift konto · 1/3 — enroll mod den anden konto", []inputField{
-		{label: "Enrollment-token"},
+	t.collectInputs(t.m.saStep1Title, []inputField{
+		{label: t.m.fldEnrollToken},
 	}, func(v []string) {
 		token := strings.TrimSpace(v[0])
 		if token == "" {
@@ -433,19 +451,17 @@ func (t *tui) switchStepEnroll() {
 }
 
 func (t *tui) switchStepDatabases() {
-	t.showNotice("Skift konto · 2/3 — find databasen",
-		"Nu vises den nye kontos databaser.\n\nNotér UUID'et på den database du vil binde til — du skal indsætte det i næste trin.",
-		func() {
-			t.runSelf("databases")
-			t.switchStepBind()
-		})
+	t.showNotice(t.m.saStep2Title, t.m.saStep2Body, func() {
+		t.runSelf("databases")
+		t.switchStepBind()
+	})
 }
 
 func (t *tui) switchStepBind() {
-	t.collectInputs("Skift konto · 3/3 — bind lokal .kdbx", []inputField{
-		{label: "Lokalt navn (fx 'adgangskoder')"},
-		{label: "Sti til lokal .kdbx"},
-		{label: "Remote database-UUID"},
+	t.collectInputs(t.m.saStep3Title, []inputField{
+		{label: t.m.fldSaName},
+		{label: t.m.fldSaPath},
+		{label: t.m.fldSaUUID},
 	}, func(v []string) {
 		name := strings.TrimSpace(v[0])
 		path := strings.TrimSpace(v[1])
@@ -460,15 +476,10 @@ func (t *tui) switchStepBind() {
 }
 
 func (t *tui) switchStepSync(name string) {
-	t.showNotice("Skift konto — næsten færdig",
-		"Bindingen '"+name+"' er sat op.\n\n"+
-			"Vælg Fortsæt for at synke nu (du bliver bedt om master-passwordet),\n"+
-			"eller Annullér for at vende tilbage og synke senere.\n\n"+
-			"Husk: den gamle binding kan fjernes med Avanceret → Glem database.",
-		func() {
-			t.runSelf("sync", name)
-			t.showMain()
-		})
+	t.showNotice(t.m.saDoneTitle, fmt.Sprintf(t.m.saDoneFmt, name), func() {
+		t.runSelf("sync", name)
+		t.showMain()
+	})
 }
 
 // showNotice viser en informations-/bekræftelses-skærm med rulbar tekst og
@@ -482,8 +493,8 @@ func (t *tui) showNotice(title, body string, onContinue func()) {
 
 	choices := tview.NewList()
 	choices.ShowSecondaryText(false)
-	choices.AddItem("Fortsæt", "", 0, onContinue)
-	choices.AddItem("Annullér", "", 0, t.showMain)
+	choices.AddItem(t.m.btnContinue, "", 0, onContinue)
+	choices.AddItem(t.m.btnCancel, "", 0, t.showMain)
 	choices.SetDoneFunc(t.showMain) // Esc
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).

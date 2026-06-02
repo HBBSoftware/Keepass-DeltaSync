@@ -12,7 +12,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   (tview) that runs the common commands without having to remember
   command names, flags or database names. It is a thin command-selector:
   reads `config.toml` for state + the database list and shells out to
-  the same binary so password prompts work unchanged.
+  the same binary so password prompts work unchanged. The interface is
+  **English by default** with a *Language / Sprog* menu item to switch
+  to Danish; the choice is remembered in `config.toml` (`language`).
 - **Android: live sync progress** — progress bar + label showing
   Opening / Pulling x/total / Pushing x/total / Saving during a sync.
 - **Android: share a database from the app** — a new Share screen
