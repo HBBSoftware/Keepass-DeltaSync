@@ -12,12 +12,14 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
+import app.keemobile.kotpass.errors.CryptoError
 import dk.bjoerckbraun.deltasync.api.ApiClient
 import dk.bjoerckbraun.deltasync.persistence.DatabaseConfigStore
 import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
+import dk.bjoerckbraun.deltasync.persistence.SyncProbeStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
 import java.io.IOException
@@ -39,11 +41,15 @@ import java.util.concurrent.TimeUnit
  * Er ingen af de tre på plads (ikke enrolled, ingen database, eller intet
  * husket password), er der intet at gøre i baggrunden → [Result.failure].
  *
- * Fejl-klassificering: netværks-fejl ([IOException]) → [Result.retry] (næste
- * tick prøver igen). Alt andet (forkert password, korrupt kdbx, trukket
- * adgang) er permanent → vi rydder det gemte password, aflyser den
- * periodiske sync, og returnerer [Result.failure] så vi ikke looper på en
- * fejl brugeren skal gribe ind i.
+ * Fejl-klassificering:
+ *   - netværks-fejl ([IOException]) → [Result.retry] (næste tick prøver igen).
+ *   - forkert password ([CryptoError.InvalidKey]) → ryd det gemte password,
+ *     aflys den periodiske sync, [Result.failure]. Et forkert password fixer
+ *     ikke sig selv; brugeren må slå auto-sync til igen fra app'en.
+ *   - alt andet (server-hik, korrupt kdbx, trukket adgang) → [Result.failure]
+ *     men vi BEHOLDER det gemte password og lader den periodiske sync køre
+ *     videre, så et forbigående problem ikke river auto-sync ned og tvinger
+ *     brugeren til at taste password igen.
  */
 class SyncWorker(
     appContext: Context,
@@ -68,20 +74,50 @@ class SyncWorker(
             return Result.failure()
         }
 
-        val kdbxCredentials = Credentials.from(EncryptedValue.fromString(passphrase))
-
         val api = ApiClient(
             baseUrl = credentials.serverUrl,
             deviceToken = credentials.deviceToken,
         )
+        val safFile = SafKdbxFile(applicationContext, config.uri)
+        val persistence = DataStoreSyncStatePersistence(applicationContext)
+        val probeStore = SyncProbeStore(applicationContext)
+
+        // Billig probe FØR vi dekoder filen: er den lokale fil uændret siden
+        // sidste sync OG serveren uden nye changes, er der intet at gøre — og
+        // vi sparer to Argon2-operationer (kotpass-decode + gomobile-session).
+        // Probe-læsningen (lille HTTP-GET + et metadata-opslag) er det eneste
+        // et tomt tick koster.
+        val lastSeq = persistence.load(config.databaseId).lastSeq
+        val currentFingerprint = safFile.fingerprint()
+        val skip = try {
+            SyncProbe.nothingToSync(
+                api = api,
+                databaseId = config.databaseId,
+                lastSeq = lastSeq,
+                current = currentFingerprint,
+                saved = probeStore.load(config.databaseId),
+            )
+        } catch (e: IOException) {
+            // Netværk nede — undgå at dekode forgæves; prøv igen næste tick.
+            Log.w(TAG, "probe failed (network); will retry", e)
+            return Result.retry()
+        } catch (e: Exception) {
+            // Anden probe-fejl: kør den fulde sync, så den klassificeres dér.
+            Log.w(TAG, "probe failed (other); falling through to full sync", e)
+            false
+        }
+        if (skip) {
+            Log.i(TAG, "no changes (seq=$lastSeq, file unchanged) — skipping decode")
+            return Result.success()
+        }
+
+        val kdbxCredentials = Credentials.from(EncryptedValue.fromString(passphrase))
         val crypto = GomobileCryptoSession.open(
             password = passphrase.toByteArray(),
             databaseId = config.databaseId,
         )
-
-        val persistence = DataStoreSyncStatePersistence(applicationContext)
         val synchronizer = Synchronizer(
-            kdbxFile = SafKdbxFile(applicationContext, config.uri),
+            kdbxFile = safFile,
             credentials = kdbxCredentials,
             api = api,
             crypto = crypto,
@@ -91,19 +127,30 @@ class SyncWorker(
         return try {
             val result = synchronizer.sync(config.databaseId)
             Log.i(TAG, "sync ok: $result")
+            // Gem nyt fil-fingeraftryk (efter en evt. gen-skrivning) så næste
+            // tick kan kortslutte hvis intet ændrer sig.
+            safFile.fingerprint()?.let { probeStore.save(config.databaseId, it) }
             Result.success()
         } catch (e: IOException) {
             // Netværk nede / server midlertidigt utilgængelig — prøv igen.
             Log.w(TAG, "sync failed (network); will retry", e)
             Result.retry()
-        } catch (e: Exception) {
-            // Permanent: forkert password, korrupt fil, eller trukket adgang.
-            // Et husket-men-forkert password må ikke loope i baggrunden —
-            // ryd det og stop den periodiske sync. Brugeren slår den til igen
-            // (og taster password på ny) fra app'en.
-            Log.w(TAG, "sync failed (permanent); clearing remembered passphrase", e)
+        } catch (e: CryptoError.InvalidKey) {
+            // Forkert password (kotpass HMAC-mismatch). Det husket-men-forkerte
+            // password må ikke loope i baggrunden — ryd det og stop den
+            // periodiske sync. Brugeren slår auto-sync til igen (og taster
+            // password på ny) fra app'en.
+            Log.w(TAG, "sync failed (wrong password); clearing remembered passphrase", e)
             passphraseStore.clear()
+            probeStore.clear()
             cancelPeriodic(applicationContext)
+            Result.failure()
+        } catch (e: Exception) {
+            // Anden fejl (server-hik, korrupt fil, trukket device-adgang). Vi
+            // beholder bevidst det gemte password og lader den periodiske sync
+            // køre videre — næste tick prøver igen. Kun et decideret forkert
+            // password (ovenfor) river auto-sync ned.
+            Log.w(TAG, "sync failed (transient/other); keeping remembered passphrase", e)
             Result.failure()
         } finally {
             crypto.close()

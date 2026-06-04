@@ -16,19 +16,23 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
+import app.keemobile.kotpass.errors.CryptoError
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dk.bjoerckbraun.deltasync.api.ApiClient
+import dk.bjoerckbraun.deltasync.persistence.AutoSyncSettingsStore
 import dk.bjoerckbraun.deltasync.persistence.DatabaseConfigStore
 import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
+import dk.bjoerckbraun.deltasync.persistence.SyncProbeStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
+import dk.bjoerckbraun.deltasync.worker.SyncProbe
 import dk.bjoerckbraun.deltasync.sync.SyncProgressEvent
 import dk.bjoerckbraun.deltasync.sync.SyncProgressListener
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
@@ -51,6 +55,11 @@ class MainActivity : FragmentActivity() {
     private lateinit var tokenStore: TokenStore
     private lateinit var configStore: DatabaseConfigStore
     private lateinit var passphraseStore: EncryptedPassphraseStore
+    private lateinit var autoSyncSettings: AutoSyncSettingsStore
+    private lateinit var probeStore: SyncProbeStore
+
+    /** Sikrer at foreground-sync ved app-åbning kun trigges én gang pr. instans. */
+    private var foregroundSyncTriggered = false
 
     private lateinit var statusText: TextView
     private lateinit var versionText: TextView
@@ -60,6 +69,9 @@ class MainActivity : FragmentActivity() {
     private lateinit var shareButton: MaterialButton
     private lateinit var unenrollButton: MaterialButton
     private lateinit var serverRequiredCard: MaterialCardView
+    private lateinit var autoSyncCard: MaterialCardView
+    private lateinit var autoSyncSwitch: MaterialSwitch
+    private lateinit var autoSyncIntervalRow: TextView
     private lateinit var syncProgressBar: ProgressBar
     private lateinit var syncProgressText: TextView
 
@@ -78,6 +90,8 @@ class MainActivity : FragmentActivity() {
         tokenStore = KeystoreTokenStore(applicationContext)
         configStore = DatabaseConfigStore(applicationContext)
         passphraseStore = EncryptedPassphraseStore(applicationContext)
+        autoSyncSettings = AutoSyncSettingsStore(applicationContext)
+        probeStore = SyncProbeStore(applicationContext)
 
         statusText = findViewById(R.id.statusText)
         versionText = findViewById(R.id.versionText)
@@ -87,6 +101,9 @@ class MainActivity : FragmentActivity() {
         shareButton = findViewById(R.id.shareButton)
         unenrollButton = findViewById(R.id.unenrollButton)
         serverRequiredCard = findViewById(R.id.serverRequiredCard)
+        autoSyncCard = findViewById(R.id.autoSyncCard)
+        autoSyncSwitch = findViewById(R.id.autoSyncSwitch)
+        autoSyncIntervalRow = findViewById(R.id.autoSyncIntervalRow)
         syncProgressBar = findViewById(R.id.syncProgressBar)
         syncProgressText = findViewById(R.id.syncProgressText)
 
@@ -113,9 +130,18 @@ class MainActivity : FragmentActivity() {
             tokenStore.clear()
             configStore.clear()
             passphraseStore.clear()
+            probeStore.clear()
             SyncWorker.cancelPeriodic(applicationContext)
             refreshStatus()
         }
+
+        // Klik (ikke checked-change) så programmatiske opdateringer i
+        // refreshStatus() ikke selv trigger enable/disable-flowet.
+        autoSyncSwitch.setOnClickListener {
+            if (autoSyncSwitch.isChecked) enableAutoSync() else disableAutoSync()
+        }
+
+        autoSyncIntervalRow.setOnClickListener { showIntervalDialog() }
     }
 
     override fun onResume() {
@@ -136,6 +162,7 @@ class MainActivity : FragmentActivity() {
                 shareButton.visibility = View.GONE
                 unenrollButton.visibility = View.GONE
                 serverRequiredCard.visibility = View.VISIBLE
+                autoSyncCard.visibility = View.GONE
             }
 
             config == null -> {
@@ -150,6 +177,7 @@ class MainActivity : FragmentActivity() {
                 shareButton.visibility = View.GONE
                 unenrollButton.visibility = View.VISIBLE
                 serverRequiredCard.visibility = View.GONE
+                autoSyncCard.visibility = View.GONE
             }
 
             else -> {
@@ -167,8 +195,120 @@ class MainActivity : FragmentActivity() {
                 shareButton.visibility = View.VISIBLE
                 unenrollButton.visibility = View.VISIBLE
                 serverRequiredCard.visibility = View.GONE
+                autoSyncCard.visibility = View.VISIBLE
+                updateAutoSyncUi(config.databaseId)
+                maybeForegroundSync(config)
             }
         }
+    }
+
+    /**
+     * Ved app-åbning (én gang pr. instans): hvis auto-sync er slået til, kør
+     * den billige probe på en baggrunds-tråd og synk KUN hvis noget faktisk er
+     * ændret — så data er friske når du åbner appen, uden at flashe progress
+     * eller dekode filen på et tomt tjek. Er auto-sync slået fra (intet husket
+     * password), gør vi intet (vi vil ikke auto-prompte for password ved åbning).
+     */
+    private fun maybeForegroundSync(config: DatabaseConfigStore.DatabaseConfig) {
+        if (foregroundSyncTriggered) return
+        val passphrase = passphraseStore.load(config.databaseId) ?: return
+        val credentials = tokenStore.load() ?: return
+        foregroundSyncTriggered = true
+
+        lifecycleScope.launch {
+            val skip = withContext(Dispatchers.IO) {
+                runCatching {
+                    val api = ApiClient(credentials.serverUrl, credentials.deviceToken)
+                    val lastSeq = DataStoreSyncStatePersistence(applicationContext)
+                        .load(config.databaseId).lastSeq
+                    SyncProbe.nothingToSync(
+                        api = api,
+                        databaseId = config.databaseId,
+                        lastSeq = lastSeq,
+                        current = SafKdbxFile(applicationContext, config.uri).fingerprint(),
+                        saved = probeStore.load(config.databaseId),
+                    )
+                    // Probe-fejl (fx netværk) → vær stille; skip (true).
+                }.getOrDefault(true)
+            }
+            if (!skip) runSync(passphrase, persistOnSuccess = false, showResultDialog = false)
+        }
+    }
+
+    /**
+     * Spejler auto-sync-kortets tilstand fra de underliggende stores. Om
+     * baggrunds-sync er tændt afledes af om der findes et husket password for
+     * [databaseId] — password og periodisk worker tændes/slukkes altid sammen.
+     * Switchen sættes uden at trigge dens listener (vi bruger setOnClickListener,
+     * så kun bruger-tap kører enable/disable).
+     */
+    private fun updateAutoSyncUi(databaseId: String) {
+        val enabled = passphraseStore.load(databaseId) != null
+        autoSyncSwitch.isChecked = enabled
+        autoSyncIntervalRow.visibility = if (enabled) View.VISIBLE else View.GONE
+        autoSyncIntervalRow.text =
+            getString(R.string.auto_sync_interval_row, autoSyncSettings.intervalMinutes)
+    }
+
+    /**
+     * Bruger slog auto-sync til: bekræft identitet én gang, bed om password,
+     * og kør en sync der ved succes gemmer passwordet og tænder den periodiske
+     * worker (selve persisteringen sker i [runSync] med persistOnSuccess=true,
+     * så vi aldrig gemmer et forkert password). Annullerer brugeren undervejs,
+     * ruller [refreshStatus] switchen tilbage til fra.
+     */
+    private fun enableAutoSync() {
+        confirmIdentityThen(
+            onConfirmed = {
+                promptPassword { passphrase ->
+                    runSync(passphrase, persistOnSuccess = true)
+                }
+                // Promptet er asynkront; hvis brugeren annullerer det sætter
+                // refreshStatus() (ved næste onResume / efter sync) switchen
+                // korrekt. Sæt den tilbage nu så den ikke står tændt mens
+                // dialogen er åben uden at noget er gemt endnu.
+                refreshStatus()
+            },
+            onDeclined = {
+                Toast.makeText(this, R.string.remember_not_confirmed, Toast.LENGTH_SHORT).show()
+                refreshStatus()
+            },
+        )
+    }
+
+    /** Bruger slog auto-sync fra: ryd det gemte password og stop worker'en. */
+    private fun disableAutoSync() {
+        passphraseStore.clear()
+        probeStore.clear()
+        SyncWorker.cancelPeriodic(applicationContext)
+        Toast.makeText(this, R.string.auto_sync_disabled, Toast.LENGTH_SHORT).show()
+        refreshStatus()
+    }
+
+    /** Lader brugeren vælge sync-intervallet (15/30/60 min). */
+    private fun showIntervalDialog() {
+        val options = AutoSyncSettingsStore.ALLOWED_INTERVALS
+        val labels = options
+            .map { getString(R.string.auto_sync_interval_option, it) }
+            .toTypedArray()
+        val current = options.indexOf(autoSyncSettings.intervalMinutes).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.auto_sync_interval_dialog_title)
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                val chosen = options[which]
+                autoSyncSettings.intervalMinutes = chosen
+                // Kører auto-sync allerede, gen-enqueue med det nye interval
+                // (UPDATE-policy erstatter den eksisterende periodiske worker).
+                val config = configStore.load()
+                if (config != null && passphraseStore.load(config.databaseId) != null) {
+                    SyncWorker.enqueuePeriodic(applicationContext, chosen.toLong())
+                }
+                refreshStatus()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun promptPassphraseAndSync() {
@@ -177,21 +317,25 @@ class MainActivity : FragmentActivity() {
         // Husket (Keystore-krypteret) → spring dialogen over og sync direkte.
         passphraseStore.load(config.databaseId)?.let { runSync(it, persistOnSuccess = false); return }
 
+        promptPassword { passphrase -> runSync(passphrase, persistOnSuccess = false) }
+    }
+
+    /**
+     * Viser én password-dialog og kalder [onEntered] med et ikke-tomt
+     * password. Bruges både af manuel "Sync nu" og af enable-auto-sync-flowet
+     * (sidstnævnte har allerede bekræftet identitet og persisterer ved succes).
+     */
+    private fun promptPassword(onEntered: (String) -> Unit) {
         val input = TextInputEditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                 android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
             hint = getString(R.string.sync_dialog_hint)
         }
         val inputLayout = TextInputLayout(this).apply { addView(input) }
-        val rememberCheckbox = MaterialCheckBox(this).apply {
-            text = getString(R.string.sync_remember_password)
-            setPadding(0, 24, 0, 0)
-        }
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
             addView(inputLayout)
-            addView(rememberCheckbox)
         }
 
         MaterialAlertDialogBuilder(this)
@@ -201,21 +345,7 @@ class MainActivity : FragmentActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.sync_dialog_action) { _, _ ->
                 val passphrase = input.text?.toString().orEmpty()
-                if (passphrase.isEmpty()) return@setPositiveButton
-                if (rememberCheckbox.isChecked) {
-                    // Bekræft med biometri/device-credential FØR vi lover at
-                    // huske passwordet; selve lagringen sker først efter en
-                    // vellykket sync (så vi aldrig gemmer et forkert password).
-                    confirmIdentityThen(
-                        onConfirmed = { runSync(passphrase, persistOnSuccess = true) },
-                        onDeclined = {
-                            Toast.makeText(this, R.string.remember_not_confirmed, Toast.LENGTH_SHORT).show()
-                            runSync(passphrase, persistOnSuccess = false)
-                        },
-                    )
-                } else {
-                    runSync(passphrase, persistOnSuccess = false)
-                }
+                if (passphrase.isNotEmpty()) onEntered(passphrase)
             }
             .show()
     }
@@ -263,8 +393,16 @@ class MainActivity : FragmentActivity() {
      * (og bekræftet med biometri) at huske passwordet til baggrunds-sync; vi
      * gemmer det først HER, efter en vellykket sync, og tænder den periodiske
      * WorkManager-sync.
+     *
+     * [showResultDialog] = false bruges af den stille foreground-sync ved
+     * app-åbning: resultatet vises ikke i en dialog (kun et forkert password
+     * giver altid feedback, da det slår auto-sync fra).
      */
-    private fun runSync(passphrase: String, persistOnSuccess: Boolean) {
+    private fun runSync(
+        passphrase: String,
+        persistOnSuccess: Boolean,
+        showResultDialog: Boolean = true,
+    ) {
         val credentials = tokenStore.load() ?: return
         val config = configStore.load() ?: return
         syncNowButton.isEnabled = false
@@ -308,7 +446,10 @@ class MainActivity : FragmentActivity() {
                     var backgroundEnabled = false
                     if (persistOnSuccess) {
                         passphraseStore.save(config.databaseId, passphrase)
-                        SyncWorker.enqueuePeriodic(applicationContext)
+                        SyncWorker.enqueuePeriodic(
+                            applicationContext,
+                            autoSyncSettings.intervalMinutes.toLong(),
+                        )
                         backgroundEnabled = true
                     }
                     val message = getString(
@@ -323,25 +464,50 @@ class MainActivity : FragmentActivity() {
                     } else {
                         ""
                     }
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle(R.string.sync_result_ok_title)
-                        .setMessage(message)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
+                    // Gem fil-fingeraftrykket (efter en evt. gen-skrivning) så
+                    // baggrunds-workerens næste tick kan kortslutte.
+                    SafKdbxFile(applicationContext, config.uri).fingerprint()
+                        ?.let { probeStore.save(config.databaseId, it) }
+                    if (showResultDialog) {
+                        MaterialAlertDialogBuilder(this@MainActivity)
+                            .setTitle(R.string.sync_result_ok_title)
+                            .setMessage(message)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
                     refreshStatus()
                 },
                 onFailure = { e ->
-                    // Et husket password må ikke blive hængende efter en fejl —
-                    // var det forkert (eller filen ændret), skal næste forsøg
-                    // prompte igen i stedet for at fejle i en løkke. Stop også
-                    // baggrunds-sync så den ikke retrier på samme fejl.
-                    passphraseStore.clear()
-                    SyncWorker.cancelPeriodic(applicationContext)
-                    MaterialAlertDialogBuilder(this@MainActivity)
-                        .setTitle(R.string.sync_result_failed_title)
-                        .setMessage(e.message ?: e::class.simpleName ?: "unknown error")
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
+                    // Skeln forkert-password fra forbigående fejl. Kun et
+                    // *forkert* password (kotpass [CryptoError.InvalidKey] når
+                    // HMAC ikke matcher) skal rydde det huskede password og
+                    // slå auto-sync fra — ellers ville et server-hik eller en
+                    // midlertidig fil-fejl pille ved password og tvinge bruger
+                    // til at taste igen "hver gang". Alt andet beholder det
+                    // gemte password så næste forsøg/baggrunds-tick kan retrye.
+                    val wrongPassword = e is CryptoError.InvalidKey
+                    if (wrongPassword) {
+                        passphraseStore.clear()
+                        probeStore.clear()
+                        SyncWorker.cancelPeriodic(applicationContext)
+                    }
+                    // Et forkert password giver ALTID feedback (det slår
+                    // auto-sync fra). Andre fejl undertrykkes ved en stille
+                    // foreground-sync, så app-åbning ikke popper en dialog.
+                    if (wrongPassword || showResultDialog) {
+                        MaterialAlertDialogBuilder(this@MainActivity)
+                            .setTitle(R.string.sync_result_failed_title)
+                            .setMessage(
+                                if (wrongPassword) {
+                                    getString(R.string.auto_sync_wrong_password)
+                                } else {
+                                    e.message ?: e::class.simpleName ?: "unknown error"
+                                },
+                            )
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                    refreshStatus()
                 },
             )
         }
