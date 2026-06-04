@@ -15,9 +15,62 @@ project adheres to [Semantic Versioning](https://semver.org/).
   the same binary so password prompts work unchanged. The interface is
   **English by default** with a *Language / Sprog* menu item to switch
   to Danish; the choice is remembered in `config.toml` (`language`).
-- **Android: live sync progress** — progress bar + label showing
+
+### Fixed
+
+- **Server returned newline-wrapped base64** — PostgreSQL's
+  `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
+  decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)
+  rejected the embedded `\n` with "Illegal base64 character a". The
+  entry changes/versions endpoints now strip the newlines.
+
+### Changed
+
+- **Per-component release versioning** — release tags are now namespaced
+  (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
+  components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
+  tags are legacy and no longer trigger CI. See
+  [`VERSIONING.md`](VERSIONING.md).
+
+## [android/v0.2.0] — 2026-06-04
+
+First Android release under the per-component tag scheme (the bare
+`0.1.0` tag was the unified product version). Collects everything the
+Android app gained since 0.1.0.
+
+### Added
+
+- **Auto-sync in the background, controlled by a visible switch** — the
+  main screen now has an *Auto-sync in the background* switch, replacing
+  the easy-to-miss "remember password" checkbox in the sync dialog.
+  Turning it on confirms your identity once with `BiometricPrompt`
+  (biometric or device PIN/pattern) and, after the next successful sync,
+  stores the kdbx master password in a new `EncryptedPassphraseStore`
+  (Keystore-backed `EncryptedSharedPreferences`, bound to the database
+  UUID) and enables the periodic `SyncWorker`. After that the app syncs
+  with **no further prompts** — no password, no fingerprint. The Keystore
+  key intentionally requires no per-use authentication so the background
+  worker can decrypt it with no user present; biometrics gate the
+  *opt-in*, not each read. The sync interval is **selectable between
+  15 / 30 / 60 minutes** (WorkManager's hard minimum is 15). Turning the
+  switch off — or "Forget device credentials" — clears the stored
+  password and cancels background sync.
+- **Idle ticks no longer decode the whole database** — sync was already
+  delta over the wire, but every tick still decoded the local `.kdbx`
+  (two Argon2 passes: the kotpass decode and the gomobile session) even
+  when nothing had changed. A new `SyncProbeStore` records a cheap file
+  fingerprint (last-modified + size via a `ContentResolver` metadata
+  query — no file read), and `SyncProbe.nothingToSync` returns early
+  when the local file is unchanged **and** the server's `current_seq`
+  equals the stored `lastSeq`, skipping the decode entirely. The same
+  probe runs once when you open the app, syncing only if something
+  actually changed. No server changes — it reuses `current_seq` from the
+  existing `/changes` endpoint. Missing file metadata never causes a
+  wrong skip, and the fingerprint is stored *after* the sync so the
+  worker's own rewrite doesn't trigger the next tick.
+- **Live sync progress** — progress bar + label showing
   Opening / Pulling x/total / Pushing x/total / Saving during a sync.
-- **Android: share a database from the app** — a new Share screen
+- **Share a database from the app** — a new Share screen
   (owner only) lists current members, adds a member by username, and
   removes one. Mirrors the desktop `share`/`unshare`/`shares` commands:
   it looks the user up (`/users/lookup`), wraps the database master key
@@ -29,27 +82,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
   master password comes from the Keystore store if remembered, otherwise
   it is prompted (and not persisted). Non-owners get a clear "only the
   owner can manage sharing" message (server returns 403).
-- **Android: opt-in background sync with a securely stored password** —
-  ticking "Remember password & sync in the background" now confirms your
-  identity with `BiometricPrompt` (biometric or device PIN/pattern) and,
-  after the next successful sync, stores the kdbx master password in a
-  new `EncryptedPassphraseStore` (Keystore-backed
-  `EncryptedSharedPreferences`, bound to the database UUID) and enables
-  the periodic `SyncWorker`. The Keystore key intentionally requires no
-  per-use authentication so the background worker can decrypt it without
-  the user present — biometrics gate the *opt-in*, not each read. A
-  failed sync (wrong password, revoked access) clears the stored
-  password and cancels background sync so it can't loop. "Forget device
-  credentials" also clears it.
 
 ### Fixed
 
-- **Android: master password no longer stored in plaintext** — the
+- **A transient sync error no longer forgets your saved password** —
+  previously any non-network error cleared the remembered password and
+  disabled background sync, so a brief server hiccup forced you to
+  re-enter it "every time". Now only a genuinely wrong password (kotpass
+  `CryptoError.InvalidKey`) clears it and turns auto-sync off; every
+  other error keeps the password and retries on the next tick.
+- **Master password no longer stored in plaintext** — the
   previous `SyncWorker` received the password through WorkManager's
   `Data`, which persists unencrypted in WorkManager's database. The
   worker now reads it from the Keystore-encrypted `EncryptedPassphraseStore`
   instead, and the in-memory-only `SessionPassphrase` is gone.
-- **Android: local deletions now propagate** — `read()` previously
+- **Local deletions now propagate** — `read()` previously
   ignored both KDBX' `DeletedObjects` list and entries the user had
   moved to the recycle bin, so deleting an entry on Android never
   removed it on the server or on other devices. The
@@ -61,22 +108,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
   wins over a stale tombstone of the same UUID. Trade-off, same as
   desktop: moving an entry back out of the recycle bin does not
   resurrect it on other devices.
-- **Server returned newline-wrapped base64** — PostgreSQL's
-  `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
-  decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)
-  rejected the embedded `\n` with "Illegal base64 character a". The
-  entry changes/versions endpoints now strip the newlines.
 
 ### Changed
 
-- **Android: `minSdk` raised 21 → 23** (Android 6.0) — required by
+- **`minSdk` raised 21 → 23** (Android 6.0) — required by
   `androidx.biometric` and gives stronger Keystore guarantees. Covers
   essentially all active devices.
-- **Per-component release versioning** — release tags are now namespaced
-  (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
-  components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
-  tags are legacy and no longer trigger CI. See
-  [`VERSIONING.md`](VERSIONING.md).
 
 ## [0.1.0] — 2026-05-29
 
