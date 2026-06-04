@@ -6,16 +6,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-
-- **Desktop client `tui` subcommand** — an interactive full-screen menu
-  (tview) that runs the common commands without having to remember
-  command names, flags or database names. It is a thin command-selector:
-  reads `config.toml` for state + the database list and shells out to
-  the same binary so password prompts work unchanged. The interface is
-  **English by default** with a *Language / Sprog* menu item to switch
-  to Danish; the choice is remembered in `config.toml` (`language`).
-
 ### Fixed
 
 - **Server returned newline-wrapped base64** — PostgreSQL's
@@ -31,6 +21,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
+
+## [client/v1.2.0] — 2026-06-04
+
+### Added
+
+- **Desktop `tui` is now bilingual** — the interactive menu defaults to
+  **English** and gains a *Language / Sprog* item that switches it to
+  Danish; the choice is remembered in `config.toml` (`language`). Every
+  menu label, prompt and status message routes through a string table
+  (`tui_i18n.go`) rather than being hard-coded.
 
 ## [android/v0.2.0] — 2026-06-04
 
@@ -114,6 +114,18 @@ Android app gained since 0.1.0.
 - **`minSdk` raised 21 → 23** (Android 6.0) — required by
   `androidx.biometric` and gives stronger Keystore guarantees. Covers
   essentially all active devices.
+
+## [client/v1.1.0] — 2026-06-01
+
+### Added
+
+- **Desktop client `tui` subcommand** — an interactive full-screen menu
+  (tview) that runs the common commands without having to remember
+  command names, flags or database names. A thin command-selector: it
+  reads `config.toml` for state + the database list and shells out to
+  the same binary so password prompts work unchanged. Includes a
+  switch-account wizard, a `forget` command, and enrollment-token
+  generation for a new device.
 
 ## [0.1.0] — 2026-05-29
 
