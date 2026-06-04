@@ -6,9 +6,9 @@ reproducible builds.
 
 ## Status
 
-- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml)
-- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/)
-- **Ikke endnu submittet** — venter på en stabil v0.1.0-tag med UI på plads.
+- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — `Builds`-poster for 0.1.0 (`v0.1.0`) og 0.2.0 (`android/v0.2.0`); `CurrentVersion: 0.2.0`.
+- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — changelogs `1.txt` + `2.txt`.
+- **Ikke endnu submittet.** UI er på plads og `android/v0.2.0` er tagget; submission afventer bevidst at appen får lidt produktionstid først. Inden submission: pin gomobile/gobind-versioner (i dag `@latest`) og overvej F-Droids egen `ndk:`-mekanisme frem for `sudo`+`curl`.
 
 ## Build-konstruktion
 
@@ -78,14 +78,21 @@ eller Google Maven):
 Den gomobile-genererede `.aar` indeholder kun vores egen Go-kode
 plus standard Go runtime — ingen tredje-parts ikke-FOSS deps.
 
-## Submission-procedure (når v0.1.0-tag er klar)
+## Submission-procedure
 
-1. Tag release: `git tag -s v0.1.0 -m "Initial release"`.
-2. Push tag: `git push --tags`.
-3. Fork [fdroiddata](https://gitlab.com/fdroid/fdroiddata).
-4. Kopiér `metadata/dk.bjoerckbraun.deltasync.yml` ind i forken.
-5. Test lokalt: `fdroid build --verbose dk.bjoerckbraun.deltasync`.
-6. Submit som merge-request i fdroiddata.
+Release-tag'et findes allerede (`android/v0.2.0`, pushet). Resten:
+
+1. Fork [fdroiddata](https://gitlab.com/fdroid/fdroiddata).
+2. Kopiér `metadata/dk.bjoerckbraun.deltasync.yml` ind i forken under
+   `metadata/`.
+3. Test lokalt: `fdroid build --verbose dk.bjoerckbraun.deltasync:2`
+   (`:2` = versionCode 2). Det er her gomobile-i-deres-container enten
+   virker eller driller — kør det før du indsender.
+4. Submit som merge-request i fdroiddata.
+
+Bemærk: `UpdateCheckMode: Tags ^android/v[\d.]+$` sikrer at F-Droid kun
+følger `android/v*`-tags og ikke forveksler dem med `client/v*`
+(desktop-klienten) i samme monorepo.
 
 ## Inspirationsmateriale
 

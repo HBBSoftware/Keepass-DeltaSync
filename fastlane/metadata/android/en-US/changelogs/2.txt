@@ -1,0 +1,8 @@
+First feature release with a complete UI.
+
+• Auto-sync is now a switch on the main screen with a selectable interval (15/30/60 min). Set it up once with your fingerprint; afterwards it syncs in the background with no password prompts.
+• Cheaper background checks: the app only does the full decrypt-and-merge when the file or the server has actually changed.
+• A brief network hiccup no longer makes the app forget your saved password.
+• Share a database with other users from the app (owner only).
+• Local deletions (recycle bin or permanent) now propagate to the server and your other devices.
+• Live sync progress, app icon, and an English/Danish interface.
