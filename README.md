@@ -4,7 +4,7 @@ Entry-level synchronization for KeePass databases (`.kdbx`) that reuses KeePassX
 
 The file format (`.kdbx`) is unchanged. Sync happens through a small server that only ever sees client-encrypted blobs — your master password never leaves your device.
 
-- **Website:** [deltasync.bjoerck-braun.dk](https://deltasync.bjoerck-braun.dk/) — visual introduction, architecture diagrams, and user guide.
+- **Documentation:** [project wiki](https://gitlab.com/Star95/keepass-deltasync/-/wikis/home) — getting started, running your own server, architecture, and troubleshooting. (Visual diagrams and a live introduction are on the [website](https://deltasync.bjoerck-braun.dk/).)
 - **Pre-built client binaries:** [Releases](https://gitlab.com/Star95/keepass-deltasync/-/releases) — Linux, macOS, Windows; no Go toolchain required.
 - **Deep dive:** [`docs/`](docs/) — threat model, concurrent-write semantics, deployment recipes. Full specification in [`keepass-deltasync-spec.md`](keepass-deltasync-spec.md).
 
