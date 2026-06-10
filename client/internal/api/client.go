@@ -507,6 +507,29 @@ func (c *Client) UnshareDatabase(ctx context.Context, deviceToken, databaseID, t
 	return nil
 }
 
+// DeleteDatabase sletter en database server-side via DELETE /databases/{id}.
+// Kun ejeren kan slette; serveren CASCADE-fjerner entries, versioner, members
+// og seq-rækken og returnerer 204. Ikke-ejer / ukendt id giver 404 via
+// parseError. Dette sletter INTET lokalt — kalderen rydder selv op i config.
+func (c *Client) DeleteDatabase(ctx context.Context, deviceToken, databaseID string) error {
+	u := fmt.Sprintf("%s/api/v1/databases/%s", c.baseURL, databaseID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)
+	if err != nil {
+		return err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete database: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return parseError(resp)
+	}
+	return nil
+}
+
 // EntryChange er én række i GET /changes-svaret: nyeste version af en entry
 // med wire-format blob (base64-encoded nonce ‖ ciphertext).
 type EntryChange struct {

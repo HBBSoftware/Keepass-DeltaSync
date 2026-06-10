@@ -24,6 +24,7 @@ Commands:
   init <name> <local.kdbx>    Register a local .kdbx for syncing
   init-shared <remote> <path> Bootstrap a local .kdbx for a database shared with you
   forget <name>               Remove a local database binding (server + file untouched)
+  delete-database <name|uuid> Permanently delete a database on the server (owner only)
   push <name>                 Upload all entries from a local .kdbx
   pull <name>                 Fetch server entries and merge into local .kdbx
   sync <name>                 Pull, then push entries modified since last sync
@@ -56,6 +57,8 @@ func main() {
 		exitOnError(runInitShared(os.Args[2:]))
 	case "forget":
 		exitOnError(runForget(os.Args[2:]))
+	case "delete-database":
+		exitOnError(runDeleteDatabase(os.Args[2:]))
 	case "push":
 		exitOnError(runPush(os.Args[2:]))
 	case "pull":
