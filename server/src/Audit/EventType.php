@@ -34,4 +34,6 @@ enum EventType: string
     case EntryVersionsListed   = 'entry.versions_listed';
     case EntryRestored         = 'entry.restored';
     case EntryVersionFetched   = 'entry.version_fetched';
+    case GroupPut              = 'group.put';
+    case GroupDeleted          = 'group.deleted';
 }
