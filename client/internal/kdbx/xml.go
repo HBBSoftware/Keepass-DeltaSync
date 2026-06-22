@@ -41,6 +41,12 @@ type Entry struct {
 	// Root-UUID). Sættes ved indsamling fra entry'ens position i gruppetræet
 	// (v4 group-sync) og bæres videre til canonical.Entry.ParentGroup.
 	ParentGroupUUID string
+
+	// LocationChanged er tidspunktet entry'en sidst blev flyttet mellem
+	// grupper. En flytning bumper denne, ikke nødvendigvis ModifiedAt, så
+	// push-delta-tjekket skal kigge på den senere af de to (v4 group-sync).
+	// Zero-time hvis ukendt.
+	LocationChanged time.Time
 }
 
 // Deletion er én tombstone fra <DeletedObjects>. Pushes som DELETE-call til serveren.
@@ -187,6 +193,7 @@ func collectTree(g *group, recycleBinUUID string, isRoot bool, entries *[]Entry,
 			ModifiedAt:      t,
 			Fragment:        []byte(e.InnerXML),
 			ParentGroupUUID: thisRef,
+			LocationChanged: parseKdbxTimeOrZero(e.Times.LocationChanged),
 		})
 	}
 

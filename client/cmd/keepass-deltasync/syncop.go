@@ -362,24 +362,46 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		return 0, 0, 0, err
 	}
 
-	// TODO(v4 phase 4c): pushe groups (3. returværdi) som object_kind=2-blobs
-	// og sætte canonical.Entry.ParentGroup fra en.ParentGroupUUID.
-	entries, _, deletions, err := kdbx.ParseExport(xmlBytes)
+	entries, groups, deletions, err := kdbx.ParseExport(xmlBytes)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("parse export: %w", err)
 	}
 
 	if force {
-		e.progressf("Pushing all %d entries + %d tombstones (force).\n", len(entries), len(deletions))
+		e.progressf("Pushing all %d groups + %d entries + %d tombstones (force).\n", len(groups), len(entries), len(deletions))
 	} else {
-		e.progressf("Found %d entries + %d tombstones; checking per-entry tracking...\n", len(entries), len(deletions))
+		e.progressf("Found %d groups + %d entries + %d tombstones; checking per-object tracking...\n", len(groups), len(entries), len(deletions))
+	}
+
+	// Grupper først, så parent-grupper findes på serveren før entries der
+	// peger på dem (selv om desktop-pull rebuilder hele træet på én gang).
+	for _, g := range groups {
+		if !force && !shouldPush(e.db.EntryStates, g.UUID, g.ModifiedAt) {
+			continue
+		}
+		blob, gerr := encodeGroupToBlob(e.entryKey, g)
+		if gerr != nil {
+			return pushed, deleted, maxSeq, gerr
+		}
+		resp, perr := e.client.PutGroup(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, g.UUID, blob, g.ModifiedAt)
+		if perr != nil {
+			return pushed, deleted, maxSeq, fmt.Errorf("PUT group %s: %w", g.UUID, perr)
+		}
+		if resp.Seq > maxSeq {
+			maxSeq = resp.Seq
+		}
+		e.db.RecordEntryState(g.UUID, g.ModifiedAt.UTC().Format("2006-01-02T15:04:05Z"))
+		pushed++
 	}
 
 	for _, en := range entries {
-		if !force && !shouldPush(e.db.EntryStates, en.UUID, en.ModifiedAt) {
+		// Flyt-detektion: en flytning mellem grupper bumper LocationChanged,
+		// ikke nødvendigvis ModifiedAt — brug den seneste som push-trigger.
+		trigger := laterTime(en.ModifiedAt, en.LocationChanged)
+		if !force && !shouldPush(e.db.EntryStates, en.UUID, trigger) {
 			continue
 		}
-		blob, eerr := encodeFragmentToBlob(e.entryKey, en.UUID, en.Fragment)
+		blob, eerr := encodeFragmentToBlob(e.entryKey, en.UUID, en.ParentGroupUUID, en.Fragment)
 		if eerr != nil {
 			return pushed, deleted, maxSeq, eerr
 		}
@@ -390,7 +412,7 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		if resp.Seq > maxSeq {
 			maxSeq = resp.Seq
 		}
-		e.db.RecordEntryState(en.UUID, en.ModifiedAt.UTC().Format("2006-01-02T15:04:05Z"))
+		e.db.RecordEntryState(en.UUID, trigger.UTC().Format("2006-01-02T15:04:05Z"))
 		pushed++
 	}
 
@@ -434,11 +456,13 @@ func shouldPush(states map[string]string, uuid string, currentMtime time.Time) b
 // til canonical.Entry, marshaller til JSON med format-byte-prefix, og krypterer
 // resultatet. Fejlmeddelelser inkluderer entry-UUID for at gøre push-fejl
 // debugbare.
-func encodeFragmentToBlob(entryKey []byte, uuid string, fragment []byte) ([]byte, error) {
+func encodeFragmentToBlob(entryKey []byte, uuid, parentGroup string, fragment []byte) ([]byte, error) {
 	ce, err := canonical.FromInnerXML(fragment)
 	if err != nil {
 		return nil, fmt.Errorf("entry %s: parse fragment: %w", uuid, err)
 	}
+	// v4: bær entry'ens gruppe-placering med i blob'en (tom = Root-sentinel).
+	ce.ParentGroup = parentGroup
 	plaintext, err := canonical.EncodeCanonical(ce)
 	if err != nil {
 		return nil, fmt.Errorf("entry %s: encode canonical: %w", uuid, err)
@@ -448,6 +472,42 @@ func encodeFragmentToBlob(entryKey []byte, uuid string, fragment []byte) ([]byte
 		return nil, fmt.Errorf("entry %s: encrypt: %w", uuid, err)
 	}
 	return blob, nil
+}
+
+// encodeGroupToBlob konverterer en kdbx.Group til en krypteret canonical
+// group-blob (envelope 0x02) klar til PUT /groups (v4 group-sync).
+func encodeGroupToBlob(entryKey []byte, g kdbx.Group) ([]byte, error) {
+	cg := &canonical.Group{
+		UUID:        g.UUID,
+		Name:        g.Name,
+		Notes:       g.Notes,
+		ParentGroup: g.ParentUUID,
+		IconID:      g.IconID,
+		Times: canonical.Times{
+			Created:         g.CreatedAt,
+			Modified:        g.ModifiedAt,
+			LocationChanged: g.LocationChanged,
+		},
+	}
+	plaintext, err := canonical.EncodeGroup(cg)
+	if err != nil {
+		return nil, fmt.Errorf("group %s: encode canonical: %w", g.UUID, err)
+	}
+	blob, err := crypto.EncryptBlob(entryKey, plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("group %s: encrypt: %w", g.UUID, err)
+	}
+	return blob, nil
+}
+
+// laterTime returnerer det seneste af to tidsstempler. Bruges til push-delta:
+// en entry-flytning bumper LocationChanged, ikke ModifiedAt, så vi skal pushe
+// hvis nogen af dem er nyere end sidst sete.
+func laterTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
 }
 
 // decryptToFragment dekrypterer en server-blob og returnerer InnerXML-fragmentet
