@@ -66,6 +66,20 @@ class GroupTest {
     }
 
     @Test
+    fun `mapper round-trips group through kotpass`() {
+        val original = sampleGroup()
+        val kp = Mapper.groupToKotpass(original)
+        val back = Mapper.groupToCanonical(kp, original.parentGroup)
+        assertEquals(original.uuid, back.uuid)
+        assertEquals(original.name, back.name)
+        assertEquals(original.notes, back.notes)
+        assertEquals(original.iconId, back.iconId)
+        assertEquals(original.parentGroup, back.parentGroup)
+        assertEquals(original.times.modified, back.times.modified)
+        assertEquals(original.times.created, back.times.created)
+    }
+
+    @Test
     fun `entry parent_group round-trips`() {
         val entry = Entry(
             v = SchemaVersion,
