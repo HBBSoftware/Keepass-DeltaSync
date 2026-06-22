@@ -59,6 +59,11 @@ data class Entry(
      *  Tom hvis entry'en ikke er flyttet. */
     val previousParentGroup: String = "",
 
+    /** UUID på den gruppe entry'en aktuelt ligger i (v4 group-sync). Tom =
+     *  Root (sentinel — hver enhed mapper den til sin egen Root). Matcher
+     *  Go's `canonical.Entry.ParentGroup` (`parent_group`). */
+    val parentGroup: String = "",
+
     /** Historiske versioner — ældste først. Indlejret history er forbudt
      *  (KDBX' eget format gør det også); validerede entries har altid
      *  tom liste på elementer inde i [history]. */
