@@ -226,6 +226,8 @@ Alt under `/api/v1/`. Auth via `Authorization: Bearer <token>`. Tokens har tre t
 | `GET`  | `/databases/{id}/entries/{uuid}/versions` | Liste alle versioner af en entry (op til 3) |
 | `GET`  | `/databases/{id}/entries/{uuid}/versions/{num}` | Hent specifik version (1, 2, eller 3) |
 | `POST` | `/databases/{id}/entries/{uuid}/restore/{num}` | Rul tilbage: kopiér version `num` som ny nyeste version |
+| `PUT`  | `/databases/{id}/groups/{uuid}` | Upload gruppe (krypteret blob, object_kind=2) - laver ny version (v4 group-sync) |
+| `DELETE` | `/databases/{id}/groups/{uuid}` | Marker gruppe som tombstone (object_kind=2) |
 | `GET`  | `/devices` | Liste over brugerens egne enheder |
 | `DELETE` | `/devices/{id}` | Tilbagekald enhed |
 | `GET`  | `/me` | Aktuel bruger-info |
@@ -263,6 +265,11 @@ Alt under `/api/v1/`. Auth via `Authorization: Bearer <token>`. Tokens har tre t
   ]
 }
 ```
+
+Som standard returneres kun entries (`object_kind=1`). Klienter med v4
+group-sync sender `?include=groups`, hvilket ogsaa inkluderer gruppe-blobs
+(`object_kind=2`) og tilfoejer et `kind`-felt (1=entry, 2=group) pr. raekke.
+Gamle v3-klienter sender ikke flaget og ser derfor aldrig gruppe-blobs.
 
 `GET /entries/{uuid}/versions` returnerer:
 ```json

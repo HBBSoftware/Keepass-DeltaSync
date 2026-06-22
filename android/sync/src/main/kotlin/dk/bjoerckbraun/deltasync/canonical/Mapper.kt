@@ -16,6 +16,7 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import java.util.UUID
 import app.keemobile.kotpass.models.Entry as KotpassEntry
+import app.keemobile.kotpass.models.Group as KotpassGroup
 
 /**
  * Konverterer mellem kotpass' typed [KotpassEntry] og vores
@@ -178,6 +179,62 @@ object Mapper {
             previousParentGroup = entry.previousParentGroup.takeIf { it.isNotEmpty() }
                 ?.let(UUID::fromString),
             qualityCheck = entry.qualityCheck ?: true,
+        )
+    }
+
+    /**
+     * Konverter en kotpass-Group til canonical-format (v4 group-sync).
+     * [parentUuid] er forældregruppens UUID, "" hvis gruppen ligger direkte i
+     * Root (sentinel) — kalderen kender parent fra træ-traverseringen.
+     */
+    fun groupToCanonical(group: KotpassGroup, parentUuid: String): Group {
+        val times = group.times?.let { td ->
+            Times(
+                created = td.creationTime?.toKotlinInstant() ?: epoch,
+                modified = td.lastModificationTime?.toKotlinInstant() ?: epoch,
+                accessed = td.lastAccessTime?.toKotlinInstant() ?: epoch,
+                expiresAt = if (td.expires) td.expiryTime?.toKotlinInstant() else null,
+                expires = td.expires,
+                usageCount = td.usageCount,
+                locationChanged = td.locationChanged?.toKotlinInstant() ?: epoch,
+            )
+        } ?: defaultTimes()
+
+        return Group(
+            v = GroupSchemaVersion,
+            uuid = group.uuid.toString(),
+            name = group.name,
+            notes = group.notes,
+            parentGroup = parentUuid,
+            iconId = group.icon.ordinal,
+            customIconUuid = group.customIconUuid?.toString() ?: "",
+            times = times,
+        )
+    }
+
+    /**
+     * Konverter en canonical-Group til en kotpass-Group med TOMME børn —
+     * entries og undergrupper sættes af træ-genopbygningen i
+     * KotpassLocalStateAdapter (v4 phase 5d). Øvrige kotpass-felter defaulter.
+     */
+    fun groupToKotpass(group: Group): KotpassGroup {
+        val times = TimeData(
+            creationTime = group.times.created.toJavaInstant(),
+            lastModificationTime = group.times.modified.toJavaInstant(),
+            lastAccessTime = group.times.accessed.toJavaInstant(),
+            locationChanged = group.times.locationChanged.toJavaInstant(),
+            expiryTime = group.times.expiresAt?.toJavaInstant(),
+            expires = group.times.expires,
+            usageCount = group.times.usageCount,
+        )
+        val icon = PredefinedIcon.entries.getOrElse(group.iconId) { PredefinedIcon.Folder }
+        return KotpassGroup(
+            uuid = UUID.fromString(group.uuid),
+            name = group.name,
+            notes = group.notes,
+            icon = icon,
+            customIconUuid = group.customIconUuid.takeIf { it.isNotEmpty() }?.let(UUID::fromString),
+            times = times,
         )
     }
 

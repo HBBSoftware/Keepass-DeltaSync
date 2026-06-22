@@ -244,7 +244,147 @@ class KotpassLocalStateAdapterTest {
         assertTrue(state.tombstones.isEmpty())
     }
 
+    @Test
+    fun `read collects groups and sets entry parentGroup`() {
+        val rootEntry = UUID.fromString("10000000-0000-0000-0000-000000000001")
+        val workId = UUID.fromString("20000000-0000-0000-0000-000000000002")
+        val workEntry = UUID.fromString("21000000-0000-0000-0000-000000000021")
+        val subId = UUID.fromString("30000000-0000-0000-0000-000000000003")
+        val subEntry = UUID.fromString("31000000-0000-0000-0000-000000000031")
+
+        val db = freshDatabase().modifyParentGroup {
+            copy(
+                entries = entries + kotpassEntry(rootEntry, "RootE"),
+                groups = groups + Group(
+                    uuid = workId,
+                    name = "Work",
+                    entries = listOf(kotpassEntry(workEntry, "WorkE")),
+                    groups = listOf(
+                        Group(
+                            uuid = subId,
+                            name = "Sub",
+                            entries = listOf(kotpassEntry(subEntry, "SubE")),
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        // 3 entries med korrekt parentGroup (Root = sentinel "").
+        assertEquals(3, state.entries.size)
+        assertEquals("", state.entries[rootEntry.toString()]?.parentGroup)
+        assertEquals(workId.toString(), state.entries[workEntry.toString()]?.parentGroup)
+        assertEquals(subId.toString(), state.entries[subEntry.toString()]?.parentGroup)
+
+        // 2 grupper (Root emittes ikke); parent-hierarki bevaret.
+        assertEquals(2, state.groups.size)
+        assertEquals("Work", state.groups[workId.toString()]?.name)
+        assertEquals("", state.groups[workId.toString()]?.parentGroup)
+        assertEquals(workId.toString(), state.groups[subId.toString()]?.parentGroup)
+    }
+
+    @Test
+    fun `applyToDatabase builds group tree and places entries`() {
+        val workId = "20000000-0000-0000-0000-000000000002"
+        val subId = "30000000-0000-0000-0000-000000000003"
+        val rootE = "10000000-0000-0000-0000-000000000001"
+        val workE = "21000000-0000-0000-0000-000000000021"
+        val subE = "31000000-0000-0000-0000-000000000031"
+
+        val state = LocalState(
+            groups = mutableMapOf(
+                workId to canonicalGroup(workId, parent = "", name = "Work"),
+                subId to canonicalGroup(subId, parent = workId, name = "Sub"),
+            ),
+            entries = mutableMapOf(
+                rootE to canonicalEntryP(rootE, parent = "", title = "RootE"),
+                workE to canonicalEntryP(workE, parent = workId, title = "WorkE"),
+                subE to canonicalEntryP(subE, parent = subId, title = "SubE"),
+            ),
+        )
+
+        val db = KotpassLocalStateAdapter.applyToDatabase(state, freshDatabase())
+
+        // Læs tilbage og verificér genopbygget hierarki + placering.
+        val s2 = KotpassLocalStateAdapter.read(db)
+        assertEquals(3, s2.entries.size)
+        assertEquals(2, s2.groups.size)
+        assertEquals("", s2.entries[rootE]?.parentGroup)
+        assertEquals(workId, s2.entries[workE]?.parentGroup)
+        assertEquals(subId, s2.entries[subE]?.parentGroup)
+        assertEquals("", s2.groups[workId]?.parentGroup)
+        assertEquals(workId, s2.groups[subId]?.parentGroup)
+    }
+
+    @Test
+    fun `applyToDatabase moves entry to another group`() {
+        val workId = UUID.fromString("20000000-0000-0000-0000-000000000002")
+        val otherId = UUID.fromString("40000000-0000-0000-0000-000000000004")
+        val entryId = UUID.fromString("21000000-0000-0000-0000-000000000021")
+
+        val db0 = freshDatabase().modifyParentGroup {
+            copy(groups = groups + listOf(
+                Group(uuid = workId, name = "Work", entries = listOf(kotpassEntry(entryId, "E"))),
+                Group(uuid = otherId, name = "Other"),
+            ))
+        }
+
+        val state = KotpassLocalStateAdapter.read(db0)
+        // Start: entry i Work.
+        assertEquals(workId.toString(), state.entries[entryId.toString()]?.parentGroup)
+        // Flyt entry til Other i state (som en pull fra en anden enhed ville gøre).
+        state.entries[entryId.toString()] = state.entries[entryId.toString()]!!
+            .copy(parentGroup = otherId.toString())
+
+        val db = KotpassLocalStateAdapter.applyToDatabase(state, db0)
+
+        val s2 = KotpassLocalStateAdapter.read(db)
+        assertEquals(otherId.toString(), s2.entries[entryId.toString()]?.parentGroup)
+        // Og entry'en findes kun ét sted.
+        assertEquals(1, s2.entries.size)
+    }
+
+    @Test
+    fun `applyToDatabase removes tombstoned group`() {
+        val workId = UUID.fromString("20000000-0000-0000-0000-000000000002")
+        val db0 = freshDatabase().modifyParentGroup {
+            copy(groups = groups + Group(uuid = workId, name = "Work"))
+        }
+        val state = LocalState(
+            tombstones = mutableMapOf(workId.toString() to Instant.parse("2026-06-01T00:00:00Z")),
+        )
+        val db = KotpassLocalStateAdapter.applyToDatabase(state, db0)
+        assertFalse(KotpassLocalStateAdapter.read(db).groups.containsKey(workId.toString()))
+    }
+
     // --- Helpers ---
+
+    private fun canonicalGroup(uuid: String, parent: String, name: String) =
+        dk.bjoerckbraun.deltasync.canonical.Group(
+            v = dk.bjoerckbraun.deltasync.canonical.GroupSchemaVersion,
+            uuid = uuid,
+            name = name,
+            parentGroup = parent,
+            times = sampleTimes(),
+        )
+
+    private fun canonicalEntryP(uuid: String, parent: String, title: String) =
+        dk.bjoerckbraun.deltasync.canonical.Entry(
+            v = dk.bjoerckbraun.deltasync.canonical.SchemaVersion,
+            uuid = uuid,
+            times = sampleTimes(),
+            strings = mapOf("Title" to dk.bjoerckbraun.deltasync.canonical.EntryString(v = title)),
+            parentGroup = parent,
+        )
+
+    private fun sampleTimes() = dk.bjoerckbraun.deltasync.canonical.Times(
+        created = Instant.parse("2026-05-01T10:00:00Z"),
+        modified = Instant.parse("2026-05-01T10:00:00Z"),
+        accessed = Instant.parse("2026-05-01T10:00:00Z"),
+        locationChanged = Instant.parse("2026-05-01T10:00:00Z"),
+    )
 
     private fun freshDatabase(): KeePassDatabase =
         KeePassDatabase.Ver4x.create(

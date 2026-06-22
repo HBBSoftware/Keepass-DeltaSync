@@ -51,34 +51,51 @@ final class EntryController
     /** GET /databases/{id}/changes?since={seq} */
     public function changes(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
-        $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
-        $since      = $this->parseSince($req);
+        $databaseId    = $this->resolveDatabase($params['id'] ?? '', $auth);
+        $since         = $this->parseSince($req);
+        $includeGroups = $this->parseIncludeGroups($req);
 
-        $stmt = $this->pdo->prepare(
-            'SELECT ev.entry_uuid,
+        // Forward-compat: entries-only som default. Gamle v3-klienter sender
+        // ikke ?include=groups og ser derfor aldrig gruppe-blobs (object_kind=2),
+        // som de ikke kan parse. Nye klienter opt-in'er og får begge dele +
+        // et 'kind'-felt pr. række. Se docs/v4-group-sync.md.
+        $sql = 'SELECT ev.entry_uuid,
                     encode(ev.blob, \'base64\') AS blob,
                     ev.modified_at,
                     ev.deleted,
                     ev.server_seq,
+                    ev.object_kind,
                     (SELECT count(*) FROM entry_versions ev2
                       WHERE ev2.database_id = ev.database_id
                         AND ev2.entry_uuid  = ev.entry_uuid) AS available_versions
                FROM entry_versions ev
               WHERE ev.database_id = :db
                 AND ev.version_num = 3
-                AND ev.server_seq  > :since
-              ORDER BY ev.server_seq ASC'
-        );
+                AND ev.server_seq  > :since';
+        if (!$includeGroups) {
+            $sql .= ' AND ev.object_kind = 1';
+        }
+        $sql .= ' ORDER BY ev.server_seq ASC';
+
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['db' => $databaseId, 'since' => $since]);
 
-        $entries = array_map(fn(array $r): array => [
-            'uuid'               => $r['entry_uuid'],
-            'blob'               => self::cleanBase64($r['blob']),
-            'modified_at'        => self::isoUtc($r['modified_at']),
-            'deleted'            => (bool) $r['deleted'],
-            'seq'                => (int)  $r['server_seq'],
-            'available_versions' => (int)  $r['available_versions'],
-        ], $stmt->fetchAll());
+        $entries = array_map(function (array $r) use ($includeGroups): array {
+            $row = [
+                'uuid'               => $r['entry_uuid'],
+                'blob'               => self::cleanBase64($r['blob']),
+                'modified_at'        => self::isoUtc($r['modified_at']),
+                'deleted'            => (bool) $r['deleted'],
+                'seq'                => (int)  $r['server_seq'],
+                'available_versions' => (int)  $r['available_versions'],
+            ];
+            // Kun emittér 'kind' når grupper er anmodet, så default-svaret er
+            // byte-identisk med v3 (gamle klienters JSON-parsere er uændrede).
+            if ($includeGroups) {
+                $row['kind'] = (int) $r['object_kind'];
+            }
+            return $row;
+        }, $stmt->fetchAll());
 
         $cur = $this->pdo->prepare(
             'SELECT next_seq - 1 AS current_seq FROM database_seq WHERE database_id = :db'
@@ -147,6 +164,70 @@ final class EntryController
         return new JsonResponse(200, [
             'entry' => [
                 'uuid'        => $entryUuid,
+                'modified_at' => self::isoUtc($modifiedAt),
+                'deleted'     => true,
+                'seq'         => $result['seq'],
+                'created_at'  => self::isoUtc($result['created_at']),
+            ],
+        ]);
+    }
+
+    /**
+     * PUT /databases/{id}/groups/{uuid}
+     *
+     * Gruppe-objekter (v4 gruppe-sync) deler blob-store, version-rotation og
+     * server_seq-strøm med entries, men markeres object_kind=2 så GET /changes
+     * kun leverer dem til klienter der opt-in'er med ?include=groups.
+     */
+    public function putGroup(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
+    {
+        $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
+        $groupUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
+
+        $body       = $req->jsonBody();
+        $blobB64    = $this->parseBlob($body, required: true);
+        $modifiedAt = $this->parseModifiedAt($body);
+
+        $result = $this->insertNewVersion($databaseId, $groupUuid, $blobB64, $modifiedAt, deleted: false, objectKind: 2);
+
+        $log->debug(EventType::GroupPut, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $groupUuid,
+            'details'     => ['seq' => $result['seq']],
+        ]);
+
+        return new JsonResponse(200, [
+            'group' => [
+                'uuid'        => $groupUuid,
+                'modified_at' => self::isoUtc($modifiedAt),
+                'deleted'     => false,
+                'seq'         => $result['seq'],
+                'created_at'  => self::isoUtc($result['created_at']),
+            ],
+        ]);
+    }
+
+    /** DELETE /databases/{id}/groups/{uuid} — tombstone (object_kind=2) */
+    public function destroyGroup(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
+    {
+        $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
+        $groupUuid  = $this->validateEntryUuid($params['uuid'] ?? '');
+
+        $body       = $req->jsonBody();
+        $blobB64    = $this->parseBlob($body, required: false) ?? '';
+        $modifiedAt = $this->parseModifiedAt($body);
+
+        $result = $this->insertNewVersion($databaseId, $groupUuid, $blobB64, $modifiedAt, deleted: true, objectKind: 2);
+
+        $log->debug(EventType::GroupDeleted, [
+            'database_id' => $databaseId,
+            'entry_uuid'  => $groupUuid,
+            'details'     => ['seq' => $result['seq']],
+        ]);
+
+        return new JsonResponse(200, [
+            'group' => [
+                'uuid'        => $groupUuid,
                 'modified_at' => self::isoUtc($modifiedAt),
                 'deleted'     => true,
                 'seq'         => $result['seq'],
@@ -359,6 +440,20 @@ final class EntryController
         return (int) $raw;
     }
 
+    /**
+     * Parser ?include=groups (komma-separeret liste af ekstra object-kinds).
+     * Default (intet flag) → entries-only, så v3-klienter aldrig ser gruppe-blobs.
+     */
+    private function parseIncludeGroups(Request $req): bool
+    {
+        $raw = $req->query['include'] ?? '';
+        if (!is_string($raw) || $raw === '') {
+            return false;
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        return in_array('groups', $parts, true);
+    }
+
     /** Returnerer normaliseret base64-streng (eller null hvis ikke required + ikke i body). */
     private function parseBlob(array $body, bool $required): ?string
     {
@@ -404,12 +499,12 @@ final class EntryController
     /**
      * @return array{seq:int, created_at:string}
      */
-    private function insertNewVersion(string $databaseId, string $entryUuid, string $blobB64, string $modifiedAt, bool $deleted): array
+    private function insertNewVersion(string $databaseId, string $entryUuid, string $blobB64, string $modifiedAt, bool $deleted, int $objectKind = 1): array
     {
         return $this->withFkSafety(fn() => Connection::transaction(
             $this->pdo,
             fn(PDO $pdo) => $this->insertNewVersionInTransaction(
-                $pdo, $databaseId, $entryUuid, $blobB64, $modifiedAt, $deleted,
+                $pdo, $databaseId, $entryUuid, $blobB64, $modifiedAt, $deleted, $objectKind,
             ),
         ));
     }
@@ -419,7 +514,7 @@ final class EntryController
      *
      * @return array{seq:int, created_at:string}
      */
-    private function insertNewVersionInTransaction(PDO $pdo, string $databaseId, string $entryUuid, string $blobB64, string $modifiedAt, bool $deleted): array
+    private function insertNewVersionInTransaction(PDO $pdo, string $databaseId, string $entryUuid, string $blobB64, string $modifiedAt, bool $deleted, int $objectKind = 1): array
     {
         // entries-rækken er FK-target for entry_versions. Idempotent UPSERT.
         $upsert = $pdo->prepare(
@@ -442,8 +537,8 @@ final class EntryController
         // INSERT — version-rotation-triggeren fra migration 005 sørger for 3→2→1.
         $ins = $pdo->prepare(
             'INSERT INTO entry_versions
-                 (database_id, entry_uuid, blob, modified_at, deleted, server_seq, version_num)
-             VALUES (:db, :uuid, decode(:blob, \'base64\'), :mod, :del, :seq, 3)
+                 (database_id, entry_uuid, blob, modified_at, deleted, server_seq, version_num, object_kind)
+             VALUES (:db, :uuid, decode(:blob, \'base64\'), :mod, :del, :seq, 3, :kind)
              RETURNING created_at'
         );
         $ins->bindValue(':db',   $databaseId);
@@ -452,6 +547,7 @@ final class EntryController
         $ins->bindValue(':mod',  $modifiedAt);
         $ins->bindValue(':del',  $deleted, PDO::PARAM_BOOL);
         $ins->bindValue(':seq',  $seq, PDO::PARAM_INT);
+        $ins->bindValue(':kind', $objectKind, PDO::PARAM_INT);
         $ins->execute();
         $createdAt = (string) $ins->fetchColumn();
 

@@ -103,7 +103,7 @@ func runSyncTest(args []string) error {
 	}
 	fmt.Printf("PUT seq=%d (entry=%s)\n", putResp.Seq, putResp.UUID)
 
-	changes, err := client.GetChanges(ctx, cfg.Server.DeviceToken, db.RemoteID, 0)
+	changes, err := client.GetChanges(ctx, cfg.Server.DeviceToken, db.RemoteID, 0, false)
 	if err != nil {
 		return fmt.Errorf("GET /changes: %w", err)
 	}

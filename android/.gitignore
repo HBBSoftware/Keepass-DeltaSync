@@ -9,3 +9,8 @@ captures/
 .cxx/
 libs/*.aar
 libs/*.jar
+
+# Signing — keystore og adgangskoder må ALDRIG committes.
+keystore.properties
+*.jks
+*.keystore

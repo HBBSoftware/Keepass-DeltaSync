@@ -282,6 +282,8 @@ class SynchronizerTest {
     private class IdentityCryptoSession : CryptoSession {
         override fun encryptEntry(entryJson: ByteArray): ByteArray = entryJson
         override fun decryptEntry(blob: ByteArray): ByteArray = blob
+        override fun encryptGroup(groupJson: ByteArray): ByteArray = groupJson
+        override fun decryptGroup(blob: ByteArray): ByteArray = blob
         override fun close() {}
     }
 }

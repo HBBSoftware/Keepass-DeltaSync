@@ -2,6 +2,7 @@
 package dk.bjoerckbraun.deltasync.sync
 
 import dk.bjoerckbraun.deltasync.canonical.Entry
+import dk.bjoerckbraun.deltasync.canonical.Group
 import kotlinx.datetime.Instant
 
 /**
@@ -24,7 +25,11 @@ data class LocalState(
     /** Aktive entries (ikke-tombstones) keyed by UUID. */
     val entries: MutableMap<String, Entry> = mutableMapOf(),
 
-    /** Tombstones: UUID → deletion mtime. */
+    /** Aktive grupper (ikke-tombstones) keyed by UUID (v4 group-sync). */
+    val groups: MutableMap<String, Group> = mutableMapOf(),
+
+    /** Tombstones: UUID → deletion mtime. Dækker både entries og grupper —
+     *  UUID-rummet er fælles, og sletning sker by-UUID. */
     val tombstones: MutableMap<String, Instant> = mutableMapOf(),
 
     /**

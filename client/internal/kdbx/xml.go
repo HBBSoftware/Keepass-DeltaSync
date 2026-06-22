@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,12 +35,38 @@ type Entry struct {
 	UUID       string    // standard UUID-format, fx "01234567-89ab-cdef-0123-456789abcdef"
 	ModifiedAt time.Time
 	Fragment  []byte // raw inner XML
+
+	// ParentGroupUUID er standard-UUID på den gruppe entry'en ligger i, eller
+	// "" hvis den ligger direkte i Root (sentinel — hver enhed har sin egen
+	// Root-UUID). Sættes ved indsamling fra entry'ens position i gruppetræet
+	// (v4 group-sync) og bæres videre til canonical.Entry.ParentGroup.
+	ParentGroupUUID string
+
+	// LocationChanged er tidspunktet entry'en sidst blev flyttet mellem
+	// grupper. En flytning bumper denne, ikke nødvendigvis ModifiedAt, så
+	// push-delta-tjekket skal kigge på den senere af de to (v4 group-sync).
+	// Zero-time hvis ukendt.
+	LocationChanged time.Time
 }
 
 // Deletion er én tombstone fra <DeletedObjects>. Pushes som DELETE-call til serveren.
 type Deletion struct {
 	UUID       string
 	DeletedAt time.Time
+}
+
+// Group er én gruppe udlæst fra en .kdbx-eksport (v4 group-sync). Root-gruppen
+// selv emittes ikke (den synkroniseres aldrig); recycle-bin-gruppen og dens
+// undertræ heller ikke (lokalt/slettet). UUID er standard hex-format.
+type Group struct {
+	UUID            string    // standard hex-format
+	ParentUUID      string    // "" = Root (sentinel)
+	Name            string
+	Notes           string
+	IconID          int
+	CreatedAt       time.Time
+	ModifiedAt      time.Time
+	LocationChanged time.Time
 }
 
 // RootGroupUUID parser XML-eksporten og returnerer Root-gruppens UUID i
@@ -70,33 +97,34 @@ func RootGroupUUID(xmlBytes []byte) (string, error) {
 // ikke på tværs af enheder — entry'en er allerede slettet på server. Hvis
 // recycle-bin er deaktiveret eller endnu ikke materialiseret
 // (RecycleBinUUID = null), gør synthesis intet.
-func ParseExport(xmlBytes []byte) ([]Entry, []Deletion, error) {
+func ParseExport(xmlBytes []byte) ([]Entry, []Group, []Deletion, error) {
 	var doc kdbxFile
 	if err := xml.Unmarshal(xmlBytes, &doc); err != nil {
-		return nil, nil, fmt.Errorf("parse kdbx xml: %w", err)
+		return nil, nil, nil, fmt.Errorf("parse kdbx xml: %w", err)
 	}
 
 	recycleBinUUID := activeRecycleBinUUID(doc.Meta)
 
 	var entries []Entry
+	var groups []Group
 	deletions := make([]Deletion, 0, len(doc.Root.DeletedObjects.Objects))
-	if err := collectEntries(&doc.Root.Group, recycleBinUUID, &entries, &deletions); err != nil {
-		return nil, nil, err
+	if err := collectTree(&doc.Root.Group, recycleBinUUID, true, &entries, &groups, &deletions); err != nil {
+		return nil, nil, nil, err
 	}
 
 	for _, d := range doc.Root.DeletedObjects.Objects {
 		uuid, err := decodeUUID(d.UUID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("deleted-object uuid: %w", err)
+			return nil, nil, nil, fmt.Errorf("deleted-object uuid: %w", err)
 		}
 		t, err := parseKdbxTime(d.DeletionTime)
 		if err != nil {
-			return nil, nil, fmt.Errorf("deletion-time for %s: %w", uuid, err)
+			return nil, nil, nil, fmt.Errorf("deletion-time for %s: %w", uuid, err)
 		}
 		deletions = append(deletions, Deletion{UUID: uuid, DeletedAt: t})
 	}
 
-	return entries, deletions, nil
+	return entries, groups, deletions, nil
 }
 
 // activeRecycleBinUUID returnerer recycle-bin-gruppens UUID i base64-form
@@ -112,12 +140,29 @@ func activeRecycleBinUUID(m meta) string {
 	return m.RecycleBinUUID
 }
 
-// collectEntries walks groups recursively. Entries i gruppen med UUID
+// collectTree walks groups recursively og indsamler entries (med deres
+// parent-gruppe), grupper og deletions. Entries i gruppen med UUID
 // recycleBinUUID synthesizes som Deletion i stedet for at lande i entries-
 // listen. Entries inde i <History>-undertræer besøges ikke — de lever som
 // raw InnerXML på hver parent-entry.
-func collectEntries(g *group, recycleBinUUID string, entries *[]Entry, deletions *[]Deletion) error {
+//
+// isRoot markerer det øverste kald: Root-gruppen emittes aldrig som en synket
+// Group, og dens entries får ParentGroupUUID = "" (sentinel). Recycle-bin-
+// gruppen og dens undertræ emittes heller ikke som grupper.
+func collectTree(g *group, recycleBinUUID string, isRoot bool, entries *[]Entry, groups *[]Group, deletions *[]Deletion) error {
 	inRecycleBin := recycleBinUUID != "" && g.UUID == recycleBinUUID
+
+	// Reference som entries i denne gruppe + dens børn skal pege på: "" for
+	// Root (sentinel), ellers gruppens standard-UUID.
+	thisRef := ""
+	if !isRoot {
+		var err error
+		thisRef, err = decodeUUID(g.UUID)
+		if err != nil {
+			return fmt.Errorf("group uuid: %w", err)
+		}
+	}
+
 	for _, e := range g.Entries {
 		uuid, err := decodeUUID(e.UUID)
 		if err != nil {
@@ -144,17 +189,70 @@ func collectEntries(g *group, recycleBinUUID string, entries *[]Entry, deletions
 			return fmt.Errorf("modified-time for entry %s: %w", uuid, err)
 		}
 		*entries = append(*entries, Entry{
-			UUID:       uuid,
-			ModifiedAt: t,
-			Fragment:   []byte(e.InnerXML),
+			UUID:            uuid,
+			ModifiedAt:      t,
+			Fragment:        []byte(e.InnerXML),
+			ParentGroupUUID: thisRef,
+			LocationChanged: parseKdbxTimeOrZero(e.Times.LocationChanged),
 		})
 	}
+
 	for i := range g.Groups {
-		if err := collectEntries(&g.Groups[i], recycleBinUUID, entries, deletions); err != nil {
+		child := &g.Groups[i]
+		childIsRecycleBin := recycleBinUUID != "" && child.UUID == recycleBinUUID
+		// Emit child som synket Group — men ikke recycle-bin'en, ikke
+		// undertræet i recycle bin (lokalt/slettet).
+		if !inRecycleBin && !childIsRecycleBin {
+			gr, err := buildGroup(child, thisRef)
+			if err != nil {
+				return err
+			}
+			*groups = append(*groups, gr)
+		}
+		if err := collectTree(child, recycleBinUUID, false, entries, groups, deletions); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// buildGroup konverterer en parset XML-gruppe til en eksporteret Group med
+// parentRef som forælder-reference ("" = Root). Gruppe-tidsstempler parses
+// lempeligt (zero-time ved tomt/ugyldigt) — de er ikke kritiske for
+// indsamling, kun for merge-konfliktløsning.
+func buildGroup(g *group, parentRef string) (Group, error) {
+	uuid, err := decodeUUID(g.UUID)
+	if err != nil {
+		return Group{}, fmt.Errorf("group uuid: %w", err)
+	}
+	icon := 0
+	if s := strings.TrimSpace(g.IconID); s != "" {
+		if n, aerr := strconv.Atoi(s); aerr == nil {
+			icon = n
+		}
+	}
+	return Group{
+		UUID:            uuid,
+		ParentUUID:      parentRef,
+		Name:            g.Name,
+		Notes:           g.Notes,
+		IconID:          icon,
+		CreatedAt:       parseKdbxTimeOrZero(g.Times.CreationTime),
+		ModifiedAt:      parseKdbxTimeOrZero(g.Times.LastModificationTime),
+		LocationChanged: parseKdbxTimeOrZero(g.Times.LocationChanged),
+	}, nil
+}
+
+// parseKdbxTimeOrZero er en lempelig variant af parseKdbxTime der returnerer
+// zero-time i stedet for fejl ved tom/ugyldig input.
+func parseKdbxTimeOrZero(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	if t, err := parseKdbxTime(s); err == nil {
+		return t
+	}
+	return time.Time{}
 }
 
 // decodeUUID konverterer KeePassXC's base64-encoded 16-byte UUID til standard
@@ -224,9 +322,19 @@ type root struct {
 }
 
 type group struct {
-	UUID    string  `xml:"UUID"`
-	Entries []entry `xml:"Entry"`
-	Groups  []group `xml:"Group"`
+	UUID    string     `xml:"UUID"`
+	Name    string     `xml:"Name"`
+	Notes   string     `xml:"Notes"`
+	IconID  string     `xml:"IconID"`
+	Times   groupTimes `xml:"Times"`
+	Entries []entry    `xml:"Entry"`
+	Groups  []group    `xml:"Group"`
+}
+
+type groupTimes struct {
+	CreationTime         string `xml:"CreationTime"`
+	LastModificationTime string `xml:"LastModificationTime"`
+	LocationChanged      string `xml:"LocationChanged"`
 }
 
 type entry struct {

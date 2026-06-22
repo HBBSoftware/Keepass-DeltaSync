@@ -128,7 +128,7 @@ func runInitShared(args []string) error {
 	defer passwd.Zero(entryKey)
 
 	fmt.Fprintln(os.Stderr, "Fetching entries from server...")
-	changes, err := client.GetChanges(ctx, cfg.Server.DeviceToken, shared.ID, 0)
+	changes, err := client.GetChanges(ctx, cfg.Server.DeviceToken, shared.ID, 0, false)
 	if err != nil {
 		return fmt.Errorf("get changes: %w", err)
 	}

@@ -60,6 +60,8 @@ final class Router
         $this->add('GET',    '/api/v1/databases/{id}/changes',                        'EntryController::changes',    'device');
         $this->add('PUT',    '/api/v1/databases/{id}/entries/{uuid}',                 'EntryController::put',        'device');
         $this->add('DELETE', '/api/v1/databases/{id}/entries/{uuid}',                 'EntryController::destroy',    'device');
+        $this->add('PUT',    '/api/v1/databases/{id}/groups/{uuid}',                  'EntryController::putGroup',     'device');
+        $this->add('DELETE', '/api/v1/databases/{id}/groups/{uuid}',                  'EntryController::destroyGroup', 'device');
         $this->add('GET',    '/api/v1/databases/{id}/entries/{uuid}/versions',        'EntryController::versions',   'device');
         $this->add('GET',    '/api/v1/databases/{id}/entries/{uuid}/versions/{num}',  'EntryController::version',    'device');
         $this->add('POST',   '/api/v1/databases/{id}/entries/{uuid}/restore/{num}',   'EntryController::restore',    'device');

@@ -33,6 +33,16 @@ class GomobileCryptoSession internal constructor(
         return session.decryptEntry(blob)
     }
 
+    override fun encryptGroup(groupJson: ByteArray): ByteArray {
+        check(!closed) { "session closed" }
+        return session.encryptGroup(groupJson)
+    }
+
+    override fun decryptGroup(blob: ByteArray): ByteArray {
+        check(!closed) { "session closed" }
+        return session.decryptGroup(blob)
+    }
+
     override fun close() {
         if (closed) return
         closed = true

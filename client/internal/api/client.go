@@ -539,6 +539,9 @@ type EntryChange struct {
 	Deleted           bool   `json:"deleted"`
 	Seq               int64  `json:"seq"`
 	AvailableVersions int    `json:"available_versions"`
+	// Kind er 1=entry, 2=group (v4 group-sync). Serveren sætter den kun når
+	// klienten anmoder med include=groups; ellers 0 (behandl som entry).
+	Kind int `json:"kind"`
 }
 
 // ChangesResponse er svaret fra GET /databases/{id}/changes.
@@ -550,8 +553,11 @@ type ChangesResponse struct {
 // GetChanges henter alle entry-versioner med server_seq > since. Serveren
 // returnerer kun nyeste version pr. entry; ældre versioner kræver separate
 // GetVersions/GetVersion-kald.
-func (c *Client) GetChanges(ctx context.Context, deviceToken, databaseID string, since int64) (*ChangesResponse, error) {
+func (c *Client) GetChanges(ctx context.Context, deviceToken, databaseID string, since int64, includeGroups bool) (*ChangesResponse, error) {
 	u := fmt.Sprintf("%s/api/v1/databases/%s/changes?since=%d", c.baseURL, databaseID, since)
+	if includeGroups {
+		u += "&include=groups"
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -587,16 +593,29 @@ type EntryPutResponse struct {
 // (nonce ‖ ciphertext); klienten base64-encoder undervejs. modifiedAt er den
 // KeePass-side last-modified timestamp og må gerne være i fortiden.
 func (c *Client) PutEntry(ctx context.Context, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
-	return c.writeEntry(ctx, http.MethodPut, deviceToken, databaseID, entryUUID, blob, modifiedAt, true)
+	return c.writeObject(ctx, http.MethodPut, deviceToken, databaseID, "entries", entryUUID, blob, modifiedAt, true)
 }
 
 // DeleteEntry markerer entry'en som tombstone. Tæller som en ny version på
 // serveren. blob er typisk nil/tom (server accepterer manglende blob).
 func (c *Client) DeleteEntry(ctx context.Context, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
-	return c.writeEntry(ctx, http.MethodDelete, deviceToken, databaseID, entryUUID, blob, modifiedAt, false)
+	return c.writeObject(ctx, http.MethodDelete, deviceToken, databaseID, "entries", entryUUID, blob, modifiedAt, false)
 }
 
-func (c *Client) writeEntry(ctx context.Context, method, deviceToken, databaseID, entryUUID string, blob []byte, modifiedAt time.Time, blobRequired bool) (*EntryPutResponse, error) {
+// PutGroup uploader en ny gruppe-version (object_kind=2, v4 group-sync). blob
+// er den rå wire-format af en canonical.Group-payload.
+func (c *Client) PutGroup(ctx context.Context, deviceToken, databaseID, groupUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
+	return c.writeObject(ctx, http.MethodPut, deviceToken, databaseID, "groups", groupUUID, blob, modifiedAt, true)
+}
+
+// DeleteGroup markerer gruppen som tombstone (object_kind=2).
+func (c *Client) DeleteGroup(ctx context.Context, deviceToken, databaseID, groupUUID string, blob []byte, modifiedAt time.Time) (*EntryPutResponse, error) {
+	return c.writeObject(ctx, http.MethodDelete, deviceToken, databaseID, "groups", groupUUID, blob, modifiedAt, false)
+}
+
+// writeObject håndterer både entry- og gruppe-skrivninger; segment er
+// "entries" eller "groups" i URL'en. Svaret er ens-formet ({entry|group}).
+func (c *Client) writeObject(ctx context.Context, method, deviceToken, databaseID, segment, objectUUID string, blob []byte, modifiedAt time.Time, blobRequired bool) (*EntryPutResponse, error) {
 	body := map[string]any{
 		"modified_at": modifiedAt.UTC().Format("2006-01-02T15:04:05Z"),
 	}
@@ -611,7 +630,7 @@ func (c *Client) writeEntry(ctx context.Context, method, deviceToken, databaseID
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	u := fmt.Sprintf("%s/api/v1/databases/%s/entries/%s", c.baseURL, databaseID, entryUUID)
+	u := fmt.Sprintf("%s/api/v1/databases/%s/%s/%s", c.baseURL, databaseID, segment, objectUUID)
 	req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(buf))
 	if err != nil {
 		return nil, err
@@ -629,12 +648,19 @@ func (c *Client) writeEntry(ctx context.Context, method, deviceToken, databaseID
 	}
 
 	var out struct {
-		Entry EntryPutResponse `json:"entry"`
+		Entry *EntryPutResponse `json:"entry"`
+		Group *EntryPutResponse `json:"group"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	return &out.Entry, nil
+	if out.Group != nil {
+		return out.Group, nil
+	}
+	if out.Entry != nil {
+		return out.Entry, nil
+	}
+	return nil, fmt.Errorf("response missing entry/group object")
 }
 
 // EntryVersion er én historisk version af en entry.

@@ -42,7 +42,7 @@ const sampleInnerXMLFragment = `<UUID>AAECAwQFBgcICQoLDA0ODw==</UUID>` +
 	`<String><Key>Password</Key><Value Protected="True">secret</Value></String>`
 
 func TestEncodeFragmentToBlob_ProducesCanonical(t *testing.T) {
-	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", []byte(sampleInnerXMLFragment))
+	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", "", []byte(sampleInnerXMLFragment))
 	if err != nil {
 		t.Fatalf("encodeFragmentToBlob: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestEncodeFragmentToBlob_ProducesCanonical(t *testing.T) {
 func TestEncodeFragmentToBlob_BadFragmentErrors(t *testing.T) {
 	// FromInnerXML fejler på et fragment uden UUID — vi skal se en wrapped
 	// fejl der nævner entry-UUID for debugability.
-	_, err := encodeFragmentToBlob(testEntryKey, "bad-uuid", []byte("<NoUUIDHere/>"))
+	_, err := encodeFragmentToBlob(testEntryKey, "bad-uuid", "", []byte("<NoUUIDHere/>"))
 	if err == nil {
 		t.Fatal("expected error for fragment without parseable UUID")
 	}
@@ -72,7 +72,7 @@ func TestEncodeFragmentToBlob_BadFragmentErrors(t *testing.T) {
 
 func TestDecryptToFragment_CanonicalPath(t *testing.T) {
 	// Byg en canonical-blob via samme path som push'en bruger.
-	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", []byte(sampleInnerXMLFragment))
+	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", "", []byte(sampleInnerXMLFragment))
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestDecryptToFragment_UnknownFormatErrors(t *testing.T) {
 
 func TestDecryptToFragment_WrongKeyErrors(t *testing.T) {
 	// Krypter med én nøgle, dekrypter med en anden — skal fejle på AEAD's MAC.
-	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", []byte(sampleInnerXMLFragment))
+	blob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", "", []byte(sampleInnerXMLFragment))
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestDecryptToFragment_WrongKeyErrors(t *testing.T) {
 // efter to round-trips skal indholdet være ækvivalent (Modified ændres
 // bevidst, men resten bevares).
 func TestPipelineRoundTrip(t *testing.T) {
-	pushBlob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", []byte(sampleInnerXMLFragment))
+	pushBlob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", "", []byte(sampleInnerXMLFragment))
 	if err != nil {
 		t.Fatalf("push: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestPipelineRoundTrip(t *testing.T) {
 	}
 
 	// Re-push den pullede fragment.
-	rePushBlob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", pullFragment)
+	rePushBlob, err := encodeFragmentToBlob(testEntryKey, "00010203-0405-0607-0809-0a0b0c0d0e0f", "", pullFragment)
 	if err != nil {
 		t.Fatalf("re-push: %v", err)
 	}
