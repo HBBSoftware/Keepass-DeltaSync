@@ -51,34 +51,51 @@ final class EntryController
     /** GET /databases/{id}/changes?since={seq} */
     public function changes(Request $req, array $params, AuthContext $auth, AuditLogger $log): Response
     {
-        $databaseId = $this->resolveDatabase($params['id'] ?? '', $auth);
-        $since      = $this->parseSince($req);
+        $databaseId    = $this->resolveDatabase($params['id'] ?? '', $auth);
+        $since         = $this->parseSince($req);
+        $includeGroups = $this->parseIncludeGroups($req);
 
-        $stmt = $this->pdo->prepare(
-            'SELECT ev.entry_uuid,
+        // Forward-compat: entries-only som default. Gamle v3-klienter sender
+        // ikke ?include=groups og ser derfor aldrig gruppe-blobs (object_kind=2),
+        // som de ikke kan parse. Nye klienter opt-in'er og får begge dele +
+        // et 'kind'-felt pr. række. Se docs/v4-group-sync.md.
+        $sql = 'SELECT ev.entry_uuid,
                     encode(ev.blob, \'base64\') AS blob,
                     ev.modified_at,
                     ev.deleted,
                     ev.server_seq,
+                    ev.object_kind,
                     (SELECT count(*) FROM entry_versions ev2
                       WHERE ev2.database_id = ev.database_id
                         AND ev2.entry_uuid  = ev.entry_uuid) AS available_versions
                FROM entry_versions ev
               WHERE ev.database_id = :db
                 AND ev.version_num = 3
-                AND ev.server_seq  > :since
-              ORDER BY ev.server_seq ASC'
-        );
+                AND ev.server_seq  > :since';
+        if (!$includeGroups) {
+            $sql .= ' AND ev.object_kind = 1';
+        }
+        $sql .= ' ORDER BY ev.server_seq ASC';
+
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['db' => $databaseId, 'since' => $since]);
 
-        $entries = array_map(fn(array $r): array => [
-            'uuid'               => $r['entry_uuid'],
-            'blob'               => self::cleanBase64($r['blob']),
-            'modified_at'        => self::isoUtc($r['modified_at']),
-            'deleted'            => (bool) $r['deleted'],
-            'seq'                => (int)  $r['server_seq'],
-            'available_versions' => (int)  $r['available_versions'],
-        ], $stmt->fetchAll());
+        $entries = array_map(function (array $r) use ($includeGroups): array {
+            $row = [
+                'uuid'               => $r['entry_uuid'],
+                'blob'               => self::cleanBase64($r['blob']),
+                'modified_at'        => self::isoUtc($r['modified_at']),
+                'deleted'            => (bool) $r['deleted'],
+                'seq'                => (int)  $r['server_seq'],
+                'available_versions' => (int)  $r['available_versions'],
+            ];
+            // Kun emittér 'kind' når grupper er anmodet, så default-svaret er
+            // byte-identisk med v3 (gamle klienters JSON-parsere er uændrede).
+            if ($includeGroups) {
+                $row['kind'] = (int) $r['object_kind'];
+            }
+            return $row;
+        }, $stmt->fetchAll());
 
         $cur = $this->pdo->prepare(
             'SELECT next_seq - 1 AS current_seq FROM database_seq WHERE database_id = :db'
@@ -357,6 +374,20 @@ final class EntryController
             throw new HttpException(400, 'since must be a non-negative integer', 'invalid_query');
         }
         return (int) $raw;
+    }
+
+    /**
+     * Parser ?include=groups (komma-separeret liste af ekstra object-kinds).
+     * Default (intet flag) → entries-only, så v3-klienter aldrig ser gruppe-blobs.
+     */
+    private function parseIncludeGroups(Request $req): bool
+    {
+        $raw = $req->query['include'] ?? '';
+        if (!is_string($raw) || $raw === '') {
+            return false;
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        return in_array('groups', $parts, true);
     }
 
     /** Returnerer normaliseret base64-streng (eller null hvis ikke required + ikke i body). */
