@@ -81,7 +81,7 @@ object KotpassLocalStateAdapter {
         // meta.recycleBinUuid, så vi ville aldrig se dem og kunne ikke
         // synthesize tombstones. Egen rekursion giver fuld kontrol og
         // matcher desktop'ens collectEntries 1:1.
-        collectEntries(db.content.group, recycleBinUuid, binaryPool, state)
+        collectTree(db.content.group, isRoot = true, recycleBinUuid, binaryPool, state)
 
         // DeletedObjects: permanente sletninger. En aktiv entry vinder over
         // et stale tombstone (resurrection), så vi springer UUIDs over der
@@ -102,13 +102,19 @@ object KotpassLocalStateAdapter {
      * `inRecycleBin` genberegnes pr. gruppe, så entries i UNDERgrupper af
      * papirkurven IKKE synthesizes — kun direkte børn — identisk med desktop.
      */
-    private fun collectEntries(
+    private fun collectTree(
         group: Group,
+        isRoot: Boolean,
         recycleBinUuid: UUID?,
         binaryPool: Map<ByteString, BinaryData>,
         state: LocalState,
     ) {
         val inRecycleBin = recycleBinUuid != null && group.uuid == recycleBinUuid
+
+        // Reference som entries i denne gruppe + dens børn peger på: "" for
+        // Root (sentinel), ellers gruppens UUID. Matcher desktop's collectTree.
+        val thisRef = if (isRoot) "" else group.uuid.toString()
+
         for (entry in group.entries) {
             if (inRecycleBin) {
                 // LocationChanged = tidspunktet entry'en blev flyttet i
@@ -122,11 +128,19 @@ object KotpassLocalStateAdapter {
             }
             val canonical = Mapper.toCanonical(entry) { ref ->
                 binaryPool[ref.hash]?.getContent()
-            }
+            }.copy(parentGroup = thisRef)
             state.entries[canonical.uuid] = canonical
         }
+
         for (child in group.groups) {
-            collectEntries(child, recycleBinUuid, binaryPool, state)
+            val childIsRecycleBin = recycleBinUuid != null && child.uuid == recycleBinUuid
+            // Emit child som synket gruppe — men ikke recycle-bin'en eller dens
+            // undertræ (lokalt/slettet). Root selv emittes aldrig.
+            if (!inRecycleBin && !childIsRecycleBin) {
+                val cg = Mapper.groupToCanonical(child, thisRef)
+                state.groups[cg.uuid] = cg
+            }
+            collectTree(child, isRoot = false, recycleBinUuid, binaryPool, state)
         }
     }
 

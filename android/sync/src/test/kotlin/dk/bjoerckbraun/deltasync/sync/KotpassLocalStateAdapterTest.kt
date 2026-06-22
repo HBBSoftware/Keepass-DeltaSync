@@ -244,6 +244,47 @@ class KotpassLocalStateAdapterTest {
         assertTrue(state.tombstones.isEmpty())
     }
 
+    @Test
+    fun `read collects groups and sets entry parentGroup`() {
+        val rootEntry = UUID.fromString("10000000-0000-0000-0000-000000000001")
+        val workId = UUID.fromString("20000000-0000-0000-0000-000000000002")
+        val workEntry = UUID.fromString("21000000-0000-0000-0000-000000000021")
+        val subId = UUID.fromString("30000000-0000-0000-0000-000000000003")
+        val subEntry = UUID.fromString("31000000-0000-0000-0000-000000000031")
+
+        val db = freshDatabase().modifyParentGroup {
+            copy(
+                entries = entries + kotpassEntry(rootEntry, "RootE"),
+                groups = groups + Group(
+                    uuid = workId,
+                    name = "Work",
+                    entries = listOf(kotpassEntry(workEntry, "WorkE")),
+                    groups = listOf(
+                        Group(
+                            uuid = subId,
+                            name = "Sub",
+                            entries = listOf(kotpassEntry(subEntry, "SubE")),
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        // 3 entries med korrekt parentGroup (Root = sentinel "").
+        assertEquals(3, state.entries.size)
+        assertEquals("", state.entries[rootEntry.toString()]?.parentGroup)
+        assertEquals(workId.toString(), state.entries[workEntry.toString()]?.parentGroup)
+        assertEquals(subId.toString(), state.entries[subEntry.toString()]?.parentGroup)
+
+        // 2 grupper (Root emittes ikke); parent-hierarki bevaret.
+        assertEquals(2, state.groups.size)
+        assertEquals("Work", state.groups[workId.toString()]?.name)
+        assertEquals("", state.groups[workId.toString()]?.parentGroup)
+        assertEquals(workId.toString(), state.groups[subId.toString()]?.parentGroup)
+    }
+
     // --- Helpers ---
 
     private fun freshDatabase(): KeePassDatabase =
