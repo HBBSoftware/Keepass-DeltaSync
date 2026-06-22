@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"time"
 
 	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
@@ -406,6 +407,31 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		pushed++
 	}
 
+	// Push-side gruppe-sletning: en gruppe der var kendt fra en tidligere sync
+	// men ikke længere findes lokalt (slettet eller flyttet til papirkurv)
+	// tombstones på serveren. Ellers ville den efterlade en tom gruppe-shell på
+	// andre enheder. Kører uanset --force (strukturel diff, ikke mtime-tracking).
+	currentGroups := make(map[string]bool, len(groups))
+	for _, g := range groups {
+		currentGroups[g.UUID] = true
+	}
+	delTime := time.Now().UTC()
+	for _, known := range e.db.KnownGroups {
+		if currentGroups[known] {
+			continue
+		}
+		resp, derr := e.client.DeleteGroup(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, known, nil, delTime)
+		if derr != nil {
+			return pushed, deleted, maxSeq, fmt.Errorf("DELETE group %s: %w", known, derr)
+		}
+		if resp.Seq > maxSeq {
+			maxSeq = resp.Seq
+		}
+		deleted++
+	}
+	// Opdater det kendte gruppe-sæt til de aktuelle (sorteret for stabil config).
+	e.db.KnownGroups = sortedStrings(currentGroups)
+
 	for _, en := range entries {
 		// Flyt-detektion: en flytning mellem grupper bumper LocationChanged,
 		// ikke nødvendigvis ModifiedAt — brug den seneste som push-trigger.
@@ -520,6 +546,17 @@ func laterTime(a, b time.Time) time.Time {
 		return b
 	}
 	return a
+}
+
+// sortedStrings returnerer set'ets nøgler sorteret — for stabil config-output
+// (undgår spurious diffs i config.toml mellem syncs).
+func sortedStrings(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // decryptToFragment dekrypterer en server-blob og returnerer InnerXML-fragmentet

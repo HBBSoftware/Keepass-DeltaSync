@@ -102,6 +102,13 @@ type Database struct {
 	LastSeq     int64             `toml:"last_seq"`
 	LastPush    string            `toml:"last_push,omitempty"`
 	EntryStates map[string]string `toml:"entry_states,omitempty"`
+
+	// KnownGroups er sættet af gruppe-UUID'er vi senest har synket (v4
+	// group-sync). Push differ det mod de aktuelle grupper i kdbx-eksporten:
+	// en gruppe der var kendt men ikke længere findes lokalt (slettet eller
+	// flyttet til papirkurv) tombstones på serveren. Uden dette ville slettede
+	// grupper efterlade tomme gruppe-shells på andre enheder.
+	KnownGroups []string `toml:"known_groups,omitempty"`
 }
 
 // RecordEntryState gemmer den seneste sete mtime for en entry (eller deletion).
