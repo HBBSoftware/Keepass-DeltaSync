@@ -245,7 +245,7 @@ func (e *runEnv) cleanup() {
 // Caller'en gemmer config selv.
 func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err error) {
 	e.progressf("Fetching changes since seq=%d...\n", e.db.LastSeq)
-	changes, err := e.client.GetChanges(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, e.db.LastSeq, false)
+	changes, err := e.client.GetChanges(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, e.db.LastSeq, true)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("GET /changes: %w", err)
 	}
@@ -256,35 +256,47 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 	}
 
 	var entries []kdbx.StagingEntry
+	var groups []kdbx.StagingGroup
 	var deletions []kdbx.StagingDeletion
 	for _, c := range changes.Entries {
 		blob, derr := base64.StdEncoding.DecodeString(c.Blob)
 		if derr != nil {
-			return 0, 0, 0, fmt.Errorf("entry %s: server blob not valid base64: %w", c.UUID, derr)
+			return 0, 0, 0, fmt.Errorf("object %s: server blob not valid base64: %w", c.UUID, derr)
 		}
 		modAt, terr := time.Parse(time.RFC3339, c.ModifiedAt)
 		if terr != nil {
-			return 0, 0, 0, fmt.Errorf("entry %s: parse modified_at: %w", c.UUID, terr)
+			return 0, 0, 0, fmt.Errorf("object %s: parse modified_at: %w", c.UUID, terr)
 		}
 		// Optag server's modified_at som "vi har set denne version" så
-		// push-delta næste sync ikke re-pusher den pullede entry.
+		// push-delta næste sync ikke re-pusher det pullede objekt.
 		e.db.RecordEntryState(c.UUID, modAt.UTC().Format("2006-01-02T15:04:05Z"))
 
+		// Tombstones (entry ELLER gruppe) → DeletedObjects; keepassxc-cli's
+		// merge sletter det matchende objekt by-UUID i target.
 		if c.Deleted {
 			deletions = append(deletions, kdbx.StagingDeletion{UUID: c.UUID, DeletedAt: modAt})
 			continue
 		}
-		fragment, derr := decryptToFragment(e.entryKey, blob, c.UUID, modAt)
+		if c.Kind == 2 {
+			g, gerr := decryptToGroup(e.entryKey, blob, c.UUID, modAt)
+			if gerr != nil {
+				return 0, 0, 0, gerr
+			}
+			groups = append(groups, g)
+			continue
+		}
+		fragment, parent, derr := decryptToFragmentWithParent(e.entryKey, blob, c.UUID, modAt)
 		if derr != nil {
 			return 0, 0, 0, derr
 		}
 		entries = append(entries, kdbx.StagingEntry{
-			UUID:       c.UUID,
-			Fragment:   fragment,
-			ModifiedAt: modAt,
+			UUID:        c.UUID,
+			Fragment:    fragment,
+			ModifiedAt:  modAt,
+			ParentGroup: parent,
 		})
 	}
-	e.progressf("Decrypted %d entries (+ %d tombstones).\n", len(entries), len(deletions))
+	e.progressf("Decrypted %d entries, %d groups (+ %d tombstones).\n", len(entries), len(groups), len(deletions))
 
 	// Find lokal Root-gruppes UUID, så staging-merge lander nye entries
 	// direkte i Root i stedet for at oprette en "deltasync"-undergruppe.
@@ -303,7 +315,7 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		rootUUID = ""
 	}
 
-	stagingXML, err := kdbx.BuildStagingXML(entries, deletions, rootUUID)
+	stagingXML, err := kdbx.BuildStagingXMLWithGroups(entries, groups, deletions, rootUUID)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("build staging xml: %w", err)
 	}
@@ -519,33 +531,67 @@ func laterTime(a, b time.Time) time.Time {
 // den rigtige version (server's mtime stiger ved restore selv om indholdet er
 // gammelt; uden override ville merge afvise det).
 func decryptToFragment(entryKey, blob []byte, uuid string, modAt time.Time) ([]byte, error) {
+	fragment, _, err := decryptToFragmentWithParent(entryKey, blob, uuid, modAt)
+	return fragment, err
+}
+
+// decryptToFragmentWithParent er som decryptToFragment, men returnerer også
+// entry'ens parent_group ("" for legacy-blobs eller Root) til v4 staging-
+// rebuild.
+func decryptToFragmentWithParent(entryKey, blob []byte, uuid string, modAt time.Time) ([]byte, string, error) {
 	plaintext, err := crypto.DecryptBlob(entryKey, blob)
 	if err != nil {
-		return nil, fmt.Errorf("entry %s: decrypt failed — wrong masterpassword? %w", uuid, err)
+		return nil, "", fmt.Errorf("entry %s: decrypt failed — wrong masterpassword? %w", uuid, err)
 	}
 
 	switch canonical.DetectFormat(plaintext) {
 	case canonical.FormatCanonical:
 		ce, err := canonical.DecodeCanonical(plaintext)
 		if err != nil {
-			return nil, fmt.Errorf("entry %s: decode canonical: %w", uuid, err)
+			return nil, "", fmt.Errorf("entry %s: decode canonical: %w", uuid, err)
 		}
 		ce.Times.Modified = modAt
 		fragment, err := canonical.ToInnerXML(ce)
 		if err != nil {
-			return nil, fmt.Errorf("entry %s: emit innerxml: %w", uuid, err)
+			return nil, "", fmt.Errorf("entry %s: emit innerxml: %w", uuid, err)
 		}
-		return fragment, nil
+		return fragment, ce.ParentGroup, nil
 
 	case canonical.FormatLegacyXML:
-		return rewriteLastModificationTime(plaintext, modAt), nil
+		return rewriteLastModificationTime(plaintext, modAt), "", nil
 
 	default:
 		if len(plaintext) == 0 {
-			return nil, fmt.Errorf("entry %s: empty plaintext after decrypt", uuid)
+			return nil, "", fmt.Errorf("entry %s: empty plaintext after decrypt", uuid)
 		}
-		return nil, fmt.Errorf("entry %s: unrecognized blob format byte 0x%02x", uuid, plaintext[0])
+		return nil, "", fmt.Errorf("entry %s: unrecognized blob format byte 0x%02x", uuid, plaintext[0])
 	}
+}
+
+// decryptToGroup dekrypterer en gruppe-blob (envelope 0x02) og mapper den til
+// en kdbx.StagingGroup klar til træ-rebuild (v4 group-sync).
+func decryptToGroup(entryKey, blob []byte, uuid string, modAt time.Time) (kdbx.StagingGroup, error) {
+	plaintext, err := crypto.DecryptBlob(entryKey, blob)
+	if err != nil {
+		return kdbx.StagingGroup{}, fmt.Errorf("group %s: decrypt failed — wrong masterpassword? %w", uuid, err)
+	}
+	if canonical.DetectFormat(plaintext) != canonical.FormatGroup {
+		return kdbx.StagingGroup{}, fmt.Errorf("group %s: blob is not a canonical group", uuid)
+	}
+	cg, err := canonical.DecodeGroup(plaintext)
+	if err != nil {
+		return kdbx.StagingGroup{}, fmt.Errorf("group %s: decode: %w", uuid, err)
+	}
+	return kdbx.StagingGroup{
+		UUID:            cg.UUID,
+		ParentUUID:      cg.ParentGroup,
+		Name:            cg.Name,
+		Notes:           cg.Notes,
+		IconID:          cg.IconID,
+		CreatedAt:       cg.Times.Created,
+		ModifiedAt:      cg.Times.Modified,
+		LocationChanged: cg.Times.LocationChanged,
+	}, nil
 }
 
 // rewriteLastModificationTime erstatter den første forekomst af
