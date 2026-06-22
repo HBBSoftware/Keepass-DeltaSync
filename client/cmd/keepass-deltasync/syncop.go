@@ -245,7 +245,7 @@ func (e *runEnv) cleanup() {
 // Caller'en gemmer config selv.
 func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err error) {
 	e.progressf("Fetching changes since seq=%d...\n", e.db.LastSeq)
-	changes, err := e.client.GetChanges(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, e.db.LastSeq)
+	changes, err := e.client.GetChanges(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, e.db.LastSeq, false)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("GET /changes: %w", err)
 	}
