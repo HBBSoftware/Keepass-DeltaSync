@@ -1,1 +1,1 @@
-End-to-end encrypted entry-level sync for KeePass databases.
+Encrypted KeePass sync — requires your own self-hosted server.

@@ -13,9 +13,15 @@ AutoName: DeltaSync
 # Description peges normalt af F-Droid hen til fastlane/metadata/.../full_description.txt;
 # yml-feltet er fallback hvis fastlane-strukturen ikke findes endnu.
 Description: |-
+    ⚠ REQUIRES YOUR OWN SERVER. DeltaSync does nothing on its own — you must
+    run the self-hosted DeltaSync server (PHP + PostgreSQL), or have access to
+    one, and enrol this device against it. There is no public or default
+    server. If you just want a standalone KeePass app, use KeePass2Android or
+    KeePassDX instead.
+
     End-to-end encrypted entry-level sync for KeePass databases. Pair with
     KeePass2Android or KeePassDX as the editor; this app runs in the
-    background and keeps your .kdbx in sync with a self-hosted server
+    background and keeps your .kdbx in sync with your self-hosted server
     via per-entry XChaCha20-Poly1305 ciphertext. The server cannot read
     titles, usernames, or passwords — even if compromised.
 

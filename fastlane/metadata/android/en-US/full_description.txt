@@ -1,3 +1,10 @@
+⚠ REQUIRES YOUR OWN SERVER. DeltaSync does nothing on its own. You must first
+install and run the self-hosted DeltaSync server (PHP + PostgreSQL), or have
+access to someone else's, and enrol this device against it. There is no public
+or default server — without one, this app has nothing to sync and cannot even
+be set up. If you just want a standalone KeePass app, this is not it: use
+KeePass2Android or KeePassDX instead.
+
 DeltaSync keeps a KeePass (.kdbx) database synchronised across your devices
 through a server that only ever sees encrypted blobs. Your master password
 never leaves the device, and the server cannot read entry titles, usernames,
@@ -32,5 +39,8 @@ once, and it keeps the file in sync with the server through WorkManager.
 Project: https://gitlab.com/Star95/keepass-deltasync
 Website: https://deltasync.bjoerck-braun.dk
 
-Status: this is v0.1 — the sync layer is feature-complete and tested,
-the UI is minimal. Treat as alpha.
+Groups sync too: group structure and which group each entry belongs to stay
+in sync across devices, alongside the entry contents.
+
+Status: v0.3 — the sync layer (entries + groups) is feature-complete and
+tested; the UI is functional but still minimal. Treat as beta.
