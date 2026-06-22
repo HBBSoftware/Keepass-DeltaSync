@@ -5,8 +5,12 @@ import app.keemobile.kotpass.database.KeePassDatabase
 import app.keemobile.kotpass.database.findEntries
 import app.keemobile.kotpass.database.modifiers.binaries
 import app.keemobile.kotpass.database.modifiers.modifyEntry
+import app.keemobile.kotpass.database.modifiers.modifyGroup
 import app.keemobile.kotpass.database.modifiers.modifyParentGroup
+import app.keemobile.kotpass.database.modifiers.moveEntry
+import app.keemobile.kotpass.database.modifiers.moveGroup
 import app.keemobile.kotpass.database.modifiers.removeEntry
+import app.keemobile.kotpass.database.modifiers.removeGroup
 import app.keemobile.kotpass.models.BinaryData
 import app.keemobile.kotpass.models.BinaryReference
 import app.keemobile.kotpass.models.Group
@@ -178,56 +182,135 @@ object KotpassLocalStateAdapter {
      */
     fun applyToDatabase(state: LocalState, original: KeePassDatabase): KeePassDatabase {
         var db = original
+        val rootUuid = db.content.group.uuid
 
-        // 1. Slet tombstones.
-        for (uuidString in state.tombstones.keys) {
-            val uuid = runCatching { UUID.fromString(uuidString) }.getOrNull() ?: continue
-            db = db.removeEntry(uuid)
-        }
-
-        // 2-3. Upsert entries. Vi snapshot'er db's eksisterende UUIDs én
-        // gang og forgrener på det — modifyParentGroup tilføjer nye,
-        // modifyEntry opdaterer gamle.
-        val existingUuids = db.findEntries { true }
+        // Snapshot start-tilstanden: eksisterende entry-/gruppe-UUIDs + hvert
+        // objekts nuværende forælder (til flytte-detektion). Vi forgrener på
+        // start-tilstanden; modify/move/add-kaldene er idempotente nok.
+        val existingEntryUuids = db.findEntries { true }
             .flatMap { (_, entries) -> entries }
             .map { it.uuid.toString() }
             .toSet()
+        val existingGroupUuids = mutableSetOf<String>()
+        val currentParent = mutableMapOf<String, String>()
+        collectExisting(db.content.group, isRoot = true, existingGroupUuids, currentParent)
 
+        // "" eller ukendt parent → Root (sentinel-mapping, samme som desktop).
+        fun resolveParent(p: String): UUID {
+            if (p.isNotEmpty() && (p in existingGroupUuids || state.groups.containsKey(p))) {
+                return runCatching { UUID.fromString(p) }.getOrNull() ?: rootUuid
+            }
+            return rootUuid
+        }
+
+        // 1. Slet tombstones — gruppe ELLER entry (fælles UUID-rum).
+        for (uuidString in state.tombstones.keys) {
+            val uuid = runCatching { UUID.fromString(uuidString) }.getOrNull() ?: continue
+            db = if (uuidString in existingGroupUuids) db.removeGroup(uuid) else db.removeEntry(uuid)
+        }
+
+        // 2. Upsert grupper — forældre før børn (topologisk), så en ny
+        //    undergruppe kan tilføjes til en parent der allerede findes.
+        val created = mutableSetOf<String>()
+        val pending = state.groups.values.toMutableList()
+        var progress = true
+        while (pending.isNotEmpty() && progress) {
+            progress = false
+            val iter = pending.iterator()
+            while (iter.hasNext()) {
+                val g = iter.next()
+                val uuid = runCatching { UUID.fromString(g.uuid) }.getOrNull()
+                if (uuid == null) { iter.remove(); continue }
+                // Kan parent resolves nu? ("" / eksisterende / allerede oprettet /
+                // ukendt→root). Ellers vent på at parent oprettes i en senere runde.
+                val parentReady = g.parentGroup.isEmpty() ||
+                    g.parentGroup in existingGroupUuids ||
+                    g.parentGroup in created ||
+                    !state.groups.containsKey(g.parentGroup)
+                if (!parentReady) continue
+                val parentUuid = resolveParent(g.parentGroup)
+                val kp = Mapper.groupToKotpass(g)
+                if (g.uuid in existingGroupUuids) {
+                    // Opdater felter — BEVAR eksisterende børn (copy på den
+                    // nuværende gruppe rører ikke entries/groups).
+                    db = db.modifyGroup(uuid) {
+                        copy(name = kp.name, notes = kp.notes, icon = kp.icon,
+                            customIconUuid = kp.customIconUuid, times = kp.times)
+                    }
+                    if (uuid != rootUuid && currentParent[g.uuid] != parentUuid.toString()) {
+                        db = db.moveGroup(uuid, parentUuid)
+                    }
+                } else {
+                    db = addChildGroup(db, parentUuid, rootUuid, kp)
+                }
+                created.add(g.uuid)
+                iter.remove()
+                progress = true
+            }
+        }
+        // Cyklus/uopnåelige rest-grupper: tilføj defensivt under Root.
+        for (g in pending) {
+            val uuid = runCatching { UUID.fromString(g.uuid) }.getOrNull() ?: continue
+            if (g.uuid in existingGroupUuids) continue
+            db = addChildGroup(db, rootUuid, rootUuid, Mapper.groupToKotpass(g))
+        }
+
+        // 3. Upsert entries i deres parent-gruppe (flyt eksisterende ved behov).
         for ((uuidString, canonicalEntry) in state.entries) {
             val uuid = runCatching { UUID.fromString(uuidString) }.getOrNull() ?: continue
-
-            // Binary store callback: tilføj data til pool og returnér ref.
-            // Dette muterer ikke db direkte; kotpass forventer at vi har
-            // pool'en opdateret før entry'en indsættes. For v1 bruger vi
-            // hashen som ID og lader kotpass' encoder fange duplikationer.
             val binaryStore: (Binary) -> BinaryReference = { binary ->
-                // Hash bytes så vi får en konsistent reference. Brug SHA-256
-                // ligesom KDBX' egen pool-deduplikering.
                 val md = java.security.MessageDigest.getInstance("SHA-256")
-                val hash = md.digest(binary.data)
-                BinaryReference(
-                    hash = okio.ByteString.of(*hash),
-                    name = binary.name,
-                )
+                BinaryReference(hash = okio.ByteString.of(*md.digest(binary.data)), name = binary.name)
             }
-
             val kotpassEntry = Mapper.toKotpass(canonicalEntry, binaryStore)
-
-            db = if (uuidString in existingUuids) {
-                db.modifyEntry(uuid) { kotpassEntry }
+            val parentUuid = resolveParent(canonicalEntry.parentGroup)
+            if (uuidString in existingEntryUuids) {
+                db = db.modifyEntry(uuid) { kotpassEntry }
+                if (currentParent[uuidString] != parentUuid.toString()) {
+                    db = db.moveEntry(uuid, parentUuid)
+                }
             } else {
-                db.modifyParentGroup {
-                    copy(entries = entries + kotpassEntry)
+                db = if (parentUuid == rootUuid) {
+                    db.modifyParentGroup { copy(entries = entries + kotpassEntry) }
+                } else {
+                    db.modifyGroup(parentUuid) { copy(entries = entries + kotpassEntry) }
                 }
             }
         }
 
-        // Binaries der refereres af de tilføjede entries skal også være i
-        // pool'en. For v1 stoler vi på at applikations-laget allerede har
-        // sørget for det via kotpass.modifyBinaries; LocalState's Binary-
-        // bytes lever ikke nødvendigvis i pool'en før encode.
-        // TODO: når vi har en konkret use-case kan vi tilføje pool-sync her.
-
         return db
     }
+
+    /**
+     * Walk'er det eksisterende træ og opsamler gruppe-UUIDs (ekskl. Root) +
+     * hvert barns (entry/gruppe) nuværende forælder-UUID — bruges til
+     * flytte-detektion i [applyToDatabase].
+     */
+    private fun collectExisting(
+        group: Group,
+        isRoot: Boolean,
+        groupUuids: MutableSet<String>,
+        currentParent: MutableMap<String, String>,
+    ) {
+        val thisUuid = group.uuid.toString()
+        if (!isRoot) groupUuids.add(thisUuid)
+        for (entry in group.entries) currentParent[entry.uuid.toString()] = thisUuid
+        for (child in group.groups) {
+            currentParent[child.uuid.toString()] = thisUuid
+            collectExisting(child, isRoot = false, groupUuids, currentParent)
+        }
+    }
+
+    /** Tilføj [child] som undergruppe til [parentUuid] (Root via modifyParentGroup). */
+    private fun addChildGroup(
+        db: KeePassDatabase,
+        parentUuid: UUID,
+        rootUuid: UUID,
+        child: Group,
+    ): KeePassDatabase =
+        if (parentUuid == rootUuid) {
+            db.modifyParentGroup { copy(groups = groups + child) }
+        } else {
+            db.modifyGroup(parentUuid) { copy(groups = groups + child) }
+        }
 }
