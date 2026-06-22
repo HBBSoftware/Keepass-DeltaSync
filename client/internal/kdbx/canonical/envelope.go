@@ -28,12 +28,20 @@ const (
 	// FormatCanonical er v3-blob-formatet: byte 0x01 efterfulgt af
 	// JSON-marshalled canonical.Entry.
 	FormatCanonical
+
+	// FormatGroup er v4-gruppe-blob-formatet: byte 0x02 efterfulgt af
+	// JSON-marshalled canonical.Group. Et selvstændigt object_kind, ikke en
+	// entry.
+	FormatGroup
 )
 
 // formatByteCanonical er magic-byten der prefixer canonical JSON-payloads.
 // Valgt så den ikke kolliderer med nogen gyldig start-byte for legacy XML —
 // XML-fragmenter starter altid med '<' (0x3C).
 const formatByteCanonical byte = 0x01
+
+// formatByteGroup prefixer canonical Group JSON-payloads (v4 gruppe-sync).
+const formatByteGroup byte = 0x02
 
 // DetectFormat klassificerer en dekrypteret entry-blob baseret på dens
 // første byte. Tom plaintext → Unknown. Caller'en dispatcher derefter til
@@ -45,6 +53,8 @@ func DetectFormat(plaintext []byte) Format {
 	switch plaintext[0] {
 	case formatByteCanonical:
 		return FormatCanonical
+	case formatByteGroup:
+		return FormatGroup
 	case '<':
 		return FormatLegacyXML
 	default:
@@ -97,4 +107,47 @@ func DecodeCanonical(plaintext []byte) (*Entry, error) {
 		return nil, fmt.Errorf("canonical schema v%d newer than supported v%d — upgrade client", e.V, SchemaVersion)
 	}
 	return &e, nil
+}
+
+// EncodeGroup marshaller en Group til JSON og prepender gruppe-format-byten
+// (0x02). Resultatet er det plaintext der skal fodres til crypto.EncryptBlob.
+// Group.V sættes til GroupSchemaVersion uanset hvad caller har sat.
+func EncodeGroup(g *Group) ([]byte, error) {
+	if g == nil {
+		return nil, errors.New("nil group")
+	}
+	g.V = GroupSchemaVersion
+
+	raw, err := json.Marshal(g)
+	if err != nil {
+		return nil, fmt.Errorf("marshal group: %w", err)
+	}
+
+	out := make([]byte, 0, len(raw)+1)
+	out = append(out, formatByteGroup)
+	out = append(out, raw...)
+	return out, nil
+}
+
+// DecodeGroup inverterer EncodeGroup: validerer gruppe-format-byten og
+// unmarshaller resten som JSON. DetectFormat skal kaldes først.
+func DecodeGroup(plaintext []byte) (*Group, error) {
+	if len(plaintext) < 2 {
+		return nil, errors.New("plaintext too short for group envelope")
+	}
+	if plaintext[0] != formatByteGroup {
+		return nil, fmt.Errorf("expected group format byte 0x%02x, got 0x%02x", formatByteGroup, plaintext[0])
+	}
+
+	var g Group
+	if err := json.Unmarshal(plaintext[1:], &g); err != nil {
+		return nil, fmt.Errorf("unmarshal group: %w", err)
+	}
+	if g.V == 0 {
+		return nil, errors.New("canonical group missing schema version (v)")
+	}
+	if g.V > GroupSchemaVersion {
+		return nil, fmt.Errorf("group schema v%d newer than supported v%d — upgrade client", g.V, GroupSchemaVersion)
+	}
+	return &g, nil
 }

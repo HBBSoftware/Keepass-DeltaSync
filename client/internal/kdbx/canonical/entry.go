@@ -80,11 +80,50 @@ type Entry struct {
 	// entry'en ikke er blevet flyttet.
 	PreviousParentGroup string `json:"previous_parent_group,omitempty"`
 
+	// ParentGroup er UUID på den gruppe entry'en aktuelt ligger i (v4
+	// gruppe-sync). Tom string = roden (sentinel) — hver klient mapper den
+	// til sin egen lokale Root-UUID, da Root-UUID er forskellig pr. enhed.
+	// Populeres fra entry'ens position i gruppetræet ved indsamling og
+	// konsumeres til at placere entry'en ved merge. Lever i JSON-blob'en, men
+	// IKKE i KDBX' <Entry>-fragment (dér er parent = træ-position). Additivt:
+	// en v1-klient ignorerer feltet og placerer entry'en i staging/Root.
+	ParentGroup string `json:"parent_group,omitempty"`
+
 	// History er entry'ens historiske versioner — ældste først. Indlejret
 	// History er forbudt (KDBX' eget format gør det også) så vi behøver
 	// ikke begrænse rekursionsdybden, men en valideret entry har altid
 	// nil History på sine History-elementer.
 	History []Entry `json:"history,omitempty"`
+}
+
+// GroupSchemaVersion er canonical-skema-versionen for Group-objekter. Bumpes
+// uafhængigt af entry-skemaet (Entry.V) når gruppe-formatet ændres breaking.
+const GroupSchemaVersion = 1
+
+// Group er den platform-uafhængige gruppe-repræsentation til v4 gruppe-sync.
+// Grupper synkroniseres som selvstændige UUID-nøglede objekter (object_kind=2
+// på serveren, envelope-byte 0x02), parallelt med entries. Sletning håndteres
+// via server's tombstone (deleted-flag), ikke et felt her. Se
+// docs/v4-group-sync.md.
+type Group struct {
+	// V er skema-versionen. Skal være GroupSchemaVersion ved emission.
+	V int `json:"v"`
+
+	// UUID i standard 8-4-4-4-12 hex-format.
+	UUID string `json:"uuid"`
+
+	Name  string `json:"name"`
+	Notes string `json:"notes,omitempty"`
+
+	// ParentGroup er UUID på forældregruppen. Tom string = roden (sentinel),
+	// samme konvention som Entry.ParentGroup. Root-gruppen selv synkroniseres
+	// aldrig som et Group-objekt.
+	ParentGroup string `json:"parent_group,omitempty"`
+
+	IconID         int    `json:"icon_id"`
+	CustomIconUUID string `json:"custom_icon_uuid,omitempty"`
+
+	Times Times `json:"times"`
 }
 
 // Times holder KDBX' tidsstempler pr. entry. Alle tider er UTC.

@@ -61,9 +61,15 @@ i `xml.go`). Uden dette peger objekter på en gruppe-UUID, der ikke findes på
 modtageren.
 
 ### Envelope / skemaversion
-- Bump `canonical.SchemaVersion` → 2.
-- Ny envelope-magic-byte for grupper: `0x02` (`formatByteGroup`). `DetectFormat`
-  udvides: `0x01`=entry-canonical, `0x02`=group-canonical, `<`=legacy-XML.
+- **Entry-`SchemaVersion` bumpes IKKE.** `parent_group` er additivt (`omitempty`)
+  — en v1-klient ignorerer bare det ukendte JSON-felt. Bumpede vi versionen,
+  ville `DecodeCanonical`'s `e.V > SchemaVersion`-tjek få gamle klienter til at
+  *afvise* nye entries. En tom `parent_group` udelades helt, så v1-blobs er
+  byte-identiske med før.
+- Grupper er et **selvstændigt object-kind** med egen envelope-magic-byte `0x02`
+  (`formatByteGroup`) og egen `GroupSchemaVersion` (starter på 1). `DetectFormat`:
+  `0x01`=entry-canonical, `0x02`=group-canonical, `<`=legacy-XML. Server-side
+  filtrering (fase 1) sikrer at v1-klienter aldrig modtager `0x02`-blobs.
 
 ## Server
 
