@@ -287,6 +287,14 @@ class SyncEngineTest {
             check(!closed)
             return blob
         }
+        override fun encryptGroup(groupJson: ByteArray): ByteArray {
+            check(!closed)
+            return groupJson
+        }
+        override fun decryptGroup(blob: ByteArray): ByteArray {
+            check(!closed)
+            return blob
+        }
         override fun close() { closed = true }
     }
 

@@ -48,8 +48,9 @@ class ApiClient(
 
     /** GET `/api/v1/databases/{id}/changes?since=N`. */
     @Throws(ApiException::class, IOException::class)
-    fun getChanges(databaseId: String, since: Long): ChangesResponse {
-        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/changes?since=$since".toHttpUrl()
+    fun getChanges(databaseId: String, since: Long, includeGroups: Boolean = false): ChangesResponse {
+        val base = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/changes?since=$since"
+        val url = (if (includeGroups) "$base&include=groups" else base).toHttpUrl()
         val req = Request.Builder().url(url).get().authed().build()
         return httpClient.newCall(req).execute().use { resp ->
             ensureSuccess(resp)
@@ -95,6 +96,36 @@ class ApiClient(
         return httpClient.newCall(req).execute().use { resp ->
             ensureSuccess(resp)
             json.decodeFromString(EntryPutEnvelope.serializer(), resp.bodyString()).entry
+        }
+    }
+
+    /** PUT `/api/v1/databases/{id}/groups/{uuid}` (v4 group-sync, object_kind=2). */
+    @Throws(ApiException::class, IOException::class)
+    fun putGroup(databaseId: String, groupUuid: String, blob: ByteArray, modifiedAt: Instant): EntryPutResponse {
+        val body = json.encodeToString(
+            PutEntryRequest.serializer(),
+            PutEntryRequest(blob = blob.toBase64(), modifiedAt = formatIso(modifiedAt)),
+        )
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/groups/$groupUuid".toHttpUrl()
+        val req = Request.Builder().url(url).put(body.toRequestBody(JSON_MEDIA)).authed().build()
+        return httpClient.newCall(req).execute().use { resp ->
+            ensureSuccess(resp)
+            json.decodeFromString(GroupPutEnvelope.serializer(), resp.bodyString()).group
+        }
+    }
+
+    /** DELETE `/api/v1/databases/{id}/groups/{uuid}` — gruppe-tombstone. */
+    @Throws(ApiException::class, IOException::class)
+    fun deleteGroup(databaseId: String, groupUuid: String, modifiedAt: Instant): EntryPutResponse {
+        val body = json.encodeToString(
+            DeleteEntryRequest.serializer(),
+            DeleteEntryRequest(modifiedAt = formatIso(modifiedAt)),
+        )
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases/$databaseId/groups/$groupUuid".toHttpUrl()
+        val req = Request.Builder().url(url).delete(body.toRequestBody(JSON_MEDIA)).authed().build()
+        return httpClient.newCall(req).execute().use { resp ->
+            ensureSuccess(resp)
+            json.decodeFromString(GroupPutEnvelope.serializer(), resp.bodyString()).group
         }
     }
 

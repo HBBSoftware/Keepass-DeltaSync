@@ -20,6 +20,9 @@ data class EntryChange(
     val deleted: Boolean = false,
     val seq: Long,
     @SerialName("available_versions") val availableVersions: Int = 0,
+    /** 1=entry, 2=group (v4 group-sync). Kun sat når klienten anmoder med
+     *  include=groups; ellers 0 (behandl som entry). */
+    val kind: Int = 0,
 )
 
 /** Respons-body fra `GET /databases/{id}/changes?since=N`. */
@@ -45,6 +48,10 @@ data class DeleteEntryRequest(
 /** Respons fra PUT/DELETE — wrapped i `{"entry": {...}}` på wire-niveau. */
 @Serializable
 data class EntryPutEnvelope(val entry: EntryPutResponse)
+
+/** Respons fra group PUT/DELETE — wrapped i `{"group": {...}}` (v4 group-sync). */
+@Serializable
+data class GroupPutEnvelope(val group: EntryPutResponse)
 
 @Serializable
 data class EntryPutResponse(

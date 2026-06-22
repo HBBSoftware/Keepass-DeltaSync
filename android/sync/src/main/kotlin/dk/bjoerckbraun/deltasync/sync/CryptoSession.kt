@@ -25,6 +25,19 @@ interface CryptoSession {
      */
     fun decryptEntry(blob: ByteArray): ByteArray
 
+    /**
+     * Tager canonical-group JSON og returnerer den krypterede on-wire blob
+     * (med gruppe-format-byte 0x02 prefix). v4 group-sync. Throws hvis
+     * sessionen er lukket.
+     */
+    fun encryptGroup(groupJson: ByteArray): ByteArray
+
+    /**
+     * Dekrypterer en gruppe-blob (object_kind=2) og returnerer canonical-group
+     * JSON. v4 group-sync.
+     */
+    fun decryptGroup(blob: ByteArray): ByteArray
+
     /** Zeroer det indlejret keymateriale. Yderligere kald fejler. */
     fun close()
 }
