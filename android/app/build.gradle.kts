@@ -1,9 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     kotlin("android")
     kotlin("plugin.serialization")
+}
+
+// Signing-config læses fra keystore.properties i android/ (gitignored). Findes
+// den ikke, bygger release usigneret — så CI/F-Droid (der bruger egne nøgler)
+// og rene debug-builds ikke kræver filen. Se README "Distribution".
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
 }
 
 android {
@@ -16,8 +27,8 @@ android {
         // Keystore-forankret EncryptedSharedPreferences er mere robust dér.
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     compileOptions {
@@ -34,12 +45,28 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             // Reproducible-build til F-Droid: ingen ProGuard/R8 i v0.1 så vi
             // har et frosset baseline at validere mod. Senere kan vi tilføje
             // shrinkResources + minifyEnabled når mappings er stabile.
             isMinifyEnabled = false
+            // Signér release med vores keystore hvis konfigureret (ellers
+            // usigneret — fx på CI/F-Droid der signerer selv).
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         getByName("debug") {
             applicationIdSuffix = ".debug"
