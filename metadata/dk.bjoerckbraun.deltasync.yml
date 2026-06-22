@@ -81,9 +81,39 @@ Builds:
     gradle:
       - yes
 
+  - versionName: 0.3.0
+    versionCode: 3
+    commit: android/v0.3.0
+    subdir: android/app
+    sudo:
+      # Samme NDK-pinning (r25c) som de tidligere builds.
+      - apt-get update
+      - apt-get install -y unzip curl
+      - mkdir -p $$NDK_HOME
+      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
+      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
+      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
+    prebuild: |-
+        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
+        # gomobile + gobind pinnes til samme version som client/go.mod's
+        # golang.org/x/mobile — @latest ville bryde reproducerbarhed (F-Droid-krav).
+        export GOPATH=/tmp/go
+        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
+        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
+        cd ../../client
+        go get -tool golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
+        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
+            -o ../android/libs/deltasync.aar \
+            gitlab.com/Star95/keepass-deltasync/client/mobile
+        cd ../android/libs
+        unzip -o deltasync.aar classes.jar
+        mv classes.jar deltasync-classes.jar
+    gradle:
+      - yes
+
 # Kun android/v*-tags er Android-app-releases; client/v* er desktop-klienten
 # i samme monorepo og må ikke forveksles med en app-version.
 AutoUpdateMode: Version android/v%v
 UpdateCheckMode: Tags ^android/v[\d.]+$
-CurrentVersion: 0.2.0
-CurrentVersionCode: 2
+CurrentVersion: 0.3.0
+CurrentVersionCode: 3

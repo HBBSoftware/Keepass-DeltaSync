@@ -1,0 +1,6 @@
+Group synchronisation.
+
+• Groups (folders) and which group each entry belongs to now sync across your devices, alongside the entry contents.
+• Move an entry to another group, or create and nest groups — the changes propagate to your other devices.
+• Concurrent edits on two devices resolve last-writer-wins.
+• Still end-to-end encrypted: the server cannot read your titles, usernames, passwords — or your group names.

@@ -6,9 +6,10 @@ reproducible builds.
 
 ## Status
 
-- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — `Builds`-poster for 0.1.0 (`v0.1.0`) og 0.2.0 (`android/v0.2.0`); `CurrentVersion: 0.2.0`.
-- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — changelogs `1.txt` + `2.txt`.
-- **Ikke endnu submittet.** UI er på plads og `android/v0.2.0` er tagget; submission afventer bevidst at appen får lidt produktionstid først. Inden submission: pin gomobile/gobind-versioner (i dag `@latest`) og overvej F-Droids egen `ndk:`-mekanisme frem for `sudo`+`curl`.
+- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — `Builds`-poster for 0.1.0, 0.2.0 og 0.3.0 (`android/v0.3.0`); `CurrentVersion: 0.3.0` / `CurrentVersionCode: 3`.
+- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — changelogs `1.txt`–`3.txt`.
+- **gomobile/gobind pinnet** i 0.3.0-build-posten til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke længere `@latest`) — reproducerbarhedskrav.
+- **Ikke endnu submittet.** Resterende før submission: kør `fdroid build dk.bjoerckbraun.deltasync:3` i et F-Droid-build-miljø (Linux + `fdroidserver`) for at validere at gomobile-bind virker i deres container, og fork+MR til fdroiddata. Submission afventer bevidst at appen får lidt produktionstid først. (Overvej stadig F-Droids egen `ndk:`-mekanisme frem for `sudo`+`curl`.)
 
 ## Build-konstruktion
 
