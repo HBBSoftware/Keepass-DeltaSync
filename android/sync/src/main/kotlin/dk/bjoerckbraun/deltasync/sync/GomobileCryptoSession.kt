@@ -35,17 +35,12 @@ class GomobileCryptoSession internal constructor(
 
     override fun encryptGroup(groupJson: ByteArray): ByteArray {
         check(!closed) { "session closed" }
-        // INTEGRATION-GAP (v4 group-sync): den prebuilt .aar har endnu ikke
-        // Session.EncryptGroup (envelope-byte 0x02). Når mobile.go er udvidet
-        // og .aar regenereret, erstat denne throw med `session.encryptGroup(...)`.
-        // Indtil da er gruppe-sync kun aktiv i :sync-unit-tests (fake CryptoSession).
-        throw NotImplementedError("group encryption requires a rebuilt gomobile .aar (mobile.Session.EncryptGroup)")
+        return session.encryptGroup(groupJson)
     }
 
     override fun decryptGroup(blob: ByteArray): ByteArray {
         check(!closed) { "session closed" }
-        // INTEGRATION-GAP: se encryptGroup — kræver .aar-regen med Session.DecryptGroup.
-        throw NotImplementedError("group decryption requires a rebuilt gomobile .aar (mobile.Session.DecryptGroup)")
+        return session.decryptGroup(blob)
     }
 
     override fun close() {
