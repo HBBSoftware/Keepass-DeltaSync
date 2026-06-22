@@ -112,6 +112,54 @@ func TestEntryRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGroupRoundTrip(t *testing.T) {
+	s, err := NewSession([]byte("master-password"), testDBID)
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	defer s.Close()
+
+	g := canonical.Group{
+		V:           canonical.GroupSchemaVersion,
+		UUID:        "11112222-3333-4444-5555-666677778888",
+		Name:        "Work",
+		ParentGroup: "00010203-0405-0607-0809-0a0b0c0d0e0f",
+		IconID:      48,
+		Times: canonical.Times{
+			Created:         time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC),
+			Modified:        time.Date(2026, 5, 29, 10, 0, 0, 0, time.UTC),
+			Accessed:        time.Date(2026, 5, 29, 10, 0, 0, 0, time.UTC),
+			LocationChanged: time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC),
+		},
+	}
+	groupJSON, err := json.Marshal(&g)
+	if err != nil {
+		t.Fatalf("marshal group: %v", err)
+	}
+
+	blob, err := s.EncryptGroup(groupJSON)
+	if err != nil {
+		t.Fatalf("EncryptGroup: %v", err)
+	}
+	decoded, err := s.DecryptGroup(blob)
+	if err != nil {
+		t.Fatalf("DecryptGroup: %v", err)
+	}
+
+	var b canonical.Group
+	if err := json.Unmarshal(decoded, &b); err != nil {
+		t.Fatalf("unmarshal decoded: %v", err)
+	}
+	if b.UUID != g.UUID || b.Name != g.Name || b.ParentGroup != g.ParentGroup {
+		t.Errorf("group round-trip mismatch: %+v vs %+v", g, b)
+	}
+
+	// Kind-separation: en gruppe-blob må ikke kunne dekrypteres som entry.
+	if _, err := s.DecryptEntry(blob); err == nil {
+		t.Error("DecryptEntry should reject a group blob")
+	}
+}
+
 func TestSession_ClosedRejectsOperations(t *testing.T) {
 	s, err := NewSession([]byte("master-password"), testDBID)
 	if err != nil {

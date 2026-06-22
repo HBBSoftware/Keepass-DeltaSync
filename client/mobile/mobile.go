@@ -169,6 +169,59 @@ func (s *Session) DecryptEntry(blob []byte) ([]byte, error) {
 	}
 }
 
+// EncryptGroup tager JSON-repræsentationen af en canonical.Group og returnerer
+// det krypterede wire-blob klar til upload som server-side gruppe-version
+// (object_kind=2). Modstykket til EncryptEntry, men med gruppe-envelope-byten
+// (0x02) via EncodeGroup. v4 group-sync.
+func (s *Session) EncryptGroup(groupJSON []byte) ([]byte, error) {
+	if s.entryKey == nil {
+		return nil, errors.New("session closed")
+	}
+	if len(groupJSON) == 0 {
+		return nil, errors.New("empty groupJSON")
+	}
+
+	var group canonical.Group
+	if err := json.Unmarshal(groupJSON, &group); err != nil {
+		return nil, fmt.Errorf("parse group json: %w", err)
+	}
+
+	plaintext, err := canonical.EncodeGroup(&group)
+	if err != nil {
+		return nil, fmt.Errorf("encode group: %w", err)
+	}
+
+	blob, err := crypto.EncryptBlob(s.entryKey, plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("encrypt blob: %w", err)
+	}
+	return blob, nil
+}
+
+// DecryptGroup tager et gruppe-blob (object_kind=2, downloadet via
+// GET /changes?include=groups) og returnerer gruppen som canonical JSON.
+// Kalderen kender allerede objektets kind fra server-metadata (changes.kind),
+// så her kræver vi at blob'en faktisk er en gruppe (envelope 0x02). v4 group-sync.
+func (s *Session) DecryptGroup(blob []byte) ([]byte, error) {
+	if s.entryKey == nil {
+		return nil, errors.New("session closed")
+	}
+
+	plaintext, err := crypto.DecryptBlob(s.entryKey, blob)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt blob: %w", err)
+	}
+
+	if canonical.DetectFormat(plaintext) != canonical.FormatGroup {
+		return nil, errors.New("blob is not a canonical group (expected envelope byte 0x02)")
+	}
+	group, err := canonical.DecodeGroup(plaintext)
+	if err != nil {
+		return nil, fmt.Errorf("decode group: %w", err)
+	}
+	return json.Marshal(group)
+}
+
 // DeviceKeypair returnerer fra GenerateDeviceKeypair. Pakket som struct så
 // gomobile bind kan generere en stabil Kotlin-class med to byte[]-gettere
 // — multi-return-non-error funcs har dårlig support i gomobile.
