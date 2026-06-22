@@ -105,7 +105,7 @@ func recycleBinXML(recycleEnabled, recycleUUID string) string {
 
 func TestParseExport_RecycleBinSynthesizesDeletion(t *testing.T) {
 	xml := recycleBinXML("True", "p06hnoEmTfeRpUWM1a14cw==")
-	entries, deletions, err := ParseExport([]byte(xml))
+	entries, _, deletions, err := ParseExport([]byte(xml))
 	if err != nil {
 		t.Fatalf("ParseExport: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestParseExport_RecycleBinSynthesizesDeletion(t *testing.T) {
 
 func TestParseExport_RecycleBinDisabledNoSynthesis(t *testing.T) {
 	xml := recycleBinXML("False", "p06hnoEmTfeRpUWM1a14cw==")
-	entries, deletions, err := ParseExport([]byte(xml))
+	entries, _, deletions, err := ParseExport([]byte(xml))
 	if err != nil {
 		t.Fatalf("ParseExport: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestParseExport_NullRecycleBinUUIDNoSynthesis(t *testing.T) {
 	// blevet materialiseret, så ingen entries er i den. Vi må ikke
 	// uagtsomt klassificere noget som slettet.
 	xml := recycleBinXML("True", nullKdbxUUID)
-	entries, deletions, err := ParseExport([]byte(xml))
+	entries, _, deletions, err := ParseExport([]byte(xml))
 	if err != nil {
 		t.Fatalf("ParseExport: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestParseExport_RecycleBinUUIDMustMatchNotJustName(t *testing.T) {
 	// Gruppe hedder "Papirkurv" men har et ANDET UUID end RecycleBinUUID.
 	// Vi må kun synthesize på UUID-match — ikke navne-match.
 	xml := recycleBinXML("True", "deadbeefdeadbeefdeadbeefdead==")
-	entries, deletions, err := ParseExport([]byte(xml))
+	entries, _, deletions, err := ParseExport([]byte(xml))
 	if err != nil {
 		t.Fatalf("ParseExport: %v", err)
 	}
@@ -171,6 +171,116 @@ func TestParseExport_RecycleBinUUIDMustMatchNotJustName(t *testing.T) {
 	}
 	if len(deletions) != 0 {
 		t.Fatalf("expected 0 deletions, got %d", len(deletions))
+	}
+}
+
+// groupTreeXML: Root med en entry, en undergruppe "Work" (med en entry og en
+// under-undergruppe "Work/Sub" der også har en entry). Ingen recycle bin.
+// UUID'er: Root=AAAA..., Work=EBES...(10111213-...), Sub=ICEi...(20212223-...).
+func groupTreeXML() string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<KeePassFile>
+  <Meta><RecycleBinEnabled>False</RecycleBinEnabled><RecycleBinUUID>` + nullKdbxUUID + `</RecycleBinUUID></Meta>
+  <Root>
+    <Group>
+      <UUID>AAAAAAAAAAAAAAAAAAAAAA==</UUID>
+      <Name>Root</Name>
+      <Entry>
+        <UUID>AAECAwQFBgcICQoLDA0ODw==</UUID>
+        <Times><LastModificationTime>2026-05-28T10:00:00Z</LastModificationTime></Times>
+      </Entry>
+      <Group>
+        <UUID>EBESExQVFhcYGRobHB0eHw==</UUID>
+        <Name>Work</Name>
+        <IconID>48</IconID>
+        <Times>
+          <LastModificationTime>2026-05-28T12:00:00Z</LastModificationTime>
+          <LocationChanged>2026-05-28T12:30:00Z</LocationChanged>
+        </Times>
+        <Entry>
+          <UUID>ICEiIyQlJicoKSorLC0uLw==</UUID>
+          <Times><LastModificationTime>2026-05-28T13:00:00Z</LastModificationTime></Times>
+        </Entry>
+        <Group>
+          <UUID>MDEyMzQ1Njc4OTo7PD0+Pw==</UUID>
+          <Name>Sub</Name>
+          <Times><LastModificationTime>2026-05-28T14:00:00Z</LastModificationTime></Times>
+          <Entry>
+            <UUID>QEFCQ0RFRkdISUpLTE1OTw==</UUID>
+            <Times><LastModificationTime>2026-05-28T15:00:00Z</LastModificationTime></Times>
+          </Entry>
+        </Group>
+      </Group>
+    </Group>
+    <DeletedObjects/>
+  </Root>
+</KeePassFile>`
+}
+
+func TestParseExport_CollectsGroupsAndParents(t *testing.T) {
+	entries, groups, _, err := ParseExport([]byte(groupTreeXML()))
+	if err != nil {
+		t.Fatalf("ParseExport: %v", err)
+	}
+
+	// 3 entries: én i Root, én i Work, én i Work/Sub.
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	// 2 grupper: Work og Sub (Root emittes ikke).
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(groups))
+	}
+
+	rootEntry := "00010203-0405-0607-0809-0a0b0c0d0e0f"
+	workUUID := "10111213-1415-1617-1819-1a1b1c1d1e1f"
+	workEntry := "20212223-2425-2627-2829-2a2b2c2d2e2f"
+	subUUID := "30313233-3435-3637-3839-3a3b3c3d3e3f"
+	subEntry := "40414243-4445-4647-4849-4a4b4c4d4e4f"
+
+	parentOf := map[string]string{}
+	for _, e := range entries {
+		parentOf[e.UUID] = e.ParentGroupUUID
+	}
+	// Root-entry: sentinel "".
+	if parentOf[rootEntry] != "" {
+		t.Errorf("root entry parent = %q, want \"\" (sentinel)", parentOf[rootEntry])
+	}
+	if parentOf[workEntry] != workUUID {
+		t.Errorf("work entry parent = %q, want %q", parentOf[workEntry], workUUID)
+	}
+	if parentOf[subEntry] != subUUID {
+		t.Errorf("sub entry parent = %q, want %q", parentOf[subEntry], subUUID)
+	}
+
+	byUUID := map[string]Group{}
+	for _, g := range groups {
+		byUUID[g.UUID] = g
+	}
+	// Work: parent = Root-sentinel "", navn + ikon + tider parset.
+	work, ok := byUUID[workUUID]
+	if !ok {
+		t.Fatalf("Work group not collected")
+	}
+	if work.ParentUUID != "" {
+		t.Errorf("Work parent = %q, want \"\" (Root sentinel)", work.ParentUUID)
+	}
+	if work.Name != "Work" {
+		t.Errorf("Work name = %q", work.Name)
+	}
+	if work.IconID != 48 {
+		t.Errorf("Work icon = %d, want 48", work.IconID)
+	}
+	if want := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC); !work.ModifiedAt.Equal(want) {
+		t.Errorf("Work modified = %v, want %v", work.ModifiedAt, want)
+	}
+	// Sub: parent = Work.
+	sub, ok := byUUID[subUUID]
+	if !ok {
+		t.Fatalf("Sub group not collected")
+	}
+	if sub.ParentUUID != workUUID {
+		t.Errorf("Sub parent = %q, want %q", sub.ParentUUID, workUUID)
 	}
 }
 

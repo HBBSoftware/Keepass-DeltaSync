@@ -362,7 +362,9 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		return 0, 0, 0, err
 	}
 
-	entries, deletions, err := kdbx.ParseExport(xmlBytes)
+	// TODO(v4 phase 4c): pushe groups (3. returværdi) som object_kind=2-blobs
+	// og sætte canonical.Entry.ParentGroup fra en.ParentGroupUUID.
+	entries, _, deletions, err := kdbx.ParseExport(xmlBytes)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("parse export: %w", err)
 	}
