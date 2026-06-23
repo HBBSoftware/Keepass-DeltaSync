@@ -126,7 +126,7 @@ final class EntryController
 
         $result = $this->insertNewVersion($databaseId, $entryUuid, $blobB64, $modifiedAt, deleted: false);
 
-        $log->debug(EventType::EntryPut, [
+        $log->info(EventType::EntryPut, [
             'database_id' => $databaseId,
             'entry_uuid'  => $entryUuid,
             'details'     => ['seq' => $result['seq']],
@@ -155,7 +155,7 @@ final class EntryController
 
         $result = $this->insertNewVersion($databaseId, $entryUuid, $blobB64, $modifiedAt, deleted: true);
 
-        $log->debug(EventType::EntryDeleted, [
+        $log->info(EventType::EntryDeleted, [
             'database_id' => $databaseId,
             'entry_uuid'  => $entryUuid,
             'details'     => ['seq' => $result['seq']],
@@ -190,7 +190,7 @@ final class EntryController
 
         $result = $this->insertNewVersion($databaseId, $groupUuid, $blobB64, $modifiedAt, deleted: false, objectKind: 2);
 
-        $log->debug(EventType::GroupPut, [
+        $log->info(EventType::GroupPut, [
             'database_id' => $databaseId,
             'entry_uuid'  => $groupUuid,
             'details'     => ['seq' => $result['seq']],
@@ -219,7 +219,7 @@ final class EntryController
 
         $result = $this->insertNewVersion($databaseId, $groupUuid, $blobB64, $modifiedAt, deleted: true, objectKind: 2);
 
-        $log->debug(EventType::GroupDeleted, [
+        $log->info(EventType::GroupDeleted, [
             'database_id' => $databaseId,
             'entry_uuid'  => $groupUuid,
             'details'     => ['seq' => $result['seq']],
@@ -366,7 +366,7 @@ final class EntryController
             },
         ));
 
-        $log->debug(EventType::EntryRestored, [
+        $log->info(EventType::EntryRestored, [
             'database_id' => $databaseId,
             'entry_uuid'  => $entryUuid,
             'details'     => [

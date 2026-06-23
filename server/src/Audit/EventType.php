@@ -8,8 +8,11 @@ namespace KeePassDeltaSync\Audit;
 /**
  * Alle event-typer fra spec § "Audit-log → Event-typer".
  *
- * INFO-niveau (logges altid):  auth.*, enrollment.*, device.revoked, user.*, admin.action
- * DEBUG-niveau (kun i udv.):   database.*, entries.*, entry.*
+ * INFO-niveau (logges altid):  auth.*, enrollment.*, device.revoked, user.*, admin.action,
+ *                              database.*, entry.put/deleted/restored, group.put/deleted
+ *                              — dvs. alle ændringer der slår igennem på serveren.
+ * DEBUG-niveau (kun i udv.):   entries.changes_fetched, entry.versions_listed,
+ *                              entry.version_fetched — read-only/poll-støj.
  */
 enum EventType: string
 {

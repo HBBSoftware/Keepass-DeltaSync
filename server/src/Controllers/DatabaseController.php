@@ -65,7 +65,7 @@ final class DatabaseController
             },
         );
 
-        $log->debug(EventType::DatabaseCreated, [
+        $log->info(EventType::DatabaseCreated, [
             'database_id' => $row['id'],
             'details'     => ['name' => $row['name']],
         ]);
@@ -139,7 +139,7 @@ final class DatabaseController
             throw new HttpException(404, 'database not found', 'not_found');
         }
 
-        $log->debug(EventType::DatabaseDeleted, ['database_id' => $id]);
+        $log->info(EventType::DatabaseDeleted, ['database_id' => $id]);
 
         // CASCADE har taget sig af entries, entry_versions, database_seq
         // og database_members.
