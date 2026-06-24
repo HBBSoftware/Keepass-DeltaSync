@@ -22,6 +22,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
 
+## [client/v1.5.0] — 2026-06-24
+
+### Added
+
+- **`devices remove <id>`** — revoke an enrolled device from the desktop
+  client. Calls `DELETE /api/v1/devices/{id}`, so the device's token is
+  invalidated server-side; any of your own devices can be revoked,
+  including the current one. This is the command the GUI's *Remove
+  device* button invokes — previously the button failed because the
+  subcommand did not exist (`devices` rejected all arguments).
+
 ## [client/v1.2.0] — 2026-06-04
 
 ### Added

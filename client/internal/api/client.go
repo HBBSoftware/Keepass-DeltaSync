@@ -238,6 +238,30 @@ func (c *Client) ListDevices(ctx context.Context, deviceToken string) ([]DeviceL
 	return out.Devices, nil
 }
 
+// DeleteDevice tilbagekalder en enhed server-side via DELETE /devices/{id}:
+// enhedens token bliver ugyldig. Kun brugerens egne enheder kan fjernes
+// (serveren matcher på user_id); ukendt/ikke-ejet id giver 404 via parseError.
+// Selv-revokering er tilladt server-side, men næste request fra den enhed vil
+// fejle 401. Serveren svarer 204. Dette rører INTET lokalt.
+func (c *Client) DeleteDevice(ctx context.Context, deviceToken, deviceID string) error {
+	u := fmt.Sprintf("%s/api/v1/devices/%s", c.baseURL, deviceID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)
+	if err != nil {
+		return err
+	}
+	c.authJSON(req, deviceToken)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete device: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return parseError(resp)
+	}
+	return nil
+}
+
 // LogEntry er én række i den autentificerede brugers audit-log.
 // `Details` er fri-form JSON og afhænger af event_type — gemmes raw så
 // klienten kan vise det uden at kende alle skemaer.

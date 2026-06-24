@@ -36,6 +36,7 @@ Commands:
   shares <name>               List members of a database (owner only)
   status                      Show current enrollment + last-seen info
   devices                     List all enrolled devices for this user
+  devices remove <id>         Revoke an enrolled device (its token becomes invalid)
   databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
   tui                         Interactive full-screen menu for the commands above

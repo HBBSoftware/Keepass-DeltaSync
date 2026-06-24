@@ -15,13 +15,18 @@ import (
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
 )
 
-// runDevices lister brugerens enrollede enheder. Den aktuelle enhed
-// markeres med en asterisk, så brugeren let kan se hvilken token der
-// er aktiv lokalt.
+// runDevices lister brugerens enrollede enheder, eller — med underkommandoen
+// `remove <id>` — tilbagekalder en enhed. Den aktuelle enhed markeres med en
+// asterisk i listen, så brugeren let kan se hvilken token der er aktiv lokalt.
 func runDevices(args []string) error {
+	// Underkommando: `devices remove <id>` tilbagekalder en enhed server-side.
+	if len(args) > 0 && args[0] == "remove" {
+		return runDevicesRemove(args[1:])
+	}
+
 	fs := flag.NewFlagSet("devices", flag.ContinueOnError)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync devices")
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync devices [remove <id>]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -31,7 +36,7 @@ func runDevices(args []string) error {
 	}
 	if fs.NArg() != 0 {
 		fs.Usage()
-		return errors.New("devices takes no arguments")
+		return errors.New("devices takes no arguments (did you mean `devices remove <id>`?)")
 	}
 
 	cfg, err := config.Load()
@@ -66,4 +71,43 @@ func runDevices(args []string) error {
 			marker, d.Name, d.ID, d.EnrolledAt, d.LastSeen)
 	}
 	return w.Flush()
+}
+
+// runDevicesRemove tilbagekalder en enhed via DELETE /devices/{id}. id'et er
+// enhedens UUID som vist i ID-kolonnen i `devices`-listen. Det rører intet
+// lokalt; fjerner man sin EGEN enhed (den med *), bliver den lokale token
+// ugyldig ved næste server-kald.
+func runDevicesRemove(args []string) error {
+	fs := flag.NewFlagSet("devices remove", flag.ContinueOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync devices remove <id>")
+	}
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+	if fs.NArg() != 1 {
+		fs.Usage()
+		return errors.New("devices remove takes exactly one device id")
+	}
+	id := fs.Arg(0)
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if cfg.Server.URL == "" || cfg.Server.DeviceToken == "" {
+		return errors.New("not enrolled — run `keepass-deltasync enroll --server <url> <token>` first")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := api.New(cfg.Server.URL).DeleteDevice(ctx, cfg.Server.DeviceToken, id); err != nil {
+		return err
+	}
+	fmt.Printf("device %s removed (token revoked)\n", id)
+	return nil
 }
