@@ -40,6 +40,10 @@ Admin-token sourcing (alle subkommandoer på nær token-sql):
   --admin-token <token>          Overrider env-var
   $KEEPASS_DELTASYNC_ADMIN_TOKEN Default-kilde
 
+Server-URL (user-create / user-enrollment):
+  --server <url>                 Påkrævet på en maskine der ikke er enrolled
+                                 endnu; ellers læses URL'en fra config.toml.
+
 Hvis du mangler en admin-token: kør 'keepass-deltasync admin token-sql' og
 paste den SQL i DBeaver.
 `
@@ -135,6 +139,17 @@ func resolveServerURL() (string, error) {
 	return cfg.Server.URL, nil
 }
 
+// resolveServerURLWith bruger en eksplicit --server flag-værdi hvis sat, ellers
+// falder den tilbage til config (resolveServerURL). Det lader admin-kommandoer
+// køre på en frisk maskine uden config.toml — fx GUI'ens avancerede tilmelding,
+// der udsteder et enrollment-token og enroller PC'en i samme arbejdsgang.
+func resolveServerURLWith(flagValue string) (string, error) {
+	if strings.TrimSpace(flagValue) != "" {
+		return flagValue, nil
+	}
+	return resolveServerURL()
+}
+
 // runAdminTokenSQL printer SQL der genererer en frisk admin-token via
 // Postgres' pgcrypto. Klienten har ikke direkte DB-adgang, så vi kan ikke
 // selv køre SQL'en — brugeren paste-kører i DBeaver.
@@ -190,8 +205,9 @@ func runAdminUserCreate(args []string) error {
 	fs := flag.NewFlagSet("admin user-create", flag.ContinueOnError)
 	adminToken := fs.String("admin-token", "", "admin-token (alternativt via $"+adminTokenEnvVar+")")
 	displayName := fs.String("display-name", "", "valgfri display-name til brugeren")
+	serverFlag := fs.String("server", "", "server URL (default: fra config.toml — påkrævet på en maskine der ikke er enrolled endnu)")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync admin user-create <username> [--display-name NAME] [--admin-token TOKEN]")
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync admin user-create <username> [--display-name NAME] [--server URL] [--admin-token TOKEN]")
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
@@ -211,7 +227,7 @@ func runAdminUserCreate(args []string) error {
 	if err != nil {
 		return err
 	}
-	serverURL, err := resolveServerURL()
+	serverURL, err := resolveServerURLWith(*serverFlag)
 	if err != nil {
 		return err
 	}
@@ -299,8 +315,9 @@ func runAdminUserList(args []string) error {
 func runAdminUserEnrollment(args []string) error {
 	fs := flag.NewFlagSet("admin user-enrollment", flag.ContinueOnError)
 	adminToken := fs.String("admin-token", "", "admin-token (alternativt via $"+adminTokenEnvVar+")")
+	serverFlag := fs.String("server", "", "server URL (default: fra config.toml — påkrævet på en maskine der ikke er enrolled endnu)")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync admin user-enrollment <username> [--admin-token TOKEN]")
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync admin user-enrollment <username> [--server URL] [--admin-token TOKEN]")
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
@@ -320,7 +337,7 @@ func runAdminUserEnrollment(args []string) error {
 	if err != nil {
 		return err
 	}
-	serverURL, err := resolveServerURL()
+	serverURL, err := resolveServerURLWith(*serverFlag)
 	if err != nil {
 		return err
 	}
