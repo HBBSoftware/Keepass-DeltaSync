@@ -97,6 +97,52 @@ type msgs struct {
 	fldSaUUID       string
 	saDoneTitle     string
 	saDoneFmt       string // %s = binding-navn
+
+	// Sektioner på forsiden (GUI-fanerne som menupunkter)
+	secDatabases, secDatabasesDesc string
+	secDevices, secDevicesDesc     string
+	secLog, secLogDesc             string
+	secAdmin, secAdminDesc         string
+	secSettings, secSettingsDesc   string
+
+	// Undermenu-titler
+	dbMenuTitle       string
+	devMenuTitle      string
+	logMenuTitle      string
+	adminMenuTitle    string
+	settingsMenuTitle string
+
+	// Database-undermenu (slet på server)
+	miDeleteDB, miDeleteDBDesc string
+	pkDeleteDB                 string
+
+	// Log-undermenu (perioder)
+	miLogLatest, miLogLatestDesc string
+	miLog24h, miLog24hDesc       string
+	miLog7d, miLog7dDesc         string
+	miLog30d, miLog30dDesc       string
+
+	// Admin-undermenu (brugeradministration)
+	miAdmUsers, miAdmUsersDesc       string
+	miAdmCreate, miAdmCreateDesc     string
+	miAdmEnable, miAdmEnableDesc     string
+	miAdmDisable, miAdmDisableDesc   string
+	miAdmDelete, miAdmDeleteDesc     string
+	miAdmTokenSQL, miAdmTokenSQLDesc string
+	admTokenTitle                    string
+	fldAdmDisplay                    string
+
+	// Avanceret tilmelding (admin udsteder token + enroller PC'en)
+	miAdvEnroll, miAdvEnrollDesc string
+	advEnrollTitle              string
+	fldAdvServer                string
+	fldAdvMode                  string
+	advModeExisting, advModeNew string
+	fldAdvDevice                string
+	advEnrollMissing            string
+	advEnrollNoToken            string
+	advEnrollFailFmt            string // %s = fejltekst
+	advEnrollOkTitle            string
 }
 
 // messagesFor returnerer strengsættet for et sprogvalg samt den normaliserede
@@ -207,6 +253,46 @@ var enMsgs = msgs{
 		"Choose Continue to sync now (you'll be asked for the master password),\n" +
 		"or Cancel to go back and sync later.\n\n" +
 		"Remember: the old binding can be removed via Advanced → Forget database.",
+
+	secDatabases: "Databases", secDatabasesDesc: "Sync, share, versions, add/remove",
+	secDevices: "Devices", secDevicesDesc: "List devices, issue enrollment tokens",
+	secLog: "Log", secLogDesc: "Server audit log (by period)",
+	secAdmin: "Admin", secAdminDesc: "User administration (needs admin token)",
+	secSettings: "Settings", secSettingsDesc: "Status, switch account, daemon, language",
+
+	dbMenuTitle:       " Databases ",
+	devMenuTitle:      " Devices ",
+	logMenuTitle:      " Log ",
+	adminMenuTitle:    " Admin ",
+	settingsMenuTitle: " Settings ",
+
+	miDeleteDB: "Delete on server", miDeleteDBDesc: "PERMANENTLY delete a database for everyone (asks to confirm)",
+	pkDeleteDB: "Delete on server",
+
+	miLogLatest: "Latest", miLogLatestDesc: "Most recent audit entries",
+	miLog24h: "Last 24 hours", miLog24hDesc: "Entries from the last 24h",
+	miLog7d: "Last 7 days", miLog7dDesc: "Entries from the last 7 days",
+	miLog30d: "Last 30 days", miLog30dDesc: "Entries from the last 30 days",
+
+	miAdmUsers: "List users", miAdmUsersDesc: "Show all users (devices/databases count)",
+	miAdmCreate: "Create user", miAdmCreateDesc: "Create a user + return an enrollment token",
+	miAdmEnable: "Enable user", miAdmEnableDesc: "Re-enable a disabled user",
+	miAdmDisable: "Disable user", miAdmDisableDesc: "Block a user's auth (data kept)",
+	miAdmDelete: "Delete user", miAdmDeleteDesc: "Permanently delete a user (CASCADE; asks to confirm)",
+	miAdmTokenSQL: "Admin token SQL", miAdmTokenSQLDesc: "Print SQL to mint a fresh admin token (DBeaver)",
+	admTokenTitle: " Admin token ",
+	fldAdmDisplay: "Display name (optional)",
+
+	miAdvEnroll: "Advanced enrollment (admin)", miAdvEnrollDesc: "Issue a token and enroll this device in one step",
+	advEnrollTitle: "Advanced enrollment — administrator",
+	fldAdvServer:   "Server URL (e.g. https://deltasync.example.dk)",
+	fldAdvMode:     "User",
+	advModeExisting: "Existing user", advModeNew: "Create new user",
+	fldAdvDevice:     "Device name (optional)",
+	advEnrollMissing: "Server URL, admin token and username are required.",
+	advEnrollNoToken: "Could not read the enrollment token from the server's response:",
+	advEnrollFailFmt: "Issuing the enrollment token failed:\n\n%s",
+	advEnrollOkTitle: "Enrolled",
 }
 
 var daMsgs = msgs{
@@ -298,4 +384,44 @@ var daMsgs = msgs{
 		"Vælg Fortsæt for at synke nu (du bliver bedt om master-passwordet),\n" +
 		"eller Annullér for at vende tilbage og synke senere.\n\n" +
 		"Husk: den gamle binding kan fjernes med Avanceret → Glem database.",
+
+	secDatabases: "Databaser", secDatabasesDesc: "Synk, deling, versioner, tilføj/fjern",
+	secDevices: "Enheder", secDevicesDesc: "Vis enheder, udsted enrollment-tokens",
+	secLog: "Log", secLogDesc: "Server-audit-log (efter periode)",
+	secAdmin: "Admin", secAdminDesc: "Brugeradministration (kræver admin-token)",
+	secSettings: "Indstillinger", secSettingsDesc: "Status, skift konto, daemon, sprog",
+
+	dbMenuTitle:       " Databaser ",
+	devMenuTitle:      " Enheder ",
+	logMenuTitle:      " Log ",
+	adminMenuTitle:    " Admin ",
+	settingsMenuTitle: " Indstillinger ",
+
+	miDeleteDB: "Slet på server", miDeleteDBDesc: "Slet en database PERMANENT for alle (beder om bekræftelse)",
+	pkDeleteDB: "Slet på server",
+
+	miLogLatest: "Seneste", miLogLatestDesc: "De nyeste audit-poster",
+	miLog24h: "Sidste 24 timer", miLog24hDesc: "Poster fra de seneste 24t",
+	miLog7d: "Sidste 7 dage", miLog7dDesc: "Poster fra de seneste 7 dage",
+	miLog30d: "Sidste 30 dage", miLog30dDesc: "Poster fra de seneste 30 dage",
+
+	miAdmUsers: "Vis brugere", miAdmUsersDesc: "List alle brugere (antal enheder/databaser)",
+	miAdmCreate: "Opret bruger", miAdmCreateDesc: "Opret en bruger + få et enrollment-token",
+	miAdmEnable: "Aktivér bruger", miAdmEnableDesc: "Genaktivér en deaktiveret bruger",
+	miAdmDisable: "Deaktivér bruger", miAdmDisableDesc: "Bloker en brugers login (data bevares)",
+	miAdmDelete: "Slet bruger", miAdmDeleteDesc: "Slet en bruger permanent (CASCADE; beder om bekræftelse)",
+	miAdmTokenSQL: "Admin-token SQL", miAdmTokenSQLDesc: "Print SQL til at lave en frisk admin-token (DBeaver)",
+	admTokenTitle: " Admin-token ",
+	fldAdmDisplay: "Visningsnavn (valgfrit)",
+
+	miAdvEnroll: "Avanceret tilmelding (admin)", miAdvEnrollDesc: "Udsted et token og tilmeld denne enhed i ét hug",
+	advEnrollTitle: "Avanceret tilmelding — administrator",
+	fldAdvServer:   "Server-URL (fx https://deltasync.example.dk)",
+	fldAdvMode:     "Bruger",
+	advModeExisting: "Eksisterende bruger", advModeNew: "Opret ny bruger",
+	fldAdvDevice:     "Enhedsnavn (valgfrit)",
+	advEnrollMissing: "Server-URL, admin-token og brugernavn er påkrævet.",
+	advEnrollNoToken: "Kunne ikke udlæse enrollment-tokenet fra serverens svar:",
+	advEnrollFailFmt: "Udstedelse af enrollment-token fejlede:\n\n%s",
+	advEnrollOkTitle: "Tilmeldt",
 }
