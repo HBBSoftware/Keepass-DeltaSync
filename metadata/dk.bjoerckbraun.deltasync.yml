@@ -74,6 +74,13 @@ Builds:
       - cd ../android/libs
       - unzip -o deltasync.aar classes.jar
       - mv classes.jar deltasync-classes.jar
+    # De tre artefakter genereres fra Go-kilde i prebuild (ikke committet —
+    # android/libs/ er gitignored). F-Droids binær-scanner kører EFTER prebuild
+    # og flagger dem ellers; whitelist dem her da de bygges fra kilde.
+    scanignore:
+      - android/libs/deltasync.aar
+      - android/libs/deltasync-classes.jar
+      - android/libs/deltasync-sources.jar
     gradle:
       - yes
 
