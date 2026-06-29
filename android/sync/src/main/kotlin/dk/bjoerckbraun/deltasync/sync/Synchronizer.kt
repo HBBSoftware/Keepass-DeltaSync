@@ -65,7 +65,7 @@ class Synchronizer(
 
         // 5. Hvis vi pullede ændringer fra serveren, opdater den lokale
         // .kdbx atomisk (delegeres til KdbxFile-impl).
-        if (result.pulledEntries > 0 || result.pulledDeletions > 0) {
+        if (result.pulledEntries > 0 || result.pulledGroups > 0 || result.pulledDeletions > 0) {
             progress.onProgress(SyncProgressEvent.Writing)
             val newDb = KotpassLocalStateAdapter.applyToDatabase(state, db)
             kdbxFile.writeAtomic { out -> newDb.encode(out) }

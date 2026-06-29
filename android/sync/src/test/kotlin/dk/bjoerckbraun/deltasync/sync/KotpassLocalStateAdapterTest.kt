@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync.sync
 
+import app.keemobile.kotpass.constants.GroupOverride
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import app.keemobile.kotpass.database.KeePassDatabase
@@ -347,6 +348,75 @@ class KotpassLocalStateAdapterTest {
     }
 
     @Test
+    fun `applyToDatabase resurrects recycle-bin entry without duplicating UUID`() {
+        // Regression: en entry der ligger i den lokale papirkurv men er aktiv på
+        // serveren (LWW-resurrection). db.findEntries skjuler papirkurven, så den
+        // tidligere "findes allerede?"-check så IKKE entry'en og tilføjede en NY
+        // kopi ved siden af den i papirkurven → dublet-UUID (KeePassDX flagger det).
+        val trashedUuid = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd")
+        val recycleBinId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+
+        val db0 = freshDatabase()
+            .modifyParentGroup {
+                copy(groups = groups + Group(
+                    uuid = recycleBinId,
+                    name = "Recycle Bin",
+                    entries = listOf(kotpassEntry(trashedUuid, "Trashed")),
+                ))
+            }
+            .modifyMeta { copy(recycleBinEnabled = true, recycleBinUuid = recycleBinId) }
+
+        // read() ser entry'en som et tombstone; serveren genopliver den som aktiv.
+        val state = KotpassLocalStateAdapter.read(db0)
+        assertTrue(state.tombstones.containsKey(trashedUuid.toString()))
+        state.tombstones.remove(trashedUuid.toString())
+        state.entries[trashedUuid.toString()] = canonicalEntryP(
+            trashedUuid.toString(), parent = "", title = "Resurrected",
+        )
+
+        val db = KotpassLocalStateAdapter.applyToDatabase(state, db0)
+
+        // Entry'en må kun findes ÉN gang i HELE træet (inkl. papirkurv) — ikke 2.
+        assertEquals(1, countOccurrences(db, trashedUuid))
+        // Og den ligger nu i Root, ikke i papirkurven.
+        assertEquals(1, db.findEntries { true }.flatMap { (_, l) -> l }
+            .count { it.uuid == trashedUuid })
+    }
+
+    @Test
+    fun `applyToDatabase does not duplicate entry in a search-disabled group`() {
+        // Regression for det faktiske felt-fund: KeePassDX lægger sine 7
+        // skabelon-entries i en gruppe med EnableSearching=false (Meta
+        // EntryTemplatesGroup). db.findEntries respekterer GroupOverride og
+        // SPRINGER søgnings-deaktiverede grupper over — så den gamle "findes
+        // allerede?"-check så aldrig skabelonerne og tilføjede en ny kopi ved
+        // hver sync → dublet-UUID (de blev 3x hos brugeren).
+        val tmplGroup = UUID.fromString("f6450db6-4ddd-e535-d1c3-7ed445c35aaa")
+        val entryId = UUID.fromString("0c4cdb46-5186-e97c-dfb3-78ca0858ec8c")
+
+        val db0 = freshDatabase().modifyParentGroup {
+            copy(groups = groups + Group(
+                uuid = tmplGroup,
+                name = "Skabeloner",
+                enableSearching = GroupOverride.Disabled,
+                entries = listOf(kotpassEntry(entryId, "Email")),
+            ))
+        }
+
+        // read() samler entry'en op som aktiv (collectTree springer ikke
+        // søgnings-deaktiverede grupper over). En efterfølgende apply af samme
+        // state svarer til en pull der leverer entry'en igen.
+        val state = KotpassLocalStateAdapter.read(db0)
+        assertTrue(state.entries.containsKey(entryId.toString()))
+
+        val db = KotpassLocalStateAdapter.applyToDatabase(state, db0)
+
+        // Må kun findes ÉN gang i HELE træet (findEntries ville ellers maskere
+        // dubletten, da den ikke ser den søgnings-deaktiverede gruppe).
+        assertEquals(1, countOccurrences(db, entryId))
+    }
+
+    @Test
     fun `applyToDatabase removes tombstoned group`() {
         val workId = UUID.fromString("20000000-0000-0000-0000-000000000002")
         val db0 = freshDatabase().modifyParentGroup {
@@ -360,6 +430,13 @@ class KotpassLocalStateAdapterTest {
     }
 
     // --- Helpers ---
+
+    /** Tæl forekomster af [uuid] i HELE gruppetræet, inkl. papirkurven (modsat findEntries). */
+    private fun countOccurrences(db: KeePassDatabase, uuid: UUID): Int {
+        fun walk(group: Group): Int =
+            group.entries.count { it.uuid == uuid } + group.groups.sumOf { walk(it) }
+        return walk(db.content.group)
+    }
 
     private fun canonicalGroup(uuid: String, parent: String, name: String) =
         dk.bjoerckbraun.deltasync.canonical.Group(

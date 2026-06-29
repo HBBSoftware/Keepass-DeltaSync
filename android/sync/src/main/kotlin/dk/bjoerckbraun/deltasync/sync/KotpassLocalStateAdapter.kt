@@ -2,7 +2,6 @@
 package dk.bjoerckbraun.deltasync.sync
 
 import app.keemobile.kotpass.database.KeePassDatabase
-import app.keemobile.kotpass.database.findEntries
 import app.keemobile.kotpass.database.modifiers.binaries
 import app.keemobile.kotpass.database.modifiers.modifyEntry
 import app.keemobile.kotpass.database.modifiers.modifyGroup
@@ -187,13 +186,22 @@ object KotpassLocalStateAdapter {
         // Snapshot start-tilstanden: eksisterende entry-/gruppe-UUIDs + hvert
         // objekts nuværende forælder (til flytte-detektion). Vi forgrener på
         // start-tilstanden; modify/move/add-kaldene er idempotente nok.
-        val existingEntryUuids = db.findEntries { true }
-            .flatMap { (_, entries) -> entries }
-            .map { it.uuid.toString() }
-            .toSet()
+        //
+        // VIGTIGT: existingEntryUuids samles via egen fuld-træ-traversering —
+        // IKKE db.findEntries. findEntries respekterer GroupOverride og springer
+        // BÅDE papirkurven OG søgnings-deaktiverede grupper (EnableSearching=
+        // false) over. KeePassDX lægger fx sine skabelon-entries i en sådan
+        // gruppe (Meta EntryTemplatesGroup). Hvis en entry i en oversprunget
+        // gruppe også er aktiv i state (pull/LWW), så findEntries den ikke, og
+        // vi tilføjede en NY kopi med samme UUID → dublet-UUID (KeePassDX flagger
+        // det; KeePassXC dedup'er stille). Med fuld-træ-set ses den som
+        // eksisterende, og modifyEntry+moveEntry (begge traverserer HELE træet,
+        // inkl. papirkurv og søgnings-deaktiverede grupper) opdaterer/flytter den
+        // på plads i stedet for at duplikere.
+        val existingEntryUuids = mutableSetOf<String>()
         val existingGroupUuids = mutableSetOf<String>()
         val currentParent = mutableMapOf<String, String>()
-        collectExisting(db.content.group, isRoot = true, existingGroupUuids, currentParent)
+        collectExisting(db.content.group, isRoot = true, existingGroupUuids, existingEntryUuids, currentParent)
 
         // "" eller ukendt parent → Root (sentinel-mapping, samme som desktop).
         fun resolveParent(p: String): UUID {
@@ -283,21 +291,27 @@ object KotpassLocalStateAdapter {
 
     /**
      * Walk'er det eksisterende træ og opsamler gruppe-UUIDs (ekskl. Root) +
-     * hvert barns (entry/gruppe) nuværende forælder-UUID — bruges til
-     * flytte-detektion i [applyToDatabase].
+     * entry-UUIDs (inkl. papirkurv — bevidst, se [applyToDatabase]) + hvert
+     * barns (entry/gruppe) nuværende forælder-UUID — bruges til flytte-
+     * detektion i [applyToDatabase].
      */
     private fun collectExisting(
         group: Group,
         isRoot: Boolean,
         groupUuids: MutableSet<String>,
+        entryUuids: MutableSet<String>,
         currentParent: MutableMap<String, String>,
     ) {
         val thisUuid = group.uuid.toString()
         if (!isRoot) groupUuids.add(thisUuid)
-        for (entry in group.entries) currentParent[entry.uuid.toString()] = thisUuid
+        for (entry in group.entries) {
+            val euid = entry.uuid.toString()
+            entryUuids.add(euid)
+            currentParent[euid] = thisUuid
+        }
         for (child in group.groups) {
             currentParent[child.uuid.toString()] = thisUuid
-            collectExisting(child, isRoot = false, groupUuids, currentParent)
+            collectExisting(child, isRoot = false, groupUuids, entryUuids, currentParent)
         }
     }
 
