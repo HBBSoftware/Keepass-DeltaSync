@@ -57,6 +57,11 @@ Builds:
       - export GOPATH=/tmp/go
       - export GOTOOLCHAIN=local
       - export ANDROID_NDK_HOME=$$NDK$$
+      # gomobile skal bruge en SDK-platform (android.jar) for at bygge .aar'ens
+      # Java-glue. I prebuild-fasen er platforms/ tom (Gradle installerer dem
+      # først senere), så installer den selv — ellers fejler bind med
+      # "failed to find android SDK platform". android-35 = appens compileSdk.
+      - sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
       - go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
       - export PATH=$GOPATH/bin:$PATH
