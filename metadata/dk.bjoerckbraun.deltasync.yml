@@ -29,121 +29,43 @@ RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
 
 Builds:
-  - versionName: 0.1.0
-    versionCode: 1
-    commit: v0.1.0
-    subdir: android/app
-    sudo:
-      # F-Droid's standard build-container har Go + Android SDK, men NDK
-      # version skal pinnes for at gomobile bind virker (vi har testet
-      # r25c).
-      - apt-get update
-      - apt-get install -y unzip curl
-      - mkdir -p $$NDK_HOME
-      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
-      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
-      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
-    prebuild: |-
-        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
-        export GOPATH=/tmp/go
-        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
-        go install golang.org/x/mobile/cmd/gomobile@latest
-        cd ../../client
-        go get -tool golang.org/x/mobile/cmd/gobind
-        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
-            -o ../android/libs/deltasync.aar \
-            gitlab.com/Star95/keepass-deltasync/client/mobile
-        cd ../android/libs
-        unzip -o deltasync.aar classes.jar
-        mv classes.jar deltasync-classes.jar
-    gradle:
-      - yes
-
-  - versionName: 0.2.0
-    versionCode: 2
-    commit: android/v0.2.0
-    subdir: android/app
-    sudo:
-      # Samme NDK-pinning som 0.1.0 — gomobile bind kræver en pinnet NDK.
-      - apt-get update
-      - apt-get install -y unzip curl
-      - mkdir -p $$NDK_HOME
-      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
-      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
-      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
-    prebuild: |-
-        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
-        export GOPATH=/tmp/go
-        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
-        go install golang.org/x/mobile/cmd/gomobile@latest
-        cd ../../client
-        go get -tool golang.org/x/mobile/cmd/gobind
-        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
-            -o ../android/libs/deltasync.aar \
-            gitlab.com/Star95/keepass-deltasync/client/mobile
-        cd ../android/libs
-        unzip -o deltasync.aar classes.jar
-        mv classes.jar deltasync-classes.jar
-    gradle:
-      - yes
-
-  - versionName: 0.3.0
-    versionCode: 3
-    commit: android/v0.3.0
-    subdir: android/app
-    sudo:
-      # Samme NDK-pinning (r25c) som de tidligere builds.
-      - apt-get update
-      - apt-get install -y unzip curl
-      - mkdir -p $$NDK_HOME
-      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
-      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
-      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
-    prebuild: |-
-        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
-        # gomobile + gobind pinnes til samme version som client/go.mod's
-        # golang.org/x/mobile — @latest ville bryde reproducerbarhed (F-Droid-krav).
-        export GOPATH=/tmp/go
-        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
-        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
-        cd ../../client
-        go get -tool golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
-        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
-            -o ../android/libs/deltasync.aar \
-            gitlab.com/Star95/keepass-deltasync/client/mobile
-        cd ../android/libs
-        unzip -o deltasync.aar classes.jar
-        mv classes.jar deltasync-classes.jar
-    gradle:
-      - yes
-
   - versionName: 0.3.1
     versionCode: 4
     commit: android/v0.3.1
     subdir: android/app
+    # NDK leveres af F-Droids build-server via ndk:-feltet og eksponeres som
+    # $$NDK$$ — IKKE en curl-download (mere reproducerbart, og sudo:-curl
+    # blev alligevel sprunget over uden for en dedikeret build-server).
+    ndk: 25.2.9519653
     sudo:
-      # Samme NDK-pinning (r25c) som de tidligere builds.
+      # gomobile bind kræver en Go-toolchain. client/go.mod kræver go 1.26.3
+      # (+ tool-direktivet → mindst Go 1.24), hvilket er for nyt til at
+      # bootstrappe via go@-srclib'en med Debians golang-go. Vi henter derfor
+      # den officielle, pinnede Go-release (SHA-256 fra https://go.dev/dl/).
       - apt-get update
       - apt-get install -y unzip curl
-      - mkdir -p $$NDK_HOME
-      - curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -o /tmp/ndk.zip
-      - unzip -q /tmp/ndk.zip -d /tmp/ndk-extracted
-      - mv /tmp/ndk-extracted/android-ndk-r25c $$NDK_HOME/25.2.9519653
-    prebuild: |-
-        # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet.
-        # gomobile + gobind pinnes til samme version som client/go.mod's
-        # golang.org/x/mobile — @latest ville bryde reproducerbarhed (F-Droid-krav).
-        export GOPATH=/tmp/go
-        export ANDROID_NDK_HOME=$$NDK_HOME/25.2.9519653
-        go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
-        cd ../../client
-        go get -tool golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
-        $$GOPATH/bin/gomobile bind -androidapi 21 -target=android \
-            -o ../android/libs/deltasync.aar \
-            gitlab.com/Star95/keepass-deltasync/client/mobile
-        cd ../android/libs
-        unzip -o deltasync.aar classes.jar
-        mv classes.jar deltasync-classes.jar
+      - curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
+      - echo "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556  /tmp/go.tar.gz" | sha256sum -c -
+      - rm -rf /usr/local/go
+      - tar -C /usr/local -xzf /tmp/go.tar.gz
+    prebuild:
+      # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet. gomobile +
+      # gobind pinnes til SAMME version som client/go.mod's golang.org/x/mobile
+      # (reproducerbarhed). GOTOOLCHAIN=local forhindrer netværks-download af
+      # en anden toolchain — vi har lige installeret præcis den rigtige.
+      - export PATH=/usr/local/go/bin:$PATH
+      - export GOPATH=/tmp/go
+      - export GOTOOLCHAIN=local
+      - export ANDROID_NDK_HOME=$$NDK$$
+      - go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
+      - go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
+      - export PATH=$GOPATH/bin:$PATH
+      - gomobile init
+      - cd ../../client
+      - gomobile bind -androidapi 21 -target=android -o ../android/libs/deltasync.aar gitlab.com/Star95/keepass-deltasync/client/mobile
+      - cd ../android/libs
+      - unzip -o deltasync.aar classes.jar
+      - mv classes.jar deltasync-classes.jar
     gradle:
       - yes
 
