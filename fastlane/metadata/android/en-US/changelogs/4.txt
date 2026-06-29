@@ -1,0 +1,4 @@
+Bug fixes.
+
+• Fixed duplicate entries after sync: entries in a search-disabled group — such as KeePassDX's template entries (Email, Wi-Fi, Bank, …) — were re-added on every sync, producing duplicate identifiers that KeePassDX flags when opening the database.
+• The database is now also saved when a sync pulled only group changes.

@@ -22,6 +22,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
 
+## [android/v0.3.1] — 2026-06-29
+
+### Fixed
+
+- **Duplicate entries after sync** — entries living in a search-disabled
+  group (notably KeePassDX's template group, `Meta/EntryTemplatesGroup`,
+  which has `EnableSearching=false`) were never recognised as already
+  present, because `applyToDatabase` used kotpass' `findEntries` — which
+  skips both the recycle bin and search-disabled groups. Every pull
+  therefore re-added a copy with the same UUID, accumulating duplicate
+  identifiers that KeePassDX flags on open (KeePassXC silently
+  de-duplicates on load). Existing entries are now matched via a full
+  group-tree walk, so they are updated in place instead of duplicated.
+- **Local database not rewritten when a sync pulled only groups** —
+  `Synchronizer` now also writes the `.kdbx` back when group changes
+  (and not just entry/deletion changes) were pulled.
+
 ## [client/v1.5.0] — 2026-06-24
 
 ### Added
