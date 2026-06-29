@@ -62,6 +62,9 @@ Builds:
       - export PATH=$GOPATH/bin:$PATH
       - gomobile init
       - cd ../../client
+      # android/libs/ er gitignored (kun *.aar/*.jar) → mappen findes ikke i en
+      # frisk klon; opret den før gomobile skriver sin output-fil.
+      - mkdir -p ../android/libs
       - gomobile bind -androidapi 21 -target=android -o ../android/libs/deltasync.aar gitlab.com/Star95/keepass-deltasync/client/mobile
       - cd ../android/libs
       - unzip -o deltasync.aar classes.jar
