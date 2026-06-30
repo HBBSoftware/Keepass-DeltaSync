@@ -22,6 +22,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
 
+## [server/v0.1.0] — 2026-06-30
+
+### Added
+
+- **Docker image + self-hosting** — the server is now published as a
+  multi-arch (amd64 + arm64) Docker image to the GitLab Container
+  Registry, built by CI on `server/vX.Y.Z` tags. A self-contained
+  `compose.yml` (PostgreSQL + app) makes running your own server a
+  copy-paste affair — including pasting straight into a NAS UI such as
+  TrueNAS SCALE's Custom App. The container entrypoint waits for the DB,
+  applies schema migrations idempotently, and mints a first admin token.
+  See [`docs/self-hosting-docker.md`](docs/self-hosting-docker.md).
+
 ## [android/v0.3.1] — 2026-06-29
 
 ### Fixed
