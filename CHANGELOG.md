@@ -6,6 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Health-check endpoint** — `GET /api/v1/health` (public, no auth) returns
+  `200 {"status":"ok","db":"up"}` when the app and database are reachable, or
+  `503` otherwise. The Docker image ships a built-in `HEALTHCHECK` that uses it,
+  so `docker ps` and NAS UIs (TrueNAS, Portainer) show real app health.
+- **SECURITY.md and CONTRIBUTING.md** — a vulnerability-reporting policy
+  (private channels, scope, trust model) and a contributor guide (DCO sign-off,
+  per-component build/test, release tagging). A `/.well-known/security.txt`
+  is served from the website.
+
 ### Fixed
 
 - **Server returned newline-wrapped base64** — PostgreSQL's

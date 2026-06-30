@@ -41,6 +41,9 @@ final class Router
 
     public function registerRoutes(): void
     {
+        // --- Public (ingen auth) ---
+        $this->add('GET', '/api/v1/health', 'HealthController::check', 'public');
+
         // --- Enrollment (engangstoken) ---
         $this->add('POST', '/api/v1/devices/enroll', 'EnrollmentController::enroll', 'enrollment');
 
@@ -117,35 +120,43 @@ final class Router
 
         [$route, $params] = $match;
 
-        $bearer = $request->bearerToken();
-        if ($bearer === null) {
-            $logger->forRequest($request)->info(EventType::AuthFailure, [
-                'details' => ['route' => $route['path'], 'reason' => 'missing_bearer'],
-                'success' => false,
-            ]);
-            return new JsonResponse(401, [
-                'error'   => 'unauthorized',
-                'message' => 'missing bearer token',
+        if ($route['auth'] === 'public') {
+            // Public routes (fx health-check) kører uden token og logges ikke:
+            // de kaldes ofte af container-/proxy-healthchecks og ville ellers
+            // oversvømme audit-loggen.
+            $ctx = null;
+            $requestLogger = $logger->forRequest($request);
+        } else {
+            $bearer = $request->bearerToken();
+            if ($bearer === null) {
+                $logger->forRequest($request)->info(EventType::AuthFailure, [
+                    'details' => ['route' => $route['path'], 'reason' => 'missing_bearer'],
+                    'success' => false,
+                ]);
+                return new JsonResponse(401, [
+                    'error'   => 'unauthorized',
+                    'message' => 'missing bearer token',
+                ]);
+            }
+
+            try {
+                $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
+            } catch (AuthenticationException) {
+                $logger->forRequest($request)->info(EventType::AuthFailure, [
+                    'details' => ['route' => $route['path'], 'reason' => 'invalid_token'],
+                    'success' => false,
+                ]);
+                return new JsonResponse(401, [
+                    'error'   => 'unauthorized',
+                    'message' => 'invalid token',
+                ]);
+            }
+
+            $requestLogger = $logger->forRequest($request, $ctx);
+            $requestLogger->info(EventType::AuthSuccess, [
+                'details' => ['route' => $route['path'], 'method' => $request->method],
             ]);
         }
-
-        try {
-            $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
-        } catch (AuthenticationException) {
-            $logger->forRequest($request)->info(EventType::AuthFailure, [
-                'details' => ['route' => $route['path'], 'reason' => 'invalid_token'],
-                'success' => false,
-            ]);
-            return new JsonResponse(401, [
-                'error'   => 'unauthorized',
-                'message' => 'invalid token',
-            ]);
-        }
-
-        $requestLogger = $logger->forRequest($request, $ctx);
-        $requestLogger->info(EventType::AuthSuccess, [
-            'details' => ['route' => $route['path'], 'method' => $request->method],
-        ]);
 
         // Instantiér controller. Handler-strengen 'MeController::show' bliver
         // til KeePassDeltaSync\Controllers\MeController::show. Sub-namespaces

@@ -27,7 +27,8 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
         libpq-dev \
         libsodium-dev \
-        postgresql-client; \
+        postgresql-client \
+        curl; \
     docker-php-ext-install -j"$(nproc)" pdo_pgsql sodium; \
     rm -rf /var/lib/apt/lists/*
 
@@ -63,6 +64,12 @@ RUN rm -f ./public/setup.php
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh ./bin/admin
+
+# Container health: the app's own /api/v1/health endpoint (200 = app + DB up).
+# Override in compose if you serve under APP_BASE_PATH (path changes to
+# /<base>/api/v1/health).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1/api/v1/health || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]
