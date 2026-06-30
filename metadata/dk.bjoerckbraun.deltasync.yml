@@ -9,21 +9,18 @@ IssueTracker: https://gitlab.com/Star95/keepass-deltasync/-/issues
 Changelog: https://gitlab.com/Star95/keepass-deltasync/-/blob/HEAD/CHANGELOG.md
 
 AutoName: DeltaSync
-
-# Description peges normalt af F-Droid hen til fastlane/metadata/.../full_description.txt;
-# yml-feltet er fallback hvis fastlane-strukturen ikke findes endnu.
 Description: |-
-    ⚠ REQUIRES YOUR OWN SERVER. DeltaSync does nothing on its own — you must
-    run the self-hosted DeltaSync server (PHP + PostgreSQL), or have access to
-    one, and enrol this device against it. There is no public or default
-    server. If you just want a standalone KeePass app, use KeePass2Android or
-    KeePassDX instead.
+  ⚠ REQUIRES YOUR OWN SERVER. DeltaSync does nothing on its own — you must
+  run the self-hosted DeltaSync server (PHP + PostgreSQL), or have access to
+  one, and enrol this device against it. There is no public or default
+  server. If you just want a standalone KeePass app, use KeePass2Android or
+  KeePassDX instead.
 
-    End-to-end encrypted entry-level sync for KeePass databases. Pair with
-    KeePass2Android or KeePassDX as the editor; this app runs in the
-    background and keeps your .kdbx in sync with your self-hosted server
-    via per-entry XChaCha20-Poly1305 ciphertext. The server cannot read
-    titles, usernames, or passwords — even if compromised.
+  End-to-end encrypted entry-level sync for KeePass databases. Pair with
+  KeePass2Android or KeePassDX as the editor; this app runs in the
+  background and keeps your .kdbx in sync with your self-hosted server
+  via per-entry XChaCha20-Poly1305 ciphertext. The server cannot read
+  titles, usernames, or passwords — even if compromised.
 
 RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
@@ -33,60 +30,40 @@ Builds:
     versionCode: 4
     commit: android/v0.3.1
     subdir: android/app
-    # NDK leveres af F-Droids build-server via ndk:-feltet og eksponeres som
-    # $$NDK$$ — IKKE en curl-download (mere reproducerbart, og sudo:-curl
-    # blev alligevel sprunget over uden for en dedikeret build-server).
-    ndk: 25.2.9519653
     sudo:
-      # gomobile bind kræver en Go-toolchain. client/go.mod kræver go 1.26.3
-      # (+ tool-direktivet → mindst Go 1.24), hvilket er for nyt til at
-      # bootstrappe via go@-srclib'en med Debians golang-go. Vi henter derfor
-      # den officielle, pinnede Go-release (SHA-256 fra https://go.dev/dl/).
       - apt-get update
       - apt-get install -y unzip curl
       - curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
-      - echo "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556  /tmp/go.tar.gz" | sha256sum -c -
+      - echo "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556  /tmp/go.tar.gz"
+        | sha256sum -c -
       - rm -rf /usr/local/go
       - tar -C /usr/local -xzf /tmp/go.tar.gz
+    gradle:
+      - yes
     prebuild:
-      # Byg gomobile-bound .aar fra Go-pakken før Gradle-buildet. gomobile +
-      # gobind pinnes til SAMME version som client/go.mod's golang.org/x/mobile
-      # (reproducerbarhed). GOTOOLCHAIN=local forhindrer netværks-download af
-      # en anden toolchain — vi har lige installeret præcis den rigtige.
       - export PATH=/usr/local/go/bin:$PATH
       - export GOPATH=/tmp/go
       - export GOTOOLCHAIN=local
       - export ANDROID_NDK_HOME=$$NDK$$
-      # gomobile skal bruge en SDK-platform (android.jar) for at bygge .aar'ens
-      # Java-glue. I prebuild-fasen er platforms/ tom (Gradle installerer dem
-      # først senere), så installer den selv — ellers fejler bind med
-      # "failed to find android SDK platform". android-35 = appens compileSdk.
       - sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
       - go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
       - export PATH=$GOPATH/bin:$PATH
       - gomobile init
       - cd ../../client
-      # android/libs/ er gitignored (kun *.aar/*.jar) → mappen findes ikke i en
-      # frisk klon; opret den før gomobile skriver sin output-fil.
       - mkdir -p ../android/libs
-      - gomobile bind -androidapi 21 -target=android -o ../android/libs/deltasync.aar gitlab.com/Star95/keepass-deltasync/client/mobile
+      - gomobile bind -androidapi 21 -target=android -o ../android/libs/deltasync.aar
+        gitlab.com/Star95/keepass-deltasync/client/mobile
       - cd ../android/libs
       - unzip -o deltasync.aar classes.jar
       - mv classes.jar deltasync-classes.jar
-    # De tre artefakter genereres fra Go-kilde i prebuild (ikke committet —
-    # android/libs/ er gitignored). F-Droids binær-scanner kører EFTER prebuild
-    # og flagger dem ellers; whitelist dem her da de bygges fra kilde.
     scanignore:
       - android/libs/deltasync.aar
       - android/libs/deltasync-classes.jar
       - android/libs/deltasync-sources.jar
-    gradle:
-      - yes
+    ndk: 25.2.9519653
 
-# Kun android/v*-tags er Android-app-releases; client/v* er desktop-klienten
-# i samme monorepo og må ikke forveksles med en app-version.
-AutoUpdateMode: Version android/v%v
+AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$
 CurrentVersion: 0.3.1
 CurrentVersionCode: 4
