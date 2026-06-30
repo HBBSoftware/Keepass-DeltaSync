@@ -12,4 +12,7 @@ desktop.ini
 # Test scratch (Bob-config + vault for v2-sharing live-tests)
 .test/
 
+# Docker Compose env (contains DB_PASSWORD) — never commit
+.env
+
 # Build / language-specifikt sniges ind via komponent-mappers egne .gitignore

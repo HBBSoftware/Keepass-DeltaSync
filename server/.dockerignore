@@ -1,0 +1,8 @@
+# Keep the build context small and avoid leaking local config/secrets.
+.env
+.env.example
+vendor/
+tests/
+.gitignore
+LICENSE
+README.md
