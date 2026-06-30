@@ -62,7 +62,18 @@ Once Bob has `master_key`, he can decrypt entries just like Alice. His local `.k
 
 ### As an administrator (server side)
 
-See [`server/README.md`](server/README.md) for deployment. Schema migrations live in [`server/schema/`](server/schema/) — `001`–`005` make up v1; `006`–`007` are v2.
+**Run your own server with Docker (easiest).** A prebuilt, multi-arch image (amd64 + arm64) is published to the GitLab Container Registry, and [`compose.yml`](compose.yml) brings up a self-contained stack (PostgreSQL + app). It works on any Docker host or a NAS such as TrueNAS SCALE / Unraid / Synology — paste the YAML, set one password, start:
+
+```sh
+# edit the single CHANGE_THIS password line in compose.yml, then:
+docker compose up -d
+docker compose logs app                          # copy the one-time admin token
+docker compose exec app php bin/admin user:create alice
+```
+
+Image: `registry.gitlab.com/star95/keepass-deltasync/server:latest`. Schema migrations run automatically on start. Full walkthrough — including TrueNAS, HTTPS and backups — in [`docs/self-hosting-docker.md`](docs/self-hosting-docker.md).
+
+**Classic PHP hosting (no Docker).** The server is plain PHP with no build step; upload it and run the setup wizard. See [`server/README.md`](server/README.md) and [`docs/deployment.md`](docs/deployment.md). Schema lives in [`server/schema/`](server/schema/).
 
 ### As a first-time user (client side)
 
