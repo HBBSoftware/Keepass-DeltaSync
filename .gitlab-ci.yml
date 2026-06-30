@@ -143,7 +143,11 @@ publish:server-image:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
     # Register QEMU so we can cross-build arm64 from an amd64 runner.
     - docker run --rm --privileged tonistiigi/binfmt --install all
-    - docker buildx create --use --name deltasync-builder
+    # dind exposes the Docker daemon over TLS via env vars; buildx's
+    # docker-container driver can't consume that directly, so wrap the current
+    # environment in an explicit docker context and build the builder on it.
+    - docker context create buildx-env
+    - docker buildx create --use --name deltasync-builder buildx-env
   script:
     - |
       set -eu
