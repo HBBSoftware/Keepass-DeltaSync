@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>DeltaSync — Admin</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel2: #273449; --line: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent2: #0ea5e9;
+    --danger: #f87171; --ok: #4ade80; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  a { color: var(--accent); }
+  header.site {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; background: #0b1220; border-bottom: 1px solid var(--line);
+  }
+  header .brand { font-weight: 700; letter-spacing: .3px; }
+  header .brand small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 22px; }
+  h2 { margin: 0 0 4px; font-size: 1.2rem; }
+  .muted { color: var(--muted); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px; margin-bottom: 20px;
+  }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 9px 11px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; font: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent2); color: #04222e; border: 0; border-radius: 7px;
+    padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: var(--accent); }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
+  button.secondary:hover { background: var(--line); }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  button.danger:hover { background: rgba(248,113,113,.12); }
+  button.small { padding: 5px 9px; font-size: .82rem; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1; min-width: 160px; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  td.actions { white-space: nowrap; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .76rem; }
+  .pill.ok { background: rgba(74,222,128,.15); color: var(--ok); }
+  .pill.off { background: rgba(248,113,113,.15); color: var(--danger); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+  .tabs button { background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .tabs button.active { background: var(--panel2); color: var(--text); border-color: var(--accent); }
+  .hidden { display: none !important; }
+  .err { color: var(--danger); margin-top: 10px; min-height: 1.2em; }
+  .token-box {
+    background: #04222e; border: 1px solid var(--accent); border-radius: 8px;
+    padding: 14px; margin-top: 12px;
+  }
+  .token-box code { display: block; word-break: break-all; font-size: 1rem; margin: 8px 0; color: var(--accent); }
+  pre.details { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--muted); font-size: .82rem; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .note { font-size: .82rem; color: var(--warn); }
+  .center { max-width: 440px; margin: 8vh auto; }
+</style>
+</head>
+<body>
+
+<!-- ===== Login ===== -->
+<div id="login" class="container center">
+  <div class="card">
+    <h2>DeltaSync Admin</h2>
+    <p class="muted">Paste your admin token to manage users and view the audit log.
+    The token is the one printed once when the server first started
+    (or from <code>bin/admin token:create-admin</code>). It is kept only in this
+    tab's session storage.</p>
+    <label for="token">Admin token</label>
+    <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
+    <div style="margin-top:14px"><button id="connect">Connect</button></div>
+    <div id="login-err" class="err"></div>
+  </div>
+</div>
+
+<!-- ===== App ===== -->
+<div id="app" class="hidden">
+  <header class="site">
+    <div class="brand">DeltaSync <small>admin</small></div>
+    <button id="logout" class="secondary small">Log out</button>
+  </header>
+  <div class="container">
+    <div class="tabs">
+      <button data-tab="users" class="active">Users</button>
+      <button data-tab="log">Audit log</button>
+    </div>
+
+    <!-- Users -->
+    <section id="tab-users">
+      <div class="card">
+        <h2>Create user</h2>
+        <p class="muted">Creates the user and issues a one-time enrollment token for their first device.</p>
+        <div class="row">
+          <div>
+            <label for="new-username">Username</label>
+            <input id="new-username" placeholder="alice" autocomplete="off">
+          </div>
+          <div>
+            <label for="new-display">Display name (optional)</label>
+            <input id="new-display" placeholder="Alice" autocomplete="off">
+          </div>
+          <div style="flex:0"><button id="create-user">Create</button></div>
+        </div>
+        <div id="create-token"></div>
+        <div id="create-err" class="err"></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <h2>Users</h2>
+          <button id="refresh-users" class="secondary small">Refresh</button>
+        </div>
+        <div id="users-table"></div>
+        <div id="users-err" class="err"></div>
+      </div>
+    </section>
+
+    <!-- Audit log -->
+    <section id="tab-log" class="hidden">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="log-event">Event type (optional)</label>
+            <input id="log-event" placeholder="auth_failure" autocomplete="off">
+          </div>
+          <div>
+            <label for="log-user">User ID (optional)</label>
+            <input id="log-user" placeholder="UUID" autocomplete="off">
+          </div>
+          <div>
+            <label for="log-limit">Limit</label>
+            <input id="log-limit" type="number" value="50" min="1" max="500">
+          </div>
+          <div style="flex:0"><button id="load-log">Load</button></div>
+          <div style="flex:0"><button id="cleanup-log" class="danger">Run cleanup</button></div>
+        </div>
+        <div id="log-err" class="err"></div>
+      </div>
+      <div class="card">
+        <div id="log-table"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const TOKEN_KEY = "deltasync_admin_token";
+  // API base relative to this page → works at the web root AND under an
+  // APP_BASE_PATH sub-path (e.g. /sync/admin.html → /sync/api/v1/).
+  const API = new URL("api/v1/", window.location.href).href;
+
+  const $ = (id) => document.getElementById(id);
+  const getToken = () => sessionStorage.getItem(TOKEN_KEY);
+
+  // ---- DOM helpers (XSS-safe: never use innerHTML for server data) ----
+  function el(tag, opts = {}, children = []) {
+    const e = document.createElement(tag);
+    if (opts.text != null) e.textContent = opts.text;
+    if (opts.class) e.className = opts.class;
+    if (opts.attrs) for (const k in opts.attrs) e.setAttribute(k, opts.attrs[k]);
+    if (opts.on) for (const ev in opts.on) e.addEventListener(ev, opts.on[ev]);
+    for (const c of [].concat(children)) if (c) e.appendChild(c);
+    return e;
+  }
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  // ---- API ----
+  async function api(method, path, body) {
+    const headers = { "Authorization": "Bearer " + getToken() };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const res = await fetch(API + path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 204) return null;
+    let data = null;
+    try { data = await res.json(); } catch (_) { /* non-JSON */ }
+    if (!res.ok) {
+      const msg = (data && (data.message || data.error)) || ("HTTP " + res.status);
+      const err = new Error(msg);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---- Login ----
+  async function tryLogin(token) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    try {
+      await api("GET", "admin/users"); // 200 ⇒ valid admin token
+      showApp();
+    } catch (e) {
+      sessionStorage.removeItem(TOKEN_KEY);
+      throw e;
+    }
+  }
+  function showApp() {
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    loadUsers();
+  }
+  function logout() {
+    sessionStorage.removeItem(TOKEN_KEY);
+    $("app").classList.add("hidden");
+    $("login").classList.remove("hidden");
+    $("token").value = "";
+  }
+
+  $("connect").addEventListener("click", async () => {
+    const t = $("token").value.trim();
+    $("login-err").textContent = "";
+    if (!t) { $("login-err").textContent = "Enter a token."; return; }
+    try { await tryLogin(t); }
+    catch (e) { $("login-err").textContent = e.status === 401 ? "Invalid admin token." : e.message; }
+  });
+  $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connect").click(); });
+  $("logout").addEventListener("click", logout);
+
+  // ---- Tabs ----
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      const tab = b.getAttribute("data-tab");
+      $("tab-users").classList.toggle("hidden", tab !== "users");
+      $("tab-log").classList.toggle("hidden", tab !== "log");
+    });
+  });
+
+  // ---- Token display (one-time enrollment tokens) ----
+  function showEnrollmentToken(container, result, label) {
+    clear(container);
+    const box = el("div", { class: "token-box" });
+    box.appendChild(el("div", { class: "note", text: "⚠ " + label + " — shown once. Send it to the user over a secure channel." }));
+    const code = el("code", { text: result.enrollment_token });
+    box.appendChild(code);
+    if (result.expires_at) box.appendChild(el("div", { class: "muted", text: "Expires: " + result.expires_at }));
+    box.appendChild(el("button", {
+      class: "secondary small", text: "Copy",
+      on: { click: () => navigator.clipboard && navigator.clipboard.writeText(result.enrollment_token) },
+    }));
+    container.appendChild(box);
+  }
+
+  // ---- Users ----
+  async function loadUsers() {
+    $("users-err").textContent = "";
+    try {
+      const data = await api("GET", "admin/users");
+      renderUsers(data.users || []);
+    } catch (e) { $("users-err").textContent = e.message; }
+  }
+
+  function renderUsers(users) {
+    const wrap = $("users-table");
+    clear(wrap);
+    if (!users.length) { wrap.appendChild(el("p", { class: "muted", text: "No users yet." })); return; }
+
+    const head = el("tr", {}, ["Username", "Display name", "Status", "Devices", "DBs", "Created", ""]
+      .map((h) => el("th", { text: h })));
+    const rows = users.map((u) => {
+      const status = u.disabled
+        ? el("span", { class: "pill off", text: "disabled" })
+        : el("span", { class: "pill ok", text: "active" });
+
+      const toggleBtn = el("button", {
+        class: "secondary small", text: u.disabled ? "Enable" : "Disable",
+        on: { click: () => setDisabled(u, !u.disabled) },
+      });
+      const enrollBtn = el("button", {
+        class: "secondary small", text: "Enroll token",
+        attrs: u.disabled ? { disabled: "disabled" } : {},
+        on: { click: () => newEnrollment(u) },
+      });
+      const delBtn = el("button", {
+        class: "danger small", text: "Delete",
+        on: { click: () => deleteUser(u) },
+      });
+
+      const actions = el("td", { class: "actions" }, [toggleBtn, document.createTextNode(" "), enrollBtn, document.createTextNode(" "), delBtn]);
+      return el("tr", {}, [
+        el("td", { text: u.username }),
+        el("td", { text: u.display_name || "—" }),
+        el("td", {}, [status]),
+        el("td", { text: String(u.device_count) }),
+        el("td", { text: String(u.database_count) }),
+        el("td", { text: (u.created_at || "").replace("T", " ").replace(/\..*$/, "") }),
+        actions,
+      ]);
+    });
+
+    const table = el("table", {}, [el("thead", {}, [head]), el("tbody", {}, rows)]);
+    wrap.appendChild(table);
+  }
+
+  async function setDisabled(u, disabled) {
+    try { await api("PATCH", "admin/users/" + u.id, { disabled }); loadUsers(); }
+    catch (e) { $("users-err").textContent = e.message; }
+  }
+  async function deleteUser(u) {
+    if (!confirm("Delete user '" + u.username + "'? This removes their devices, databases and entries. This cannot be undone.")) return;
+    try { await api("DELETE", "admin/users/" + u.id); loadUsers(); }
+    catch (e) { $("users-err").textContent = e.message; }
+  }
+  async function newEnrollment(u) {
+    $("users-err").textContent = "";
+    try {
+      const res = await api("POST", "admin/users/" + u.id + "/enrollment");
+      // Show the one-time token in a box above the table; it persists until the
+      // next refresh so the admin can copy it.
+      const box = $("users-table");
+      const holder = el("div", {});
+      showEnrollmentToken(holder, res, "Enrollment token for " + u.username);
+      box.insertBefore(holder, box.firstChild);
+    } catch (e) { $("users-err").textContent = e.message; }
+  }
+
+  $("refresh-users").addEventListener("click", loadUsers);
+  $("create-user").addEventListener("click", async () => {
+    $("create-err").textContent = "";
+    clear($("create-token"));
+    const username = $("new-username").value.trim();
+    const display = $("new-display").value.trim();
+    if (!username) { $("create-err").textContent = "Username is required."; return; }
+    const body = { username };
+    if (display) body.display_name = display;
+    try {
+      const res = await api("POST", "admin/users", body);
+      $("new-username").value = ""; $("new-display").value = "";
+      showEnrollmentToken($("create-token"), res, "Enrollment token for " + res.user.username);
+      loadUsers();
+    } catch (e) { $("create-err").textContent = e.message; }
+  });
+
+  // ---- Audit log ----
+  async function loadLog() {
+    $("log-err").textContent = "";
+    const params = new URLSearchParams();
+    const evt = $("log-event").value.trim();
+    const uid = $("log-user").value.trim();
+    const lim = $("log-limit").value.trim();
+    if (evt) params.set("event_type", evt);
+    if (uid) params.set("user_id", uid);
+    if (lim) params.set("limit", lim);
+    try {
+      const data = await api("GET", "admin/log?" + params.toString());
+      renderLog(data.log || []);
+    } catch (e) { $("log-err").textContent = e.message; }
+  }
+
+  function renderLog(entries) {
+    const wrap = $("log-table");
+    clear(wrap);
+    if (!entries.length) { wrap.appendChild(el("p", { class: "muted", text: "No entries." })); return; }
+    const head = el("tr", {}, ["Time (UTC)", "Event", "OK", "IP", "Details"].map((h) => el("th", { text: h })));
+    const rows = entries.map((e) => {
+      const ok = e.success
+        ? el("span", { class: "pill ok", text: "yes" })
+        : el("span", { class: "pill off", text: "no" });
+      let detail = "";
+      if (e.details) { try { detail = JSON.stringify(e.details); } catch (_) { detail = ""; } }
+      return el("tr", {}, [
+        el("td", { text: (e.occurred_at || "").replace("T", " ").replace("Z", "") }),
+        el("td", { text: e.event_type || "" }),
+        el("td", {}, [ok]),
+        el("td", { text: e.ip_address || "—" }),
+        el("td", {}, [el("pre", { class: "details", text: detail })]),
+      ]);
+    });
+    wrap.appendChild(el("table", {}, [el("thead", {}, [head]), el("tbody", {}, rows)]));
+  }
+
+  $("load-log").addEventListener("click", loadLog);
+  $("cleanup-log").addEventListener("click", async () => {
+    if (!confirm("Run audit-log + enrollment-token cleanup now?")) return;
+    $("log-err").textContent = "";
+    try {
+      const res = await api("POST", "admin/log/cleanup");
+      $("log-err").style.color = "var(--ok)";
+      $("log-err").textContent = "Cleanup done: " + JSON.stringify(res);
+      setTimeout(() => { $("log-err").style.color = ""; $("log-err").textContent = ""; }, 6000);
+    } catch (e) { $("log-err").style.color = ""; $("log-err").textContent = e.message; }
+  });
+
+  // ---- Boot: resume session if a token is already stored ----
+  if (getToken()) { tryLogin(getToken()).catch(() => logout()); }
+})();
+</script>
+</body>
+</html>

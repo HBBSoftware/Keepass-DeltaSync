@@ -65,6 +65,14 @@ docker compose exec app php bin/admin user:create alice
 (`docker compose run --rm app php bin/admin ...` works too and does not touch
 the running web server.)
 
+## Web admin panel
+
+Prefer a browser? Open `https://<your-server>/admin.html` and paste your admin
+token. From there you can create users, issue enrollment tokens,
+enable/disable and delete users, and browse the audit log — no command line
+needed. The token is held only in the browser tab's session storage and sent
+as a bearer token to the existing admin API.
+
 ---
 
 ## HTTPS

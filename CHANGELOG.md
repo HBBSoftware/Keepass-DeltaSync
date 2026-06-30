@@ -8,6 +8,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Web admin panel** — `admin.html`, served by the server, is a
+  token-authenticated UI for managing the server from a browser: create users,
+  issue enrollment tokens, enable/disable and delete users, and browse the
+  audit log (with manual cleanup). It calls the existing admin API with the
+  admin token (kept only in the tab's session storage); no new server
+  endpoints, and it works under an `APP_BASE_PATH` sub-path.
 - **Health-check endpoint** — `GET /api/v1/health` (public, no auth) returns
   `200 {"status":"ok","db":"up"}` when the app and database are reachable, or
   `503` otherwise. The Docker image ships a built-in `HEALTHCHECK` that uses it,

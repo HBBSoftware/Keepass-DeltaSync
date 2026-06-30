@@ -73,6 +73,8 @@ docker compose exec app php bin/admin user:create alice
 
 Image: `registry.gitlab.com/star95/keepass-deltasync/server:latest`. Schema migrations run automatically on start. Full walkthrough — including TrueNAS, HTTPS and backups — in [`docs/self-hosting-docker.md`](docs/self-hosting-docker.md).
 
+**Web admin panel.** Browse to `https://your-server/admin.html`, paste your admin token, and manage the server from the browser — create users, issue enrollment tokens, enable/disable/delete users, and view the audit log. (The CLI `bin/admin` does the same and is handy for first-user bootstrap.)
+
 **Classic PHP hosting (no Docker).** The server is plain PHP with no build step; upload it and run the setup wizard. See [`server/README.md`](server/README.md) and [`docs/deployment.md`](docs/deployment.md). Schema lives in [`server/schema/`](server/schema/).
 
 ### As a first-time user (client side)
