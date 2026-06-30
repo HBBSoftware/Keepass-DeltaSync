@@ -6,42 +6,78 @@ reproducible builds.
 
 ## Status
 
-- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — `Builds`-poster for 0.1.0, 0.2.0 og 0.3.0 (`android/v0.3.0`); `CurrentVersion: 0.3.0` / `CurrentVersionCode: 3`.
-- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — changelogs `1.txt`–`3.txt`.
-- **gomobile/gobind pinnet** i 0.3.0-build-posten til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke længere `@latest`) — reproducerbarhedskrav.
-- **Ikke endnu submittet.** Resterende før submission: kør `fdroid build dk.bjoerckbraun.deltasync:3` i et F-Droid-build-miljø (Linux + `fdroidserver`) for at validere at gomobile-bind virker i deres container, og fork+MR til fdroiddata. Submission afventer bevidst at appen får lidt produktionstid først. (Overvej stadig F-Droids egen `ndk:`-mekanisme frem for `sudo`+`curl`.)
+- **Submittet:** [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). **Pipelinen er grøn hele vejen** — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer. Mangler kun en reviewers merge.
+- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.3.1 (`commit: android/v0.3.1`); `CurrentVersion: 0.3.1` / `CurrentVersionCode: 4`. De gamle 0.1.0–0.3.0 blev aldrig publiceret og er fjernet. Filen er på kanonisk form (`fdroid rewritemeta` er idempotent) — INGEN kommentarer, build-flags i kanonisk rækkefølge (`sudo → gradle → prebuild → scanignore → ndk`), linjer ombrudt ved 80 tegn.
+- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`4.txt`. F-Droid bruger DISSE til app-sidens tekst (yml-`Description:` er kun fallback). Kun en-US findes; ingen dansk listing endnu.
+- **NDK** leveres af F-Droids build-server via `ndk: 25.2.9519653`-feltet (eksponeret som `$$NDK$$`) — ikke længere en `curl`-download.
+- **gomobile/gobind pinnet** til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke `@latest`) — reproducerbarhedskrav.
+
+### Validér de to metadata-jobs lokalt
+
+`fdroid build` kan ikke køres uden for en provisioneret build-server, men de to format-jobs der typisk driller (`fdroid rewritemeta` + `schema validation`) kan valideres 100 % lokalt i Docker med samme `fdroid`-version som CI:
+
+```sh
+docker run --rm -v "$PWD":/repo -w /repo python:3.12-slim bash -c '
+  apt-get update -qq && apt-get install -y -qq git          # fdroidserver kræver git i PATH
+  pip install --quiet fdroidserver check-jsonschema
+  export GIT_PYTHON_REFRESH=quiet
+  touch config.yml
+  fdroid rewritemeta dk.bjoerckbraun.deltasync              # diff mod original SKAL være tom
+  check-jsonschema --schemafile schemas/metadata.json \
+      metadata/dk.bjoerckbraun.deltasync.yml               # schema fra fdroiddata-repoet
+'
+```
 
 ## Build-konstruktion
 
 F-Droid's build-server kører i en Debian-baseret container. Vores app
-kræver et lille pre-build-step udover det almindelige Gradle-flow:
+kræver et lille pre-build-step udover det almindelige Gradle-flow.
+Recipen koder det i `.yml`'ens `sudo:`- og `prebuild:`-felter; det
+svarer til:
 
 ```sh
-# 1. Engang per CI-runner: hent Go-mobile binær.
-go install golang.org/x/mobile/cmd/gomobile@latest
+# 1. (sudo:) Hent en Go-toolchain. client/go.mod kræver go 1.26.3 — for nyt
+#    til Debians golang-go — så vi henter den officielle, pinnede tarball med
+#    SHA-256-verifikation.
+curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
+echo "<sha256>  /tmp/go.tar.gz" | sha256sum -c -
+tar -C /usr/local -xzf /tmp/go.tar.gz
 
-# 2. Pin'et NDK r25c. F-Droid's standard er typisk nyere; vi henter eksplicit.
-curl -sL https://dl.google.com/android/repository/android-ndk-r25c-linux.zip \
-    -o /tmp/ndk.zip
-unzip /tmp/ndk.zip -d /tmp/
+# 2. (prebuild:) NDK kommer fra F-Droids ndk:-felt, eksponeret som $$NDK$$.
+export PATH=/usr/local/go/bin:$PATH GOPATH=/tmp/go GOTOOLCHAIN=local
+export ANDROID_NDK_HOME=$$NDK$$
 
-# 3. Byg .aar fra Go-pakken (client/mobile).
-cd client
+# 3. Installér en SDK-platform: i prebuild-fasen er platforms/ stadig tom
+#    (Gradle installerer dem først senere), så gomobile bind ville ellers
+#    fejle med "failed to find android SDK platform".
+sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+# 4. gomobile/gobind pinnet til client/go.mod's x/mobile-version.
+go install golang.org/x/mobile/cmd/gomobile@<pinned>
+go install golang.org/x/mobile/cmd/gobind@<pinned>
+export PATH=$GOPATH/bin:$PATH
+gomobile init
+
+# 5. Byg .aar fra Go-pakken (client/mobile). android/libs/ er gitignored →
+#    mappen findes ikke i en frisk klon, så opret den først.
+cd ../../client
+mkdir -p ../android/libs
 gomobile bind -androidapi 21 -target=android \
     -o ../android/libs/deltasync.aar \
     gitlab.com/Star95/keepass-deltasync/client/mobile
 
-# 4. Udpak classes.jar til :sync's compileOnly-classpath.
+# 6. Udpak classes.jar til :sync's compileOnly-classpath.
 cd ../android/libs
 unzip -o deltasync.aar classes.jar
 mv classes.jar deltasync-classes.jar
 
-# 5. Standard Gradle-build.
-cd ..
-./gradlew :app:assembleRelease
+# 7. Standard Gradle-build (F-Droid kører selv assembleRelease).
 ```
 
-F-Droid's `metadata/*.yml` koder dette flow i `prebuild`-feltet. Se
+De tre gomobile-genererede artefakter (`deltasync.aar`,
+`deltasync-classes.jar`, `deltasync-sources.jar`) er `scanignore`'t i
+recipen, fordi F-Droids binær-scanner kører EFTER prebuild og ellers
+ville flagge dem — de bygges fra kilde i prebuild-trinnet. Se
 [`dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml)
 for den eksakte form.
 
@@ -56,7 +92,7 @@ matcher kildekoden:
    `archivesBaseName` og bruger `useReleaseTimestamps = false`.
 3. APK'en skal være v2-signeret med en stabil nøgle. Submitter'en
    leverer signing-konfig separat.
-4. Ingen ProGuard/R8 i v0.1 — vi har ikke en mappings-fil at fryse mod.
+4. Ingen ProGuard/R8 endnu — vi har ikke en mappings-fil at fryse mod.
    Tilføjes når v1 er stabil.
 
 ## Inkluderede tredje-parts biblioteker
@@ -81,19 +117,27 @@ plus standard Go runtime — ingen tredje-parts ikke-FOSS deps.
 
 ## Submission-procedure
 
-Release-tag'et findes allerede (`android/v0.2.0`, pushet). Resten:
+Submission er gennemført som [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661);
+nedenstående er proceduren for fremtidige opdateringer.
 
-1. Fork [fdroiddata](https://gitlab.com/fdroid/fdroiddata).
-2. Kopiér `metadata/dk.bjoerckbraun.deltasync.yml` ind i forken under
-   `metadata/`.
-3. Test lokalt: `fdroid build --verbose dk.bjoerckbraun.deltasync:2`
-   (`:2` = versionCode 2). Det er her gomobile-i-deres-container enten
-   virker eller driller — kør det før du indsender.
-4. Submit som merge-request i fdroiddata.
+Forken ligger i WSL: `~/fdroiddata` (remote `fork` = `Star95/fdroiddata`,
+`origin` = upstream `fdroid/fdroiddata`).
+
+1. Tag og push en ny release i monorepoet (`android/vX.Y.Z`) — det er
+   `commit:`-feltet F-Droid bygger fra.
+2. I `~/fdroiddata` på branch `deltasync`: opdatér
+   `metadata/dk.bjoerckbraun.deltasync.yml` (ny `Builds`-post +
+   `CurrentVersion`/`CurrentVersionCode`).
+3. Kør `fdroid rewritemeta` + `check-jsonschema` lokalt (se Docker-snippet
+   ovenfor) så `rewritemeta`- og `schema validation`-jobbene passerer.
+4. `git push fork deltasync` → re-trigger MR-pipelinen. Når den er grøn,
+   afventer det en reviewers merge.
 
 Bemærk: `UpdateCheckMode: Tags ^android/v[\d.]+$` sikrer at F-Droid kun
 følger `android/v*`-tags og ikke forveksler dem med `client/v*`
-(desktop-klienten) i samme monorepo.
+(desktop-klienten) i samme monorepo. `AutoUpdateMode: Version` (uden
+pattern — `android/v%v`-syntaksen afvises af det nuværende schema)
+opretter selv nye build-poster fra de matchede tags.
 
 ## Inspirationsmateriale
 
