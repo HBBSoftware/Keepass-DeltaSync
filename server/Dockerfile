@@ -12,6 +12,11 @@
 
 FROM php:8.2-apache
 
+LABEL org.opencontainers.image.title="DeltaSync sync server" \
+      org.opencontainers.image.description="End-to-end encrypted, entry-level sync server for KeePass databases (PHP + PostgreSQL). Requires self-hosting." \
+      org.opencontainers.image.source="https://gitlab.com/Star95/keepass-deltasync" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
+
 # --- PHP extensions ---------------------------------------------------------
 # pdo_pgsql + sodium are the only non-bundled extensions the server needs
 # (pdo, json are built in). libpq-dev/libsodium-dev pull in their runtime libs
