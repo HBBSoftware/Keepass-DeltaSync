@@ -119,13 +119,22 @@ build:client:
 # ----------------------------------------------------------------------
 #
 # Produces a multi-arch (amd64 + arm64) image so it runs on x86 servers/NAS as
-# well as ARM boxes (Raspberry Pi, ARM VPS, Apple Silicon). Pushed to this
-# project's GitLab Container Registry — credentials are injected automatically
-# (CI_REGISTRY_USER / CI_REGISTRY_PASSWORD), no secrets to configure.
+# well as ARM boxes (Raspberry Pi, ARM VPS, Apple Silicon). Always pushed to
+# this project's GitLab Container Registry — credentials are injected
+# automatically (CI_REGISTRY_USER / CI_REGISTRY_PASSWORD), no setup needed.
+#
+# OPTIONAL add-ons, each activated only when its CI/CD variable is set (so the
+# job keeps working untouched until you opt in):
+#   • Docker Hub mirror — set DOCKERHUB_USER + DOCKERHUB_TOKEN (a Docker Hub
+#     access token). Optionally DOCKERHUB_IMAGE to override the repo name
+#     (default: $DOCKERHUB_USER/deltasync-server). Same multi-arch image is
+#     pushed there in the same build.
+#   • cosign signature — set COSIGN_PRIVATE_KEY (a cosign private key) and
+#     COSIGN_PASSWORD. The pushed image digest is signed in every registry it
+#     was pushed to. Verify with:  cosign verify --key cosign.pub <image>
 #
 # Cut a server release:
-#   git tag server/v0.1.0
-#   git push origin server/v0.1.0
+#   git tag server/v0.1.0 && git push origin server/v0.1.0
 #
 # Consumers then pull (anonymously, public project):
 #   registry.gitlab.com/star95/keepass-deltasync/server:0.1.0   (and :latest)
@@ -154,15 +163,42 @@ publish:server-image:
       VERSION="${CI_COMMIT_TAG#server/}"          # server/v0.1.0 → v0.1.0
       VERSION="${VERSION#v}"                       # v0.1.0 → 0.1.0
       IMAGE="$CI_REGISTRY_IMAGE/server"
+
+      # GitLab registry tags are always pushed.
+      TAGS="--tag $IMAGE:$VERSION --tag $IMAGE:latest"
+      SIGN_REFS="$IMAGE"
+
+      # Optional Docker Hub mirror (only if the access token is configured).
+      if [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+        DHIMAGE="${DOCKERHUB_IMAGE:-${DOCKERHUB_USER}/deltasync-server}"
+        echo "==> Docker Hub mirror enabled: $DHIMAGE"
+        echo "$DOCKERHUB_TOKEN" | docker login -u "${DOCKERHUB_USER}" --password-stdin docker.io
+        TAGS="$TAGS --tag docker.io/$DHIMAGE:$VERSION --tag docker.io/$DHIMAGE:latest"
+        SIGN_REFS="$SIGN_REFS docker.io/$DHIMAGE"
+      fi
+
       echo "==> Building $IMAGE:$VERSION (+ :latest) for linux/amd64,linux/arm64"
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --label "org.opencontainers.image.version=${VERSION}" \
         --label "org.opencontainers.image.revision=${CI_COMMIT_SHA}" \
-        --tag "$IMAGE:$VERSION" \
-        --tag "$IMAGE:latest" \
+        $TAGS \
+        --metadata-file /tmp/build-meta.json \
         --push \
         ./server
+
+      # Optional cosign signature (only if a signing key is configured). Sign by
+      # digest — the same manifest-list digest was pushed to every registry.
+      if [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
+        DIGEST="$(sed -n 's/.*"containerimage.digest": *"\([^"]*\)".*/\1/p' /tmp/build-meta.json)"
+        echo "==> Signing $DIGEST with cosign"
+        COSIGN_VERSION=v2.4.1
+        wget -qO /usr/local/bin/cosign "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+        chmod +x /usr/local/bin/cosign
+        for ref in $SIGN_REFS; do
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${ref}@${DIGEST}"
+        done
+      fi
 
 # ----------------------------------------------------------------------
 # Publish GitLab Release
@@ -202,3 +238,58 @@ release:client:
         - name: 'SHA256SUMS'
           url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS'
           link_type: 'other'
+
+# ----------------------------------------------------------------------
+# Mirror the client release to GitHub Releases (optional)
+# ----------------------------------------------------------------------
+#
+# Uploads the same desktop binaries to a GitHub Release on the public mirror,
+# so the GitHub showcase has downloadable artifacts too. Activated only when
+# GITHUB_TOKEN is set (a GitHub PAT with `repo` scope on the mirror repo), so
+# it stays dormant until you opt in. Override GITHUB_REPO if the mirror moves.
+# The client/v* tag is already on GitHub (origin pushes tags to both remotes).
+
+release:client-github:
+  stage: release
+  image: alpine:3
+  variables:
+    GITHUB_REPO: "HBBSoftware/Keepass-DeltaSync"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^client\/v\d+\.\d+\.\d+$/ && $GITHUB_TOKEN
+  needs:
+    - job: build:client
+      artifacts: true
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      set -eu
+      VERSION="${CI_COMMIT_TAG#client/}"
+      API="https://api.github.com/repos/$GITHUB_REPO"
+      AUTH="Authorization: Bearer $GITHUB_TOKEN"
+      ACCEPT="Accept: application/vnd.github+json"
+
+      # Create the release for this tag, or reuse it if it already exists.
+      body=$(printf '{"tag_name":"%s","name":"keepass-deltasync client %s","body":"Pre-built desktop client binaries for %s. Verify integrity with SHA256SUMS; build from source: see README.md."}' "$CI_COMMIT_TAG" "$VERSION" "$VERSION")
+      code=$(curl -sS -o /tmp/rel.json -w '%{http_code}' -X POST "$API/releases" -H "$AUTH" -H "$ACCEPT" -d "$body")
+      if [ "$code" = "201" ]; then
+        echo "==> created GitHub release $CI_COMMIT_TAG"
+      else
+        echo "==> release create returned $code; fetching existing release by tag"
+        curl -fsS "$API/releases/tags/$CI_COMMIT_TAG" -H "$AUTH" -H "$ACCEPT" -o /tmp/rel.json
+      fi
+      rid=$(jq -r '.id' /tmp/rel.json)
+      [ -n "$rid" ] && [ "$rid" != "null" ] || { echo "could not resolve release id"; cat /tmp/rel.json; exit 1; }
+
+      existing=$(curl -fsS "$API/releases/$rid/assets" -H "$AUTH" -H "$ACCEPT" | jq -r '.[].name')
+      for f in dist/*.tar.gz dist/*.zip dist/SHA256SUMS; do
+        name=$(basename "$f")
+        if echo "$existing" | grep -qx "$name"; then
+          echo "    skip (already uploaded): $name"
+          continue
+        fi
+        curl -fsS -X POST "https://uploads.github.com/repos/$GITHUB_REPO/releases/$rid/assets?name=$name" \
+          -H "$AUTH" -H "Content-Type: application/octet-stream" \
+          --data-binary @"$f" >/dev/null
+        echo "    uploaded: $name"
+      done
