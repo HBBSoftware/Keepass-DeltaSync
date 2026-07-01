@@ -29,6 +29,26 @@
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/enrollScanButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/enroll_action_scan"
+            app:icon="@android:drawable/ic_menu_camera"
+            app:iconGravity="textStart" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="4dp"
+            android:text="@string/enroll_or_enter_manually"
+            android:textSize="12sp"
+            android:textAllCaps="true"
+            android:textColor="?android:attr/textColorSecondary" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

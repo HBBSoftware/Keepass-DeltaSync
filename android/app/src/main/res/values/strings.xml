@@ -74,6 +74,11 @@
     <string name="enroll_label_token">Enrollment token</string>
     <string name="enroll_label_device_name">Device name (optional)</string>
     <string name="enroll_action">Enroll</string>
+    <string name="enroll_action_scan">Scan QR code</string>
+    <string name="enroll_or_enter_manually">or enter manually</string>
+    <string name="enroll_scan_prompt">Point the camera at the enrollment QR code shown in the admin panel.</string>
+    <string name="enroll_scan_invalid">That isn\'t a DeltaSync enrollment QR code.</string>
+    <string name="enroll_scan_filled">Scanned. Review the details and tap Enroll.</string>
     <string name="enroll_error_required_fields">Server URL and enrollment token are required.</string>
     <string name="enroll_error_url_scheme">Server URL must start with https:// or http://</string>
     <string name="enroll_error_server_format">Server rejected: %1$d %2$s %3$s</string>

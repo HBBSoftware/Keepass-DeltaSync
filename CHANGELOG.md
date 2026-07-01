@@ -8,6 +8,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **QR-code enrollment (Android)** — the enrollment screen now has a
+  *Scan QR code* button (ZXing, camera). The web admin panel renders a QR next
+  to each one-time enrollment token that bundles the server URL and token
+  (`deltasync://enroll?server=…&token=…`), so a new device is bound by scanning
+  instead of typing. The QR is generated fully client-side by a self-contained
+  encoder in `admin.html`; manual entry still works unchanged. Camera use is
+  optional (`android.hardware.camera` not required).
 - **Web admin panel** — `admin.html`, served by the server, is a
   token-authenticated UI for managing the server from a browser: create users,
   issue enrollment tokens, enable/disable and delete users, and browse the

@@ -114,6 +114,11 @@ dependencies {
     // baggrunds-sync (se EncryptedPassphraseStore).
     implementation("androidx.biometric:biometric:1.1.0")
 
+    // ZXing embedded — QR-scanning af enrollment-tokens (kamera). FOSS
+    // (Apache-2.0), ingen Google Play Services → F-Droid-kompatibel, i
+    // modsætning til ML Kit. Trækker com.google.zxing:core ind transitivt.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
     // Coroutines — bruges af DataStore + WorkManager
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

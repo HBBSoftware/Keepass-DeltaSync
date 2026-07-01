@@ -73,6 +73,11 @@
     <string name="enroll_label_token">Enrollment-token</string>
     <string name="enroll_label_device_name">Enheds-navn (valgfrit)</string>
     <string name="enroll_action">Enroll</string>
+    <string name="enroll_action_scan">Scan QR-kode</string>
+    <string name="enroll_or_enter_manually">eller indtast manuelt</string>
+    <string name="enroll_scan_prompt">Ret kameraet mod enrollment-QR-koden fra admin-panelet.</string>
+    <string name="enroll_scan_invalid">Det er ikke en DeltaSync enrollment-QR-kode.</string>
+    <string name="enroll_scan_filled">Scannet. Tjek detaljerne og tryk Enroll.</string>
     <string name="enroll_error_required_fields">Server-URL og enrollment-token er påkrævet.</string>
     <string name="enroll_error_url_scheme">Server-URL skal starte med https:// eller http://</string>
     <string name="enroll_error_server_format">Server afviste: %1$d %2$s %3$s</string>

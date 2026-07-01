@@ -73,6 +73,10 @@ enable/disable and delete users, and browse the audit log — no command line
 needed. The token is held only in the browser tab's session storage and sent
 as a bearer token to the existing admin API.
 
+Each issued enrollment token is also shown as a QR code that bundles the server
+URL and token. On Android, open **Enroll → Scan QR code** to bind the device by
+scanning it instead of typing the token by hand.
+
 ---
 
 ## HTTPS

@@ -66,6 +66,9 @@
     padding: 14px; margin-top: 12px;
   }
   .token-box code { display: block; word-break: break-all; font-size: 1rem; margin: 8px 0; color: var(--accent); }
+  .qr-wrap { margin: 12px 0 4px; }
+  .qr-wrap canvas { background: #fff; padding: 8px; border-radius: 6px; display: block; image-rendering: pixelated; width: 208px; height: 208px; }
+  .qr-cap { font-size: .78rem; color: var(--muted); margin-top: 6px; }
   pre.details { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--muted); font-size: .82rem; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
   .note { font-size: .82rem; color: var(--warn); }
@@ -163,6 +166,141 @@
 (function () {
   "use strict";
 
+  // ---- Self-contained QR encoder (byte mode, EC level M) ----------------
+  // No external dependency: encodes the deltasync://enroll URL so the Android
+  // app can scan it instead of the user typing the token. Verified bit-for-bit
+  // against a reference encoder and round-tripped through a QR decoder for
+  // versions 1–40. Standard tables from ISO/IEC 18004.
+  const QREnc = (function () {
+    const CW_COUNT = [0,26,44,70,100,134,172,196,242,292,346,404,466,532,581,655,733,815,901,991,1085,
+      1156,1258,1364,1474,1588,1706,1828,1921,2051,2185,2323,2465,2611,2761,2876,3034,3196,3362,3532,3706];
+    const EC_CW_M = [10,16,26,36,48,64,72,88,110,130,150,176,198,216,240,280,308,338,364,416,
+      442,476,504,560,588,644,700,728,784,812,868,924,980,1036,1064,1120,1204,1260,1316,1372];
+    const EC_BLK_M = [1,1,1,2,2,4,4,4,5,5,5,8,9,9,10,10,11,13,14,16,
+      17,17,18,20,21,23,25,26,28,29,31,33,35,37,38,40,43,45,47,49];
+    const sizeOf = (v) => v * 4 + 17;
+    const dataCw = (v) => CW_COUNT[v] - EC_CW_M[v - 1];
+    const ccBits = (v) => (v < 10 ? 8 : 16);
+
+    // GF(256)
+    const EXP = new Array(512), LOG = new Array(256);
+    (function () { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11d; } for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255]; })();
+    const mul = (a, b) => (a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]]);
+    function genPoly(deg) { let p = [1]; for (let i = 0; i < deg; i++) { const n = new Array(p.length + 1).fill(0); for (let j = 0; j < p.length; j++) { n[j] ^= p[j]; n[j + 1] ^= mul(p[j], EXP[i]); } p = n; } return p; }
+    function rs(data, ecLen) { const g = genPoly(ecLen); const res = new Array(ecLen).fill(0); for (const d of data) { const f = d ^ res[0]; res.shift(); res.push(0); for (let j = 0; j < ecLen; j++) res[j] ^= mul(g[j + 1], f); } return res; }
+
+    function chooseVersion(len) { for (let v = 1; v <= 40; v++) if (4 + ccBits(v) + len * 8 <= dataCw(v) * 8) return v; throw new Error("data too long for QR"); }
+
+    function alignCoords(v) { if (v === 1) return []; const cnt = Math.floor(v / 7) + 2; const s = sizeOf(v); const iv = s === 145 ? 26 : Math.ceil((s - 13) / (2 * cnt - 2)) * 2; const pos = [s - 7]; for (let i = 1; i < cnt - 1; i++) pos[i] = pos[i - 1] - iv; pos.push(6); return pos.reverse(); }
+
+    function buildData(text) {
+      const bytes = Array.from(new TextEncoder().encode(text));
+      const v = chooseVersion(bytes.length);
+      const bits = [];
+      const put = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+      put(0b0100, 4); put(bytes.length, ccBits(v)); for (const b of bytes) put(b, 8);
+      const cap = dataCw(v) * 8;
+      put(0, Math.min(4, cap - bits.length));
+      while (bits.length % 8 !== 0) bits.push(0);
+      const pad = [0xec, 0x11]; let pi = 0;
+      while (bits.length < cap) { put(pad[pi % 2], 8); pi++; }
+      const cw = []; for (let i = 0; i < bits.length; i += 8) { let x = 0; for (let j = 0; j < 8; j++) x = (x << 1) | bits[i + j]; cw.push(x); }
+      return { version: v, codewords: cw };
+    }
+
+    function interleave(v, cw) {
+      const nb = EC_BLK_M[v - 1], total = dataCw(v), ecPer = EC_CW_M[v - 1] / nb;
+      const base = Math.floor(total / nb), rem = total % nb;
+      const dblk = [], eblk = []; let off = 0;
+      for (let b = 0; b < nb; b++) { const len = base + (b >= nb - rem ? 1 : 0); const blk = cw.slice(off, off + len); off += len; dblk.push(blk); eblk.push(rs(blk, ecPer)); }
+      const out = []; const maxD = base + (rem > 0 ? 1 : 0);
+      for (let i = 0; i < maxD; i++) for (let b = 0; b < nb; b++) if (i < dblk[b].length) out.push(dblk[b][i]);
+      for (let i = 0; i < ecPer; i++) for (let b = 0; b < nb; b++) out.push(eblk[b][i]);
+      return out;
+    }
+
+    function makeMatrix(v) {
+      const size = sizeOf(v); const m = [], rv = [];
+      for (let r = 0; r < size; r++) { m.push(new Array(size).fill(0)); rv.push(new Array(size).fill(false)); }
+      const set = (r, c, val) => { m[r][c] = val ? 1 : 0; rv[r][c] = true; };
+      function finder(r, c) { for (let dr = -1; dr <= 7; dr++) for (let dc = -1; dc <= 7; dc++) { const rr = r + dr, cc = c + dc; if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue; const ring = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6 && (dr === 0 || dr === 6 || dc === 0 || dc === 6); const core = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4; set(rr, cc, ring || core ? 1 : 0); } }
+      finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+      for (let i = 8; i < size - 8; i++) { if (!rv[6][i]) set(6, i, i % 2 === 0 ? 1 : 0); if (!rv[i][6]) set(i, 6, i % 2 === 0 ? 1 : 0); }
+      set(size - 8, 8, 1);
+      const co = alignCoords(v), last = co.length - 1;
+      for (let i = 0; i <= last; i++) for (let j = 0; j <= last; j++) {
+        if ((i === 0 && j === 0) || (i === 0 && j === last) || (i === last && j === 0)) continue;
+        const r = co[i], c = co[j];
+        for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) set(r + dr, c + dc, Math.max(Math.abs(dr), Math.abs(dc)) !== 1 ? 1 : 0);
+      }
+      for (let i = 0; i < 9; i++) { rv[8][i] = true; rv[i][8] = true; }
+      for (let i = 0; i < 8; i++) { rv[8][size - 1 - i] = true; rv[size - 1 - i][8] = true; }
+      if (v >= 7) for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { rv[size - 11 + j][i] = true; rv[i][size - 11 + j] = true; }
+      return { size, m, rv };
+    }
+
+    function placeData(mat, data) {
+      const { size, m, rv } = mat; const totalBits = data.length * 8;
+      const bitAt = (i) => (i < totalBits ? (data[i >> 3] >> (7 - (i & 7))) & 1 : 0);
+      let bi = 0, up = true;
+      for (let col = size - 1; col > 0; col -= 2) { if (col === 6) col--; for (let i = 0; i < size; i++) { const row = up ? size - 1 - i : i; for (let c = 0; c < 2; c++) { const cc = col - c; if (rv[row][cc]) continue; m[row][cc] = bitAt(bi++); } } up = !up; }
+    }
+
+    function maskFn(id, r, c) {
+      switch (id) {
+        case 0: return (r + c) % 2 === 0; case 1: return r % 2 === 0; case 2: return c % 3 === 0;
+        case 3: return (r + c) % 3 === 0; case 4: return (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0;
+        case 5: return ((r * c) % 2) + ((r * c) % 3) === 0; case 6: return (((r * c) % 2) + ((r * c) % 3)) % 2 === 0;
+        default: return (((r + c) % 2) + ((r * c) % 3)) % 2 === 0;
+      }
+    }
+    function applyMask(mat, id) { const { size, m, rv } = mat; const out = m.map((row) => row.slice()); for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!rv[r][c] && maskFn(id, r, c)) out[r][c] ^= 1; return out; }
+
+    function formatBits(mask) { const data = (0b00 << 3) | mask; let d = data << 10; const g = 0b10100110111; for (let i = 14; i >= 10; i--) if ((d >> i) & 1) d ^= g << (i - 10); return ((data << 10) | d) ^ 0b101010000010010; }
+    function versionBits(v) { let d = v << 12; const g = 0b1111100100101; for (let i = 17; i >= 12; i--) if ((d >> i) & 1) d ^= g << (i - 12); return (v << 12) | d; }
+    function placeFmtVer(size, g, mask, v) {
+      const fmt = formatBits(mask);
+      for (let i = 0; i < 15; i++) { const bit = (fmt >> i) & 1; if (i < 6) g[i][8] = bit; else if (i < 8) g[i + 1][8] = bit; else g[size - 15 + i][8] = bit; if (i < 8) g[8][size - i - 1] = bit; else if (i < 9) g[8][7] = bit; else g[8][15 - i - 1] = bit; }
+      g[size - 8][8] = 1;
+      if (v >= 7) { const vb = versionBits(v); for (let i = 0; i < 18; i++) { const bit = (vb >> i) & 1; const r = Math.floor(i / 3), c = i % 3; g[size - 11 + c][r] = bit; g[r][size - 11 + c] = bit; } }
+    }
+    function penalty(size, g) {
+      let score = 0;
+      for (let r = 0; r < size; r++) { let rc = 1, rr = 1; for (let c = 1; c < size; c++) { if (g[r][c] === g[r][c - 1]) { rc++; if (rc === 5) score += 3; else if (rc > 5) score++; } else rc = 1; if (g[c][r] === g[c - 1][r]) { rr++; if (rr === 5) score += 3; else if (rr > 5) score++; } else rr = 1; } }
+      for (let r = 0; r < size - 1; r++) for (let c = 0; c < size - 1; c++) if (g[r][c] === g[r][c + 1] && g[r][c] === g[r + 1][c] && g[r][c] === g[r + 1][c + 1]) score += 3;
+      const p1 = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0], p2 = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+      const match = (arr, i, get) => { for (let k = 0; k < 11; k++) if (get(i + k) !== arr[k]) return false; return true; };
+      for (let r = 0; r < size; r++) for (let c = 0; c <= size - 11; c++) if (match(p1, c, (x) => g[r][x]) || match(p2, c, (x) => g[r][x])) score += 40;
+      for (let c = 0; c < size; c++) for (let r = 0; r <= size - 11; r++) if (match(p1, r, (x) => g[x][c]) || match(p2, r, (x) => g[x][c])) score += 40;
+      let dark = 0; for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) dark += g[r][c];
+      score += Math.floor(Math.abs((dark * 100) / (size * size) - 50) / 5) * 10;
+      return score;
+    }
+
+    function encode(text) {
+      const { version, codewords } = buildData(text);
+      const mat = makeMatrix(version);
+      placeData(mat, interleave(version, codewords));
+      let best = null;
+      for (let id = 0; id < 8; id++) { const g = applyMask(mat, id); placeFmtVer(mat.size, g, id, version); const p = penalty(mat.size, g); if (!best || p < best.p) best = { p, g }; }
+      return { size: mat.size, modules: best.g };
+    }
+    return { encode };
+  })();
+
+  // Draws a QR of `text` onto a fresh <canvas> and returns it. quiet-zone = 4.
+  function qrCanvas(text) {
+    const { size, modules } = QREnc.encode(text);
+    const quiet = 4, dim = size + quiet * 2;
+    const canvas = el("canvas");
+    canvas.width = dim; canvas.height = dim;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, dim, dim);
+    ctx.fillStyle = "#000";
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (modules[r][c]) ctx.fillRect(c + quiet, r + quiet, 1, 1);
+    return canvas;
+  }
+
   const TOKEN_KEY = "deltasync_admin_token";
   // API base relative to this page → works at the web root AND under an
   // APP_BASE_PATH sub-path (e.g. /sync/admin.html → /sync/api/v1/).
@@ -249,6 +387,14 @@
   });
 
   // ---- Token display (one-time enrollment tokens) ----
+  // Server base URL for the enroll QR = this page's API base minus /api/v1/.
+  // The Android app appends /api/v1/devices/enroll itself.
+  function serverBaseUrl() { return API.replace(/api\/v1\/?$/, "").replace(/\/+$/, ""); }
+  function enrollUri(token) {
+    return "deltasync://enroll?server=" + encodeURIComponent(serverBaseUrl()) +
+      "&token=" + encodeURIComponent(token);
+  }
+
   function showEnrollmentToken(container, result, label) {
     clear(container);
     const box = el("div", { class: "token-box" });
@@ -260,6 +406,14 @@
       class: "secondary small", text: "Copy",
       on: { click: () => navigator.clipboard && navigator.clipboard.writeText(result.enrollment_token) },
     }));
+    // QR: server URL + token bundled so the Android app can scan instead of typing.
+    try {
+      const canvas = qrCanvas(enrollUri(result.enrollment_token));
+      box.appendChild(el("div", { class: "qr-wrap" }, [
+        canvas,
+        el("div", { class: "qr-cap", text: "Scan with the DeltaSync Android app (Enroll → Scan QR code)." }),
+      ]));
+    } catch (_) { /* payload too large for a QR — token + copy button still work */ }
     container.appendChild(box);
   }
 

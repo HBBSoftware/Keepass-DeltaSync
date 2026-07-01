@@ -49,7 +49,10 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     - `EnrollActivity` — enrollment-formular (server-URL +
       enrollment-token + valgfrit device-navn). Genererer X25519-keypair
       via gomobile-laget, POST'er til serveren, gemmer device-token via
-      Keystore.
+      Keystore. Kan også **scanne en QR-kode** (ZXing) fra web-admin-panelet
+      — `deltasync://enroll?server=…&token=…` — der udfylder felterne, så
+      brugeren slipper for at taste. Parseren ligger i `:sync`
+      (`EnrollUriParser`, ren JVM + unit-testet).
     - `SetupActivity` — kdbx-picker via SAF (Storage Access Framework) +
       database-vælger der lister databases fra serveren.
     - `KeystoreTokenStore` — `EncryptedSharedPreferences` + Android

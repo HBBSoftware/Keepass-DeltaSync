@@ -5,12 +5,16 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import dk.bjoerckbraun.deltasync.api.ApiException
 import dk.bjoerckbraun.deltasync.api.EnrollmentClient
+import dk.bjoerckbraun.deltasync.enroll.EnrollUriParser
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import kotlinx.coroutines.Dispatchers
@@ -33,16 +37,39 @@ import kotlinx.coroutines.withContext
  */
 class EnrollActivity : ComponentActivity() {
 
+    private lateinit var serverUrlInput: TextInputEditText
+    private lateinit var tokenInput: TextInputEditText
+    private lateinit var deviceNameInput: TextInputEditText
+    private lateinit var errorText: TextView
+
+    // ZXing scan-launcher: åbner kamera-scanneren og leverer den rå QR-tekst
+    // (eller null hvis brugeren annullerer). Registreres i onCreate.
+    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@registerForActivityResult // annulleret
+        onScanned(contents)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_enroll)
 
-        val serverUrlInput = findViewById<TextInputEditText>(R.id.serverUrlInput)
-        val tokenInput = findViewById<TextInputEditText>(R.id.tokenInput)
-        val deviceNameInput = findViewById<TextInputEditText>(R.id.deviceNameInput)
+        serverUrlInput = findViewById(R.id.serverUrlInput)
+        tokenInput = findViewById(R.id.tokenInput)
+        deviceNameInput = findViewById(R.id.deviceNameInput)
+        errorText = findViewById(R.id.enrollError)
         val submitButton = findViewById<MaterialButton>(R.id.enrollSubmitButton)
+        val scanButton = findViewById<MaterialButton>(R.id.enrollScanButton)
         val progress = findViewById<ProgressBar>(R.id.enrollProgress)
-        val errorText = findViewById<TextView>(R.id.enrollError)
+
+        scanButton.setOnClickListener {
+            errorText.visibility = View.GONE
+            scanLauncher.launch(ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt(getString(R.string.enroll_scan_prompt))
+                setBeepEnabled(false)
+                setOrientationLocked(false)
+            })
+        }
 
         submitButton.setOnClickListener {
             val serverUrl = serverUrlInput.text?.toString()?.trim().orEmpty()
@@ -87,6 +114,26 @@ class EnrollActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Håndterer en scannet QR: parser `deltasync://enroll`-URI'en og udfylder
+     * felterne. Vi auto-submitter bevidst IKKE — brugeren får lov at se
+     * server-URL'en (bekræfte at det er den rigtige server) og evt. tilføje et
+     * enheds-navn før der trykkes Enroll. Ugyldige koder afvises pænt.
+     */
+    private fun onScanned(contents: String) {
+        val parsed = EnrollUriParser.parse(contents)
+        if (parsed == null) {
+            errorText.setText(R.string.enroll_scan_invalid)
+            errorText.visibility = View.VISIBLE
+            return
+        }
+        serverUrlInput.setText(parsed.server)
+        tokenInput.setText(parsed.token)
+        parsed.deviceName?.let { deviceNameInput.setText(it) }
+        errorText.visibility = View.GONE
+        Toast.makeText(this, R.string.enroll_scan_filled, Toast.LENGTH_SHORT).show()
     }
 
     private suspend fun runEnrollment(
