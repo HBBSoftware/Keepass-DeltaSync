@@ -8,35 +8,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **QR-code enrollment (Android)** — the enrollment screen now has a
-  *Scan QR code* button (ZXing, camera). The web admin panel renders a QR next
-  to each one-time enrollment token that bundles the server URL and token
-  (`deltasync://enroll?server=…&token=…`), so a new device is bound by scanning
-  instead of typing. The QR is generated fully client-side by a self-contained
-  encoder in `admin.html`; manual entry still works unchanged. Camera use is
-  optional (`android.hardware.camera` not required).
-- **Web admin panel** — `admin.html`, served by the server, is a
-  token-authenticated UI for managing the server from a browser: create users,
-  issue enrollment tokens, enable/disable and delete users, and browse the
-  audit log (with manual cleanup). It calls the existing admin API with the
-  admin token (kept only in the tab's session storage); no new server
-  endpoints, and it works under an `APP_BASE_PATH` sub-path.
-- **Health-check endpoint** — `GET /api/v1/health` (public, no auth) returns
-  `200 {"status":"ok","db":"up"}` when the app and database are reachable, or
-  `503` otherwise. The Docker image ships a built-in `HEALTHCHECK` that uses it,
-  so `docker ps` and NAS UIs (TrueNAS, Portainer) show real app health.
+- **QR-code enrollment (Android)** — the enrollment screen gains a *Scan QR
+  code* button (ZXing, camera) that reads the enrollment QR shown by the web
+  admin panel (`deltasync://enroll?server=…&token=…`) and fills the form, so a
+  new device is bound by scanning instead of typing. Manual entry is unchanged;
+  camera use is optional (`android.hardware.camera` not required). Ships in a
+  future `android/*` release. (The QR itself is produced server-side — see
+  server/v0.2.0.)
 - **SECURITY.md and CONTRIBUTING.md** — a vulnerability-reporting policy
   (private channels, scope, trust model) and a contributor guide (DCO sign-off,
   per-component build/test, release tagging). A `/.well-known/security.txt`
   is served from the website.
-
-### Fixed
-
-- **Server returned newline-wrapped base64** — PostgreSQL's
-  `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
-  decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)
-  rejected the embedded `\n` with "Illegal base64 character a". The
-  entry changes/versions endpoints now strip the newlines.
 
 ### Changed
 
@@ -45,6 +27,34 @@ project adheres to [Semantic Versioning](https://semver.org/).
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
+
+## [server/v0.2.0] — 2026-07-01
+
+### Added
+
+- **Web admin panel** — `admin.html`, served by the server, is a
+  token-authenticated UI for managing the server from a browser: create users,
+  issue enrollment tokens, enable/disable and delete users, and browse the
+  audit log (with manual cleanup). It calls the existing admin API with the
+  admin token (kept only in the tab's session storage); no new server
+  endpoints, and it works under an `APP_BASE_PATH` sub-path.
+- **QR codes for enrollment tokens** — each issued enrollment token is rendered
+  as a QR (server URL + token bundled) so Android devices can enroll by
+  scanning. The QR is produced entirely client-side by a self-contained
+  byte-mode encoder embedded in `admin.html` — no new dependency and no server
+  code.
+- **Health-check endpoint** — `GET /api/v1/health` (public, no auth) returns
+  `200 {"status":"ok","db":"up"}` when the app and database are reachable, or
+  `503` otherwise. The Docker image ships a built-in `HEALTHCHECK` that uses it,
+  so `docker ps` and NAS UIs (TrueNAS, Portainer) show real app health.
+
+### Fixed
+
+- **Server returned newline-wrapped base64** — PostgreSQL's
+  `encode(…, 'base64')` breaks output at 76 chars per RFC 2045. Strict
+  decoders (Android's `java.util.Base64`, Go's `base64.StdEncoding`)
+  rejected the embedded `\n` with "Illegal base64 character a". The
+  entry changes/versions endpoints now strip the newlines.
 
 ## [server/v0.1.0] — 2026-06-30
 
