@@ -128,10 +128,10 @@ build:client:
 #   • Docker Hub mirror — set DOCKERHUB_USER + DOCKERHUB_TOKEN (a Docker Hub
 #     access token). Optionally DOCKERHUB_IMAGE to override the repo name
 #     (default: $DOCKERHUB_USER/deltasync-server). Same multi-arch image is
-#     pushed there in the same build. The repo's short + full description are
-#     kept in sync from docs/dockerhub-overview.md by the separate
-#     `dockerhub:description` job below (override the one-line short text with
-#     DOCKERHUB_DESC).
+#     pushed there in the same build. (The Docker Hub page's short + full
+#     description are NOT set by the push — a PAT lacks the scope to edit them.
+#     Paste them once from docs/dockerhub-overview.md via the Docker Hub UI:
+#     Repository -> Manage repository -> Description + Overview.)
 #   • cosign signature — set COSIGN_PRIVATE_KEY (a cosign private key) and
 #     COSIGN_PASSWORD. The pushed image digest is signed in every registry it
 #     was pushed to. Verify with:  cosign verify --key cosign.pub <image>
@@ -202,52 +202,6 @@ publish:server-image:
           cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${ref}@${DIGEST}"
         done
       fi
-
-# ----------------------------------------------------------------------
-# Sync Docker Hub repository description
-# ----------------------------------------------------------------------
-#
-# The registry push never sets the Docker Hub page text, so this job pushes the
-# short + full description from docs/dockerhub-overview.md via the Docker Hub
-# API. Decoupled from the image build so a docs-only edit refreshes the page
-# without cutting a release. Gated on DOCKERHUB_TOKEN (skipped entirely when the
-# mirror isn't configured). Runs on server/v* tags and when the overview file
-# changes on the default branch. allow_failure: a hiccup here never breaks a
-# release.
-
-dockerhub:description:
-  stage: publish
-  image: alpine:3.20
-  allow_failure: true
-  rules:
-    - if: '$DOCKERHUB_TOKEN == null || $DOCKERHUB_TOKEN == ""'
-      when: never
-    - if: $CI_COMMIT_TAG =~ /^server\/v\d+\.\d+\.\d+$/
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        - docs/dockerhub-overview.md
-  before_script:
-    - apk add --no-cache curl jq
-  script:
-    - |
-      set -eu
-      DHIMAGE="${DOCKERHUB_IMAGE:-${DOCKERHUB_USER}/deltasync-server}"
-      SHORT="${DOCKERHUB_DESC:-Self-hostable, end-to-end-encrypted KeePass (.kdbx) delta-sync server. Multi-arch amd64+arm64.}"
-      echo "==> Syncing Docker Hub description for $DHIMAGE"
-      JWT="$(curl -sf -H 'Content-Type: application/json' -X POST \
-        -d "$(jq -n --arg u "$DOCKERHUB_USER" --arg p "$DOCKERHUB_TOKEN" '{username:$u,password:$p}')" \
-        https://hub.docker.com/v2/users/login/ | jq -r '.token // empty')"
-      if [ -z "$JWT" ]; then
-        echo "ERROR: Docker Hub API login failed"; exit 1
-      fi
-      BODY="$(jq -n --rawfile full docs/dockerhub-overview.md --arg short "$SHORT" \
-        '{full_description:$full, description:$short}')"
-      CODE="$(curl -s -o /tmp/resp.json -w '%{http_code}' -X PATCH \
-        -H "Authorization: JWT $JWT" -H 'Content-Type: application/json' \
-        -d "$BODY" "https://hub.docker.com/v2/repositories/$DHIMAGE/")"
-      echo "    PATCH $DHIMAGE -> HTTP $CODE"
-      [ "$CODE" = "200" ] || { echo "unexpected status; response:"; cat /tmp/resp.json; exit 1; }
-      echo "==> Docker Hub description updated."
 
 # ----------------------------------------------------------------------
 # Publish GitLab Release
