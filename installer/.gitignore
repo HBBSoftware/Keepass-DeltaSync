@@ -1,0 +1,3 @@
+# Byggeartefakter — installeren og staging-træet bygges lokalt af build.ps1.
+dist/
+out/
