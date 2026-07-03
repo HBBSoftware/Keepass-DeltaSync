@@ -261,11 +261,12 @@ func autostartInstalled() (bool, error) {
 		}
 		return fileExists(p), nil
 	case "linux":
-		p, err := linuxUnitPath()
-		if err != nil {
-			return false, err
-		}
-		return fileExists(p), nil
+		// Spørg systemd om unitten faktisk er *enabled* — ikke bare om filen
+		// ligger der. En unit-fil kan sagtens findes uden at være enabled (fx
+		// hvis `enable` fejlede), og så autostarter den ikke. is-enabled skriver
+		// "enabled" til stdout og afslutter 0 når den er slået til.
+		out, _ := runHidden("systemctl", "--user", "is-enabled", autostartUnit)
+		return strings.TrimSpace(out) == "enabled", nil
 	}
 	return false, fmt.Errorf("%s", runtime.GOOS)
 }
@@ -405,15 +406,25 @@ func macPlist(cliPath string) string {
 }
 
 // linuxUnit bygger systemd --user-unitten. WantedBy=default.target gør at den
-// startes ved login når den er enabled.
+// startes ved login når den er enabled — svarende til Windows-opgavens
+// LogonTrigger. Genstartspolitikken spejler Windows-opgavens 30s-forsinkelse +
+// RestartOnFailure: lige efter login er netværket og OS-keyringen ofte ikke
+// klar endnu, så daemonen fejler og skal prøve igen om lidt.
 func linuxUnit(cliPath string) string {
 	return fmt.Sprintf(`[Unit]
 Description=KeePass Delta-Sync baggrunds-synkronisering
-After=network-online.target
+# Ingen ordering mod network-online.target: det target findes ikke i --user-
+# manageren og ignoreres. I stedet lader vi Restart klare "netværk/keyring ikke
+# klar endnu ved login" (se [Service]). StartLimitIntervalSec=0 slår systemd's
+# start-grænse fra, så Restart=always kan blive ved med at prøve — ellers brænder
+# den standard-grænsen på 5 forsøg/10s af på få sekunder og ender død (så kører
+# der ingen proces efter genstart, mens filen stadig ligger der).
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=%s daemon
-Restart=on-failure
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=default.target
