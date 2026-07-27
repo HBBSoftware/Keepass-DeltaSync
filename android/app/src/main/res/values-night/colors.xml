@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lysere brand-blå til mørk baggrund: den mættede #1E40AF har for dårlig
+         kontrast mod den næsten-sorte mørke-tema-baggrund (links, switch, knapper). -->
+    <color name="brand_blue">#A8C7FF</color>
+</resources>

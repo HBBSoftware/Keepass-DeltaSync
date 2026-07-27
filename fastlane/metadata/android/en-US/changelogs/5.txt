@@ -1,0 +1,4 @@
+QR-code enrolment.
+
+• Enrol a new device by scanning the QR code shown in the server's web admin panel, instead of typing the server address and token by hand. Manual entry still works, and the camera is optional.
+• Build changes only otherwise: the Go toolchain requirement was relaxed from an exact patch release to 1.26, so the app can be built with the Go package shipped by the distribution rather than a downloaded binary.

@@ -188,9 +188,72 @@ trække JNI-laget med ind i ren-JVM-tests.
 - **F-Droid** (prioriteret): reproducible builds, fuld open source-toolchain.
   Kræver at vi undgår Google Play Services — ingen FCM push, så sync
   drives af WorkManager-polling med rimelig interval (15–30 min) plus
-  manuel "sync now" fra UI.
+  manuel "sync now" fra UI. Status: se [`F-DROID.md`](F-DROID.md).
+- **Obtainium** (tilgængelig nu): signeret APK på GitHub Releases, som
+  Obtainium selv holder opdateret. Se nedenfor.
 - **Play** (senere): standard Android-signering. Kan tilføjes uden ændringer
   af kerne-arkitekturen.
+
+### Installér med Obtainium
+
+[Obtainium](https://github.com/ImranR98/Obtainium) henter appen direkte fra
+vores GitHub Releases og giver besked når der er en ny version — ingen
+app-butik involveret.
+
+Tilføj appen med dette deep-link (åbn det på telefonen med Obtainium
+installeret):
+
+[Tilføj DeltaSync til Obtainium](obtainium://app/%7B%22id%22%3A%22dk.bjoerckbraun.deltasync%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FHBBSoftware%2FKeepass-DeltaSync%22%2C%22author%22%3A%22HBBSoftware%22%2C%22name%22%3A%22DeltaSync%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EDeltaSync%20Android%5C%22%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5B0-9.%5D%2B%24%5C%22%2C%5C%22about%5C%22%3A%5C%22End-to-end%20encrypted%20KeePass%20sync.%20Requires%20your%20own%20self-hosted%20DeltaSync%20server.%5C%22%7D%22%7D)
+
+Eller opret den manuelt i Obtainium med disse felter:
+
+| Felt | Værdi |
+|------|-------|
+| App source URL | `https://github.com/HBBSoftware/Keepass-DeltaSync` |
+| Filter release titles by regex | `^DeltaSync Android` |
+| Version extraction regex | `[0-9.]+$` |
+
+De to regex'er er nødvendige fordi dette er et **monorepo**: samme repo
+udgiver også `client/vX.Y.Z`-releases. Titel-filteret sorterer dem fra, og
+versions-regex'en trækker `0.3.1` ud af tagget `android/v0.3.1` (Obtainium
+ville ellers vise hele tag-navnet som versionsnummer). Releases uden en
+`.apk` springes over af Obtainium i forvejen, så filteret er et sikkerhedsnet
+snarere end et krav.
+
+**Signatur.** Alle Obtainium-APK'er signeres med projektets egen nøgle:
+
+```
+$ apksigner verify --print-certs DeltaSync-<version>.apk
+Signer #1 certificate SHA-256 digest: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
+```
+
+⚠️ **Skifter du senere til F-Droid-versionen, kan Android ikke opdatere
+hen over det** — F-Droid signerer med deres egen nøgle, og et
+signaturskifte kræver afinstallation. Det betyder at appdata (enrollment,
+gemt password, valgt .kdbx-fil) går tabt og enheden skal enrolles igen via
+QR. Vælg én kanal og bliv på den.
+
+### Udgiv en ny Obtainium-release
+
+Signeringsnøglen ligger kun lokalt (`keystore.properties` + `.jks` er
+gitignored), så byg og signér på egen maskine og upload derefter med
+[`publish-release.sh`](publish-release.sh):
+
+```sh
+# 1. Bump versionCode + versionName i app/build.gradle.kts, commit, tag:
+git tag android/v0.4.0 && git push origin android/v0.4.0
+
+# 2. Byg den signerede APK (JAVA_HOME = Android Studios jbr):
+./gradlew :app:assembleRelease
+
+# 3. Upload til GitHub Releases (og GitLab hvis GITLAB_TOKEN er sat):
+GITHUB_TOKEN=ghp_xxx ./publish-release.sh
+```
+
+Scriptet nægter at uploade hvis APK'en er usigneret, hvis dens indbyggede
+`versionName`/`versionCode` ikke matcher `build.gradle.kts` (typisk en glemt
+genbygning), eller hvis tagget ikke findes. `DRY_RUN=1` kører alle tjek uden
+at uploade noget.
 
 ## Hvad er ikke i scope (forblevet på desktop)
 

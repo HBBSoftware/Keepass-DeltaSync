@@ -15,6 +15,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
   camera use is optional (`android.hardware.camera` not required). Ships in a
   future `android/*` release. (The QR itself is produced server-side — see
   server/v0.2.0.)
+- **Obtainium as an Android distribution channel** — signed release APKs are
+  now published to GitHub Releases, so [Obtainium](https://github.com/ImranR98/Obtainium)
+  can install the app and track updates while the F-Droid submission is
+  pending. `android/publish-release.sh` uploads a locally built + signed APK
+  (the release keystore deliberately stays off CI) and refuses to publish an
+  unsigned APK, one whose embedded version disagrees with
+  `app/build.gradle.kts`, or one without a matching `android/v*` tag.
+  `android/README.md` carries the Obtainium deep link and the signing
+  certificate's SHA-256. Note that switching between this channel and a future
+  F-Droid build requires a reinstall — the signing keys differ.
 - **SECURITY.md and CONTRIBUTING.md** — a vulnerability-reporting policy
   (private channels, scope, trust model) and a contributor guide (DCO sign-off,
   per-component build/test, release tagging). A `/.well-known/security.txt`
@@ -22,11 +32,33 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Go toolchain requirement relaxed to `go 1.26.0`** — `client/go.mod`
+  declared `go 1.26.3`, an exact patch release that was simply whatever
+  toolchain happened to be installed when `go mod tidy` last ran. Nothing
+  needs that patch level, and it forced the F-Droid recipe to download a
+  prebuilt Go tarball from go.dev — which F-Droid rejects. Debian
+  trixie-backports ships `golang-go` 1.26, so the distribution's own package
+  now suffices. Verified with `GOTOOLCHAIN=go1.26.0`: build, vet and the full
+  test suite pass.
+- **F-Droid recipe reworked** per review feedback on
+  [fdroiddata!41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661):
+  Go comes from `trixie-backports` instead of a downloaded tarball; the
+  gomobile steps moved from `prebuild:` to `build:` so the generated `.aar`
+  is created after the binary scanner runs (`scanignore:` dropped entirely);
+  and `AutoName:`/`Description:` were removed so the app's name and
+  description are pulled from `fastlane/` alone.
 - **Per-component release versioning** — release tags are now namespaced
   (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
   tags are legacy and no longer trigger CI. See
   [`VERSIONING.md`](VERSIONING.md).
+
+### Fixed
+
+- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
+  was hard to read against the near-black dark-theme background, affecting
+  links, switches and buttons. A `values-night` override lightens it to
+  `#A8C7FF`.
 
 ## [server/v0.2.0] — 2026-07-01
 

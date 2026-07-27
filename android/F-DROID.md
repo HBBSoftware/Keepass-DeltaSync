@@ -6,48 +6,102 @@ reproducible builds.
 
 ## Status
 
-- **Submittet:** [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). **Pipelinen er grøn hele vejen** — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer. Mangler kun en reviewers merge.
-- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.3.1 (`commit: android/v0.3.1`); `CurrentVersion: 0.3.1` / `CurrentVersionCode: 4`. De gamle 0.1.0–0.3.0 blev aldrig publiceret og er fjernet. Filen er på kanonisk form (`fdroid rewritemeta` er idempotent) — INGEN kommentarer, build-flags i kanonisk rækkefølge (`sudo → gradle → prebuild → scanignore → ndk`), linjer ombrudt ved 80 tegn.
-- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`4.txt`. F-Droid bruger DISSE til app-sidens tekst (yml-`Description:` er kun fallback). Kun en-US findes; ingen dansk listing endnu.
+- **Submittet:** [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). **Pipelinen er grøn hele vejen** — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer.
+- **⚠ Blokeret på os, ikke på F-Droid (tjekket 2026-07-27):** reviewer
+  **@linsui** bad 2026-06-30 om tre ændringer der aldrig blev besvaret — derfor
+  labelen `waiting-on-response`. Checkboksene i MR-beskrivelsen er sat
+  2026-07-27 (5 Required + 2 Strongly Recommended; de 3 Suggested står
+  bevidst tomme), men **det løser ikke de tre krav**:
+
+  1. *"Don't add summary and description here. Add them in fastlane structure
+     in your repo and they will be pulled from there."* → fjern `AutoName:`
+     og `Description:` fra `metadata/dk.bjoerckbraun.deltasync.yml`.
+     Ufarligt: `/fastlane/metadata/android/en-US/` er komplet.
+  2. *"Build Go from source. You can find examples in other metadata."* → den
+     tunge. Recipen henter i dag en **prebuilt** Go-tarball fra go.dev, hvilket
+     bryder F-Droids no-prebuilt-binaries-politik. Se
+     `metadata/com.nutomic.syncthingandroid.yml` for det gængse mønster:
+     `apt-get install -y -t bookworm-backports golang-go`. Der findes ingen
+     generisk `Go.yml`-srclib i fdroiddata.
+  3. Diff-tråd på `prebuild:`: *"Move build steps to build."* → flyt
+     gomobile-bind-trinnene til `build:`-feltet.
+
+  Desuden er branchen ~2200 commits bagud for `master` og skal rebases.
+
+- **LØSNINGEN på krav 2 (verificeret 2026-07-27):** F-Droids build-server er
+  Debian **Trixie** (`config.vm.box = "debian/trixie64"` i fdroidservers
+  `buildserver/Vagrantfile`), og **trixie-backports har `golang-go` 1.26**
+  (`2:1.26~1~bpo13+1`). Der skal altså ikke nedgraderes noget — Debians egen
+  Go er ny nok. Den eneste blokering var at `client/go.mod` erklærede
+  `go 1.26.3`, altså en eksakt patch-version; det var blot den toolchain der
+  tilfældigvis var installeret da `go mod tidy` sidst kørte. Er Debians pakke
+  bygget fra en lavere patch, ville buildet fejle med
+  `requires go >= 1.26.3`. **`go.mod` er derfor slækket til `go 1.26.0`** —
+  verificeret med `GOTOOLCHAIN=go1.26.0`: `go build`, `go vet` og alle tests
+  passerer. Bemærk at det IKKE kunne løses ved at gå til 1.24/1.23:
+  `golang.org/x/crypto@v0.52.0` og den pinnede `golang.org/x/mobile` kræver
+  begge ≥ 1.25, og bookworm-backports har kun 1.23.
+- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.0 (`commit: android/v0.4.0`); `CurrentVersion: 0.4.0` / `CurrentVersionCode: 5`. De gamle 0.1.0–0.3.1 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
+- **Ingen `AutoName:`/`Description:` i yml'en** — linsui: *"Don't add summary and description here. Add them in fastlane structure in your repo and they will be pulled from there."* App-navn og beskrivelse kommer udelukkende fra fastlane.
+- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`5.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
 - **NDK** leveres af F-Droids build-server via `ndk: 25.2.9519653`-feltet (eksponeret som `$$NDK$$`) — ikke længere en `curl`-download.
 - **gomobile/gobind pinnet** til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke `@latest`) — reproducerbarhedskrav.
 
-### Validér de to metadata-jobs lokalt
+### Validér de tre metadata-jobs lokalt
 
-`fdroid build` kan ikke køres uden for en provisioneret build-server, men de to format-jobs der typisk driller (`fdroid rewritemeta` + `schema validation`) kan valideres 100 % lokalt i Docker med samme `fdroid`-version som CI:
+`fdroid build` kan ikke køres uden for en provisioneret build-server, men de
+tre metadata-jobs (`fdroid lint`, `fdroid rewritemeta`, `schema validation`)
+kan valideres 100 % lokalt. `fdroid` er allerede installeret i WSL
+(`/usr/bin/fdroid`); kør fra Git Bash på Windows:
 
 ```sh
-docker run --rm -v "$PWD":/repo -w /repo python:3.12-slim bash -c '
-  apt-get update -qq && apt-get install -y -qq git          # fdroidserver kræver git i PATH
-  pip install --quiet fdroidserver check-jsonschema
+wsl -e sh -lc '
   export GIT_PYTHON_REFRESH=quiet
-  touch config.yml
-  fdroid rewritemeta dk.bjoerckbraun.deltasync              # diff mod original SKAL være tom
-  check-jsonschema --schemafile schemas/metadata.json \
-      metadata/dk.bjoerckbraun.deltasync.yml               # schema fra fdroiddata-repoet
+  SRC=/mnt/d/Kunder/Data/Hans/Keepass-deltasync/metadata/dk.bjoerckbraun.deltasync.yml
+  d=$(mktemp -d); mkdir -p $d/metadata; cp $SRC $d/metadata/; cd $d
+  touch config.yml                       # fdroid nægter at køre uden
+
+  fdroid lint dk.bjoerckbraun.deltasync  # tavshed = ingen fejl
+
+  # rewritemeta SKAL være en no-op. Er den ikke, så kopiér DENS output
+  # tilbage over kildefilen — den er facit, ikke din håndformatering.
+  fdroid rewritemeta dk.bjoerckbraun.deltasync
+  diff -u $SRC metadata/dk.bjoerckbraun.deltasync.yml && echo IDEMPOTENT
+
+  curl -fsS -o m.json https://gitlab.com/fdroid/fdroiddata/-/raw/master/schemas/metadata.json
+  python3 -m check_jsonschema --schemafile m.json metadata/dk.bjoerckbraun.deltasync.yml
 '
 ```
 
+Mangler `check-jsonschema`: `wsl -e sh -lc 'python3 -m pip install check-jsonschema'`.
+
+Fælde: rewritemeta ombryder **ikke** lange `sudo:`/`build:`-kommandoer ved 80
+tegn — den vil have dem på én linje. Ombryder du dem selv for læsbarhedens
+skyld, fejler `rewritemeta`-jobbet i CI.
+
 ## Build-konstruktion
 
-F-Droid's build-server kører i en Debian-baseret container. Vores app
-kræver et lille pre-build-step udover det almindelige Gradle-flow.
-Recipen koder det i `.yml`'ens `sudo:`- og `prebuild:`-felter; det
-svarer til:
+F-Droids build-server kører Debian Trixie. Vores app kræver et gomobile-trin
+udover det almindelige Gradle-flow. Det ligger i `.yml`'ens `sudo:`- og
+`build:`-felter; det svarer til:
 
 ```sh
-# 1. (sudo:) Hent en Go-toolchain. client/go.mod kræver go 1.26.3 — for nyt
-#    til Debians golang-go — så vi henter den officielle, pinnede tarball med
-#    SHA-256-verifikation.
-curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
-echo "<sha256>  /tmp/go.tar.gz" | sha256sum -c -
-tar -C /usr/local -xzf /tmp/go.tar.gz
+# 1. (sudo:) Go fra Debian, IKKE en downloadet tarball. F-Droid tillader ikke
+#    prebuilt binaries i buildet — derfor backports-pakken, som Debian selv
+#    har bygget fra kilde. trixie-backports har 1.26, og client/go.mod kræver
+#    kun `go 1.26.0`, så den passer.
+echo "deb https://deb.debian.org/debian trixie-backports main" \
+    > /etc/apt/sources.list.d/backports.list
+apt-get update
+apt-get install -y unzip
+apt-get install -y -t trixie-backports golang-go
 
-# 2. (prebuild:) NDK kommer fra F-Droids ndk:-felt, eksponeret som $$NDK$$.
-export PATH=/usr/local/go/bin:$PATH GOPATH=/tmp/go GOTOOLCHAIN=local
+# 2. (build:) NDK kommer fra F-Droids ndk:-felt, eksponeret som $$NDK$$.
+#    GOTOOLCHAIN=local forhindrer Go i at hente en anden toolchain over nettet.
+export GOPATH=/tmp/go GOTOOLCHAIN=local
 export ANDROID_NDK_HOME=$$NDK$$
 
-# 3. Installér en SDK-platform: i prebuild-fasen er platforms/ stadig tom
+# 3. Installér en SDK-platform: platforms/ er stadig tom på dette tidspunkt
 #    (Gradle installerer dem først senere), så gomobile bind ville ellers
 #    fejle med "failed to find android SDK platform".
 sdkmanager "platforms;android-35" "build-tools;35.0.0"
@@ -74,12 +128,14 @@ mv classes.jar deltasync-classes.jar
 # 7. Standard Gradle-build (F-Droid kører selv assembleRelease).
 ```
 
-De tre gomobile-genererede artefakter (`deltasync.aar`,
-`deltasync-classes.jar`, `deltasync-sources.jar`) er `scanignore`'t i
-recipen, fordi F-Droids binær-scanner kører EFTER prebuild og ellers
-ville flagge dem — de bygges fra kilde i prebuild-trinnet. Se
-[`dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml)
-for den eksakte form.
+**Hvorfor `build:` og ikke `prebuild:`** (linsui: *"Move build steps to
+build."*): F-Droids binær-scanner kører EFTER `prebuild:` men FØR `build:`.
+Lå gomobile-trinnene i `prebuild:`, ville scanneren finde de genererede
+`deltasync.aar` / `deltasync-classes.jar` / `deltasync-sources.jar` og flagge
+dem som prebuilt binaries — hvilket den gamle recipe måtte dæmpe med
+`scanignore:`. Flyttet til `build:` opstår artefakterne først efter scanningen,
+og `scanignore:` er derfor fjernet helt. Ser scanneren dem alligevel, er det
+`scanignore:` der skal tilbage — ikke `prebuild:`.
 
 ## Reproducible builds
 

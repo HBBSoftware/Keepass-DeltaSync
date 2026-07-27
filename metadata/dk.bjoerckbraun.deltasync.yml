@@ -8,40 +8,22 @@ SourceCode: https://gitlab.com/Star95/keepass-deltasync
 IssueTracker: https://gitlab.com/Star95/keepass-deltasync/-/issues
 Changelog: https://gitlab.com/Star95/keepass-deltasync/-/blob/HEAD/CHANGELOG.md
 
-AutoName: DeltaSync
-Description: |-
-  ⚠ REQUIRES YOUR OWN SERVER. DeltaSync does nothing on its own — you must
-  run the self-hosted DeltaSync server (PHP + PostgreSQL), or have access to
-  one, and enrol this device against it. There is no public or default
-  server. If you just want a standalone KeePass app, use KeePass2Android or
-  KeePassDX instead.
-
-  End-to-end encrypted entry-level sync for KeePass databases. Pair with
-  KeePass2Android or KeePassDX as the editor; this app runs in the
-  background and keeps your .kdbx in sync with your self-hosted server
-  via per-entry XChaCha20-Poly1305 ciphertext. The server cannot read
-  titles, usernames, or passwords — even if compromised.
-
 RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
 
 Builds:
-  - versionName: 0.3.1
-    versionCode: 4
-    commit: android/v0.3.1
+  - versionName: 0.4.0
+    versionCode: 5
+    commit: android/v0.4.0
     subdir: android/app
     sudo:
+      - echo "deb https://deb.debian.org/debian trixie-backports main" > /etc/apt/sources.list.d/backports.list
       - apt-get update
-      - apt-get install -y unzip curl
-      - curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
-      - echo "2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556  /tmp/go.tar.gz"
-        | sha256sum -c -
-      - rm -rf /usr/local/go
-      - tar -C /usr/local -xzf /tmp/go.tar.gz
+      - apt-get install -y unzip
+      - apt-get install -y -t trixie-backports golang-go
     gradle:
       - yes
-    prebuild:
-      - export PATH=/usr/local/go/bin:$PATH
+    build:
       - export GOPATH=/tmp/go
       - export GOTOOLCHAIN=local
       - export ANDROID_NDK_HOME=$$NDK$$
@@ -57,13 +39,9 @@ Builds:
       - cd ../android/libs
       - unzip -o deltasync.aar classes.jar
       - mv classes.jar deltasync-classes.jar
-    scanignore:
-      - android/libs/deltasync.aar
-      - android/libs/deltasync-classes.jar
-      - android/libs/deltasync-sources.jar
     ndk: 25.2.9519653
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$
-CurrentVersion: 0.3.1
-CurrentVersionCode: 4
+CurrentVersion: 0.4.0
+CurrentVersionCode: 5
