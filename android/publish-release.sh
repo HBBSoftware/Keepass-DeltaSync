@@ -106,7 +106,30 @@ if [ -z "$CERTS" ]; then
     echo "    APK is unsigned — signing with the local keystore"
     PROPS=keystore.properties
     [ -f "$PROPS" ] || die "$APK is unsigned and $PWD/$PROPS does not exist"
-    prop() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\(.*\)/\1/p" "$PROPS" | head -1 | tr -d '\r'; }
+    # keystore.properties is a Java .properties file, so `\` is an escape
+    # character: a password containing a literal backslash is stored as `\\`,
+    # and `:` `=` `!` `#` may be escaped too. Gradle reads it with
+    # Properties.load() and unescapes; reading it raw yields a password that is
+    # subtly wrong and fails with "keystore password was incorrect".
+    unescape() {
+        awk 'BEGIN{ s=ARGV[1]; out=""; i=1
+          while (i <= length(s)) {
+            c = substr(s,i,1)
+            if (c == "\\" && i < length(s)) {
+              n = substr(s,i+1,1)
+              if (n == "n") out = out "\n"
+              else if (n == "t") out = out "\t"
+              else if (n == "r") out = out "\r"
+              else out = out n
+              i += 2
+            } else { out = out c; i++ }
+          }
+          printf "%s", out }' "$1"
+    }
+    prop() {
+        raw=$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\(.*\)/\1/p" "$PROPS" | head -1 | tr -d '\r')
+        unescape "$raw"
+    }
     STORE_FILE=$(prop storeFile)
     STORE_PASS=$(prop storePassword)
     KEY_ALIAS=$(prop keyAlias)
@@ -122,13 +145,26 @@ if [ -z "$CERTS" ]; then
     [ -n "$ZIPALIGN" ] || die "zipalign not found under $SDK/build-tools"
     "$ZIPALIGN" -p -f 4 "$APK" "$DIST/aligned.apk"
 
+    # Pass the secrets through the environment, never `pass:` on the command
+    # line. On Windows apksigner is a .bat, so the shell hands the command to
+    # cmd.exe, which re-parses it and mangles any password containing & ^ | %
+    # or ( ) — the failure looks like "Unexpected parameter(s) after input
+    # APK". It also keeps the passwords out of argv, which is world-readable
+    # in process listings on most systems.
+    # `|| true`: apksigner.bat on Windows returns a non-zero exit status even
+    # when it succeeds — `verify` prints "Verifies" and still exits 1. Its exit
+    # code is therefore worthless here; the signature is validated below by
+    # reading the certificate back out of the finished APK instead.
+    DELTASYNC_KS_PASS="$STORE_PASS" \
+    DELTASYNC_KEY_PASS="$KEY_PASS" \
     "$APKSIGNER" sign \
         --ks "$STORE_FILE" \
-        --ks-pass "pass:$STORE_PASS" \
+        --ks-pass env:DELTASYNC_KS_PASS \
         --ks-key-alias "$KEY_ALIAS" \
-        --key-pass "pass:$KEY_PASS" \
+        --key-pass env:DELTASYNC_KEY_PASS \
         --out "$DIST/signed.apk" \
-        "$DIST/aligned.apk"
+        "$DIST/aligned.apk" || true
+    [ -s "$DIST/signed.apk" ] || die "apksigner produced no output — is JAVA_HOME correct? (${JAVA_HOME:-unset})"
     rm -f "$DIST/aligned.apk" "$DIST/signed.apk.idsig"
     APK="$DIST/signed.apk"
 
@@ -182,9 +218,13 @@ ACCEPT="Accept: application/vnd.github+json"
 
 NOTES="Signed release APK for DeltaSync Android $VERSION_NAME (versionCode $VERSION_CODE).\n\nInstall or auto-update with Obtainium — see android/README.md.\nSigning certificate SHA-256: $CERT_SHA256\nVerify the download against SHA256SUMS."
 
-body=$(printf '{"tag_name":"%s","name":"%s","body":"%s"}' "$TAG" "$TITLE" "$NOTES")
+# Send the JSON from a file, not `-d "$body"`. Under Git Bash the shell mangles
+# an inline JSON argument on its way to curl.exe and GitHub answers 400
+# "Problems parsing JSON", even though the string itself is valid.
+printf '{"tag_name":"%s","name":"%s","body":"%s"}' "$TAG" "$TITLE" "$NOTES" > /tmp/ds-body.json
 code=$(curl -sS -o /tmp/ds-rel.json -w '%{http_code}' -X POST "$API/releases" \
-    -H "$AUTH" -H "$ACCEPT" -d "$body")
+    -H "$AUTH" -H "$ACCEPT" -H "Content-Type: application/json" \
+    --data-binary @/tmp/ds-body.json)
 if [ "$code" = "201" ]; then
     echo "==> created GitHub release $TAG"
 else
@@ -226,10 +266,11 @@ if [ -n "${GITLAB_TOKEN:-}" ]; then
         echo "    uploaded to GitLab package registry: $name"
     done
 
-    rel=$(printf '{"name":"%s","tag_name":"%s","description":"%s","assets":{"links":[{"name":"%s","url":"%s/%s","link_type":"package"},{"name":"SHA256SUMS","url":"%s/SHA256SUMS","link_type":"other"}]}}' \
-        "$TITLE" "$TAG" "$NOTES" "$ASSET" "$PKG" "$ASSET" "$PKG")
+    printf '{"name":"%s","tag_name":"%s","description":"%s","assets":{"links":[{"name":"%s","url":"%s/%s","link_type":"package"},{"name":"SHA256SUMS","url":"%s/SHA256SUMS","link_type":"other"}]}}' \
+        "$TITLE" "$TAG" "$NOTES" "$ASSET" "$PKG" "$ASSET" "$PKG" > /tmp/ds-gl-body.json
     code=$(curl -sS -o /tmp/ds-gl.json -w '%{http_code}' -X POST "$GL/releases" \
-        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H 'Content-Type: application/json' -d "$rel")
+        -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H 'Content-Type: application/json' \
+        --data-binary @/tmp/ds-gl-body.json)
     case "$code" in
         20*) echo "==> created GitLab release $TAG" ;;
         409) echo "==> GitLab release $TAG already exists, left untouched" ;;
