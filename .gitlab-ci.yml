@@ -149,6 +149,13 @@ build:android:
   variables:
     ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
+    # gomobile bind runs javac over the Java it generates, and that Java
+    # carries the Danish doc comments from client/mobile/*.go verbatim. JDK 17
+    # takes its default source encoding from the platform locale, which is
+    # US-ASCII in a bare container — every æ/ø/å and → then becomes
+    # "error: unmappable character". Debian ships C.UTF-8 with no setup.
+    LANG: "C.UTF-8"
+    LC_ALL: "C.UTF-8"
     # Must match metadata/dk.bjoerckbraun.deltasync.yml's ndk: field, so our
     # APK and F-Droid's are built against the same NDK.
     NDK_VERSION: "25.2.9519653"
