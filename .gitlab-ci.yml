@@ -142,6 +142,10 @@ build:android:
   image: golang:1.26-bookworm
   rules:
     - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
+    # Escape hatch for iterating on this job itself. Without it, the only way
+    # to exercise an Android build is to move a published tag — which F-Droid
+    # notices and dislikes. Push to a ci/android-* branch instead.
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/android/
   variables:
     ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
@@ -174,25 +178,38 @@ build:android:
         mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
       fi
       export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
-      yes | sdkmanager --licenses >/dev/null
+      # Feed the licence prompts from a FILE, never a pipe. The runner runs
+      # scripts under `set -o pipefail`, so `yes | sdkmanager` fails the job
+      # with exit 141: sdkmanager stops reading, `yes` dies of SIGPIPE, and
+      # pipefail promotes that to the pipeline's status even though every
+      # licence was accepted. Redirecting from a regular file cannot SIGPIPE.
+      for _ in $(seq 1 100); do echo y; done > /tmp/licences.txt
+      sdkmanager --licenses < /tmp/licences.txt >/dev/null
+      # stdout is progress spam; errors still reach stderr and the log.
       sdkmanager --install "platforms;android-$COMPILE_SDK" \
                            "build-tools;$BUILD_TOOLS" \
                            "ndk;$NDK_VERSION" >/dev/null
   script:
     - |
       set -eu
-      VERSION="${CI_COMMIT_TAG#android/v}"        # android/v0.4.0 → 0.4.0
       export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
       export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
       export PATH="$GOPATH/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
       export GRADLE_USER_HOME="$CI_PROJECT_DIR/.gradle-home"
 
-      # Refuse to build a version the app doesn't claim to be — the tag and
-      # android/app/build.gradle.kts drifting apart is the easy mistake here.
       GRADLE_VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' android/app/build.gradle.kts)
-      if [ "$GRADLE_VERSION" != "$VERSION" ]; then
-        echo "tag says $VERSION but build.gradle.kts says $GRADLE_VERSION" >&2
-        exit 1
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        VERSION="${CI_COMMIT_TAG#android/v}"      # android/v0.4.0 → 0.4.0
+        # Refuse to build a version the app doesn't claim to be — the tag and
+        # build.gradle.kts drifting apart is the easy mistake here.
+        if [ "$GRADLE_VERSION" != "$VERSION" ]; then
+          echo "tag says $VERSION but build.gradle.kts says $GRADLE_VERSION" >&2
+          exit 1
+        fi
+      else
+        # ci/android-* branch run: nothing to cross-check against.
+        VERSION="$GRADLE_VERSION"
+        echo "==> branch build of $VERSION (not a release)"
       fi
 
       echo "==> gomobile bind (x/mobile $XMOBILE)"
