@@ -139,7 +139,11 @@ build:client:
 
 build:android:
   stage: build
-  image: golang:1.26-bookworm
+  # Trixie, not bookworm: android/sync/build.gradle.kts declares
+  # jvmToolchain(21) to match Android Studio's bundled JBR, and bookworm only
+  # ships JDK 17. Trixie is also what F-Droid's buildserver runs, so our build
+  # and theirs sit on the same JDK.
+  image: golang:1.26-trixie
   rules:
     - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
     # Escape hatch for iterating on this job itself. Without it, the only way
@@ -149,6 +153,7 @@ build:android:
   variables:
     ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
+    JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
     # gomobile bind runs javac over the Java it generates, and that Java
     # carries the Danish doc comments from client/mobile/*.go verbatim. JDK 17
     # takes its default source encoding from the platform locale, which is
@@ -172,8 +177,7 @@ build:android:
       - .gradle-home/
   before_script:
     - apt-get update -qq
-    - apt-get install -y -qq --no-install-recommends openjdk-17-jdk-headless unzip
-    - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    - apt-get install -y -qq --no-install-recommends openjdk-21-jdk-headless unzip
     - |
       set -eu
       if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
@@ -199,7 +203,6 @@ build:android:
   script:
     - |
       set -eu
-      export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
       export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
       export PATH="$GOPATH/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
       export GRADLE_USER_HOME="$CI_PROJECT_DIR/.gradle-home"
