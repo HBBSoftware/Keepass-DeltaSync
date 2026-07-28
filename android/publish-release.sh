@@ -14,10 +14,19 @@
 # the client/* and server/* releases in the same monorepo. Don't rename it
 # without updating android/README.md's Obtainium settings.
 #
-# Usage, from android/ after building the signed release APK:
+# Two ways in, from android/:
 #
+#   # a) let CI do the heavy build (preferred) — download the build:android
+#   #    artifact from the android/vX.Y.Z pipeline, unzip it so that
+#   #    dist/DeltaSync-<version>-unsigned.apk sits next to android/, then:
+#   GITHUB_TOKEN=ghp_xxx ./publish-release.sh
+#
+#   # b) build everything locally
 #   ./gradlew :app:assembleRelease
 #   GITHUB_TOKEN=ghp_xxx ./publish-release.sh
+#
+# An unsigned APK is zipaligned and signed here using keystore.properties; an
+# already-signed one is published as-is.
 #
 # Environment:
 #   GITHUB_TOKEN    required — PAT with `repo` scope on the mirror
@@ -74,19 +83,61 @@ ASSET="DeltaSync-$VERSION_NAME.apk"
 
 echo "==> $TITLE (versionCode $VERSION_CODE), tag $TAG"
 
-# --- Locate and sanity-check the APK ----------------------------------------
+# --- Locate the APK ---------------------------------------------------------
+# Either a locally built signed APK, or the unsigned artifact from the
+# build:android CI job (put it anywhere under android/ or pass APK=...).
 if [ -z "${APK:-}" ]; then
-    for c in app/build/outputs/apk/release/*-release.apk; do
+    for c in app/build/outputs/apk/release/*-release.apk \
+             app/build/outputs/apk/release/*-release-unsigned.apk \
+             dist/DeltaSync-*-unsigned.apk \
+             ../dist/DeltaSync-*-unsigned.apk; do
         [ -f "$c" ] && APK="$c"
     done
 fi
-[ -n "${APK:-}" ] && [ -f "$APK" ] || die "no release APK found — run ./gradlew :app:assembleRelease first"
+[ -n "${APK:-}" ] && [ -f "$APK" ] || die "no release APK found — run ./gradlew :app:assembleRelease, or download the build:android artifact"
 echo "    APK: $APK ($(du -h "$APK" | cut -f1))"
 
-# An unsigned APK cannot be installed, and a *differently* signed one silently
-# breaks updates for everyone who already has the app. Both are worth failing on.
+DIST=build/release-assets
+rm -rf "$DIST" && mkdir -p "$DIST"
+
+# --- Sign it if CI handed us an unsigned build ------------------------------
 CERTS=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null | grep 'SHA-256 digest' || true)
-[ -n "$CERTS" ] || die "$APK is not signed — check android/keystore.properties"
+if [ -z "$CERTS" ]; then
+    echo "    APK is unsigned — signing with the local keystore"
+    PROPS=keystore.properties
+    [ -f "$PROPS" ] || die "$APK is unsigned and $PWD/$PROPS does not exist"
+    prop() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\(.*\)/\1/p" "$PROPS" | head -1 | tr -d '\r'; }
+    STORE_FILE=$(prop storeFile)
+    STORE_PASS=$(prop storePassword)
+    KEY_ALIAS=$(prop keyAlias)
+    KEY_PASS=$(prop keyPassword)
+    [ -n "$STORE_FILE" ] && [ -f "$STORE_FILE" ] || die "storeFile '$STORE_FILE' from $PROPS not found"
+
+    # apksigner does not align; an unaligned APK still installs but wastes
+    # memory at runtime, so align first like the Gradle signing path does.
+    ZIPALIGN=""
+    for c in "$SDK"/build-tools/*/zipalign "$SDK"/build-tools/*/zipalign.exe; do
+        [ -f "$c" ] && ZIPALIGN="$c"
+    done
+    [ -n "$ZIPALIGN" ] || die "zipalign not found under $SDK/build-tools"
+    "$ZIPALIGN" -p -f 4 "$APK" "$DIST/aligned.apk"
+
+    "$APKSIGNER" sign \
+        --ks "$STORE_FILE" \
+        --ks-pass "pass:$STORE_PASS" \
+        --ks-key-alias "$KEY_ALIAS" \
+        --key-pass "pass:$KEY_PASS" \
+        --out "$DIST/signed.apk" \
+        "$DIST/aligned.apk"
+    rm -f "$DIST/aligned.apk" "$DIST/signed.apk.idsig"
+    APK="$DIST/signed.apk"
+
+    CERTS=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null | grep 'SHA-256 digest' || true)
+    [ -n "$CERTS" ] || die "signing appeared to succeed but the APK still verifies as unsigned"
+fi
+
+# A *differently* signed APK silently breaks updates for everyone who already
+# has the app, so always show which certificate we are about to ship.
 CERT_SHA256=$(echo "$CERTS" | head -1 | sed 's/.*: *//')
 echo "    signing cert SHA-256: $CERT_SHA256"
 
@@ -110,9 +161,9 @@ if [ "$(git rev-parse "$TAG^{commit}")" != "$(git rev-parse HEAD)" ]; then
 fi
 
 # --- Stage the asset + checksum ---------------------------------------------
-DIST=build/release-assets
-rm -rf "$DIST" && mkdir -p "$DIST"
+# $DIST was created above and may already hold the freshly signed APK.
 cp "$APK" "$DIST/$ASSET"
+rm -f "$DIST/signed.apk"
 ( cd "$DIST" && sha256sum "$ASSET" > SHA256SUMS )
 echo "    staged $DIST/$ASSET"
 cat "$DIST/SHA256SUMS" | sed 's/^/    /'

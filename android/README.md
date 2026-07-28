@@ -235,20 +235,29 @@ QR. Vælg én kanal og bliv på den.
 
 ### Udgiv en ny Obtainium-release
 
-Signeringsnøglen ligger kun lokalt (`keystore.properties` + `.jks` er
-gitignored), så byg og signér på egen maskine og upload derefter med
-[`publish-release.sh`](publish-release.sh):
+CI bygger APK'en, men signerer den ikke: signeringsnøglen er det eneste der
+binder fremtidige opdateringer til projektet, og CI-variabler kan læses af
+enhver Maintainer og af ethvert kompromitteret job. Derfor bliver
+`keystore.properties` + `.jks` liggende lokalt (begge gitignored), og
+[`publish-release.sh`](publish-release.sh) signerer på din maskine:
 
 ```sh
 # 1. Bump versionCode + versionName i app/build.gradle.kts, commit, tag:
 git tag android/v0.4.0 && git push origin android/v0.4.0
 
-# 2. Byg den signerede APK (JAVA_HOME = Android Studios jbr):
-./gradlew :app:assembleRelease
+# 2. Vent på pipelinen. Jobbet build:android lægger
+#    dist/DeltaSync-0.4.0-unsigned.apk som artefakt — hent og udpak den
+#    i repo-roden.
 
-# 3. Upload til GitHub Releases (og GitLab hvis GITLAB_TOKEN er sat):
+# 3. Signér lokalt og upload til GitHub Releases
+#    (og GitLab hvis GITLAB_TOKEN er sat):
 GITHUB_TOKEN=ghp_xxx ./publish-release.sh
 ```
+
+Vil du hellere bygge alt lokalt, så kør `./gradlew :app:assembleRelease` i
+stedet for trin 2 (`JAVA_HOME` = Android Studios jbr) — scriptet tager imod
+både en usigneret CI-APK og en færdigsigneret lokal build. Er APK'en usigneret,
+bliver den zipalignet og signeret undervejs.
 
 Scriptet nægter at uploade hvis APK'en er usigneret, hvis dens indbyggede
 `versionName`/`versionCode` ikke matcher `build.gradle.kts` (typisk en glemt

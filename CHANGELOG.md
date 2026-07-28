@@ -25,6 +25,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `android/README.md` carries the Obtainium deep link and the signing
   certificate's SHA-256. Note that switching between this channel and a future
   F-Droid build requires a reinstall — the signing keys differ.
+- **CI builds the Android APK** — a `build:android` job on `android/v*` tags
+  builds the gomobile `.aar` and runs `assembleRelease`, publishing
+  `DeltaSync-<version>-unsigned.apk` as an artifact. It deliberately stops
+  short of signing: the release keystore would otherwise be readable by every
+  Maintainer and by any compromised job, and that key is the only thing tying
+  future updates to this project. `publish-release.sh` now zipaligns and signs
+  an unsigned APK locally before uploading, so the key never leaves the
+  maintainer's machine. The job also fails if the tag and
+  `build.gradle.kts`'s `versionName` disagree.
 - **SECURITY.md and CONTRIBUTING.md** — a vulnerability-reporting policy
   (private channels, scope, trust model) and a contributor guide (DCO sign-off,
   per-component build/test, release tagging). A `/.well-known/security.txt`

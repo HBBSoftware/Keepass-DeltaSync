@@ -4,7 +4,9 @@
 # NAMESPACED BY COMPONENT so their version lines never collide:
 #
 #   client/vX.Y.Z   → desktop Go client  (this pipeline builds + releases it)
-#   android/vX.Y.Z  → Android app         (built & signed outside CI for now)
+#   android/vX.Y.Z  → Android app         (this pipeline builds an UNSIGNED APK;
+#                                          signing happens on the maintainer's
+#                                          machine — see build:android below)
 #   server/vX.Y.Z   → PHP server          (this pipeline builds + pushes a
 #                                          multi-arch Docker image to the GitLab
 #                                          Container Registry)
@@ -112,6 +114,113 @@ build:client:
       - dist/*.tar.gz
       - dist/*.zip
       - dist/SHA256SUMS
+    expire_in: never
+
+# ----------------------------------------------------------------------
+# Build the Android APK — UNSIGNED (only on android/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# Deliberately stops short of signing. The release keystore is what binds every
+# future update to this project: anyone who can read it can ship an APK that
+# Android will happily install over ours. Putting it in CI variables would hand
+# it to every Maintainer and to any job that gets compromised, so it stays on
+# the maintainer's machine.
+#
+# The job therefore produces `DeltaSync-<version>-unsigned.apk` as an artifact.
+# Download it, then run `android/publish-release.sh` locally — it signs the
+# unsigned APK with android/keystore.properties and uploads the result.
+#
+# android/app/build.gradle.kts only wires up a signingConfig when
+# keystore.properties exists, which it never does here, so assembleRelease
+# yields an unsigned APK without any CI-specific branching.
+#
+# The base image pins Go (its whole point); the JDK comes from Debian and the
+# Android SDK/NDK from Google's sdkmanager, cached between runs.
+
+build:android:
+  stage: build
+  image: golang:1.26-bookworm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
+  variables:
+    ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
+    GOPATH: "$CI_PROJECT_DIR/.go"
+    # Must match metadata/dk.bjoerckbraun.deltasync.yml's ndk: field, so our
+    # APK and F-Droid's are built against the same NDK.
+    NDK_VERSION: "25.2.9519653"
+    COMPILE_SDK: "35"
+    BUILD_TOOLS: "35.0.0"
+    CMDLINE_TOOLS: "11076708"
+    # Pinned to client/go.mod's x/mobile — reproducibility, not convenience.
+    XMOBILE: "v0.0.0-20260520154334-0e4426e1883d"
+  cache:
+    key: "android-$CMDLINE_TOOLS-$NDK_VERSION-$BUILD_TOOLS"
+    paths:
+      - .android-sdk/
+      - .go/pkg/mod/
+      - .gradle-home/
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends openjdk-17-jdk-headless unzip
+    - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    - |
+      set -eu
+      if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+        echo "==> installing Android cmdline-tools $CMDLINE_TOOLS"
+        mkdir -p "$ANDROID_HOME/cmdline-tools"
+        curl -fsSL -o /tmp/cmdline-tools.zip \
+          "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS}_latest.zip"
+        unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools
+        mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+      fi
+      export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+      yes | sdkmanager --licenses >/dev/null
+      sdkmanager --install "platforms;android-$COMPILE_SDK" \
+                           "build-tools;$BUILD_TOOLS" \
+                           "ndk;$NDK_VERSION" >/dev/null
+  script:
+    - |
+      set -eu
+      VERSION="${CI_COMMIT_TAG#android/v}"        # android/v0.4.0 → 0.4.0
+      export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+      export PATH="$GOPATH/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+      export GRADLE_USER_HOME="$CI_PROJECT_DIR/.gradle-home"
+
+      # Refuse to build a version the app doesn't claim to be — the tag and
+      # android/app/build.gradle.kts drifting apart is the easy mistake here.
+      GRADLE_VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' android/app/build.gradle.kts)
+      if [ "$GRADLE_VERSION" != "$VERSION" ]; then
+        echo "tag says $VERSION but build.gradle.kts says $GRADLE_VERSION" >&2
+        exit 1
+      fi
+
+      echo "==> gomobile bind (x/mobile $XMOBILE)"
+      go install "golang.org/x/mobile/cmd/gomobile@$XMOBILE"
+      go install "golang.org/x/mobile/cmd/gobind@$XMOBILE"
+      gomobile init
+      mkdir -p android/libs
+      ( cd client && gomobile bind -androidapi 21 -target=android \
+          -o ../android/libs/deltasync.aar \
+          gitlab.com/Star95/keepass-deltasync/client/mobile )
+
+      # :sync compiles against the bound classes only (compileOnly), so the
+      # JNI layer stays out of the pure-JVM test classpath.
+      ( cd android/libs && unzip -o -q deltasync.aar classes.jar \
+          && mv classes.jar deltasync-classes.jar )
+
+      echo "==> assembleRelease"
+      ( cd android && ./gradlew --no-daemon :app:assembleRelease )
+
+      mkdir -p dist
+      APK=$(ls android/app/build/outputs/apk/release/*-release-unsigned.apk)
+      cp "$APK" "dist/DeltaSync-${VERSION}-unsigned.apk"
+      ( cd dist && sha256sum *.apk > SHA256SUMS-unsigned && cat SHA256SUMS-unsigned )
+  artifacts:
+    name: "deltasync-android-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - dist/*.apk
+      - dist/SHA256SUMS-unsigned
     expire_in: never
 
 # ----------------------------------------------------------------------

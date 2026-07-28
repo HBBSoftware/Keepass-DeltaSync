@@ -7,7 +7,7 @@ different rates. Each is versioned **independently**, and release tags are
 | Component | Tag format | Released by |
 |-----------|------------|-------------|
 | Desktop client (Go, `client/`) | `client/vX.Y.Z` | GitLab CI → cross-compiled binaries + GitLab Release |
-| Android app (`android/`) | `android/vX.Y.Z` | Built & signed outside CI, then uploaded by `android/publish-release.sh` (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
+| Android app (`android/`) | `android/vX.Y.Z` | CI builds an **unsigned** APK; `android/publish-release.sh` signs it locally and publishes it (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
 | Server (PHP, `server/`) | `server/vX.Y.Z` | Deployed directly; the tag is a marker only — no build artifact |
 
 The components do **not** share a number. The desktop client being at `1.x`
@@ -30,11 +30,20 @@ git push origin client/v1.1.0
 ```
 git tag android/v0.4.0
 git push origin android/v0.4.0
-
-cd android
-./gradlew :app:assembleRelease            # signed with the local keystore
-GITHUB_TOKEN=ghp_xxx ./publish-release.sh # → GitHub Release, read by Obtainium
 ```
+
+That triggers `build:android`, which produces `dist/DeltaSync-<version>-unsigned.apk`
+as a job artifact. Download and unzip it in the repo root, then:
+
+```
+cd android
+GITHUB_TOKEN=ghp_xxx ./publish-release.sh # signs locally → GitHub Release
+```
+
+CI stops short of signing on purpose: the release keystore is what binds every
+future update to this project, and CI variables are readable by every
+Maintainer and by any compromised job. To build without CI, run
+`./gradlew :app:assembleRelease` locally instead — the script accepts either.
 
 `versionCode` **must** increase on every release — Android refuses to install
 an update that doesn't. `publish-release.sh` verifies that the APK's embedded
