@@ -8,6 +8,8 @@ SourceCode: https://gitlab.com/Star95/keepass-deltasync
 IssueTracker: https://gitlab.com/Star95/keepass-deltasync/-/issues
 Changelog: https://gitlab.com/Star95/keepass-deltasync/-/blob/HEAD/CHANGELOG.md
 
+AutoName: DeltaSync
+
 RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
 
