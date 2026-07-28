@@ -51,11 +51,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
   test suite pass.
 - **F-Droid recipe reworked** per review feedback on
   [fdroiddata!41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661):
-  Go comes from `trixie-backports` instead of a downloaded tarball; the
-  gomobile steps moved from `prebuild:` to `build:` so the generated `.aar`
-  is created after the binary scanner runs (`scanignore:` dropped entirely);
-  and `AutoName:`/`Description:` were removed so the app's name and
-  description are pulled from `fastlane/` alone.
+  Go is now built from source via fdroiddata's `go` srclib and `make.bash`,
+  with Debian's `golang-go` serving only as the bootstrap toolchain, instead
+  of downloading a prebuilt tarball from go.dev; the gomobile steps moved from
+  `prebuild:` to `build:` so the generated `.aar` is created after the binary
+  scanner runs (`scanignore:` dropped entirely); and `AutoName:`/`Description:`
+  were removed so the app's name and description are pulled from `fastlane/`
+  alone.
 - **Per-component release versioning** — release tags are now namespaced
   (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`

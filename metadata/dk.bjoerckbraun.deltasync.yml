@@ -17,25 +17,32 @@ Builds:
     commit: android/v0.4.0
     subdir: android/app
     sudo:
-      - echo "deb https://deb.debian.org/debian trixie-backports main" > /etc/apt/sources.list.d/backports.list
       - apt-get update
       - apt-get install -y unzip
       - apt-get install -y -t trixie-backports golang-go
     gradle:
       - yes
+    srclibs:
+      - go@go1.26.3
+    prebuild: sdkmanager "platforms;android-35" "build-tools;35.0.0"
     build:
-      - export GOPATH=/tmp/go
-      - export GOTOOLCHAIN=local
+      - pushd $$go$$/src
+      - ./make.bash
+      - popd
+      - export GOROOT=$$go$$
+      - export GOPATH="$HOME/go"
+      - export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
       - export ANDROID_NDK_HOME=$$NDK$$
-      - sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260520154334-0e4426e1883d
-      - go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260520154334-0e4426e1883d
-      - export PATH=$GOPATH/bin:$PATH
+      - XM=golang.org/x/mobile
+      - XV=v0.0.0-20260520154334-0e4426e1883d
+      - go install $XM/cmd/gomobile@$XV
+      - go install $XM/cmd/gobind@$XV
       - gomobile init
       - cd ../../client
       - mkdir -p ../android/libs
-      - gomobile bind -androidapi 21 -target=android -o ../android/libs/deltasync.aar
-        gitlab.com/Star95/keepass-deltasync/client/mobile
+      - AAR=../android/libs/deltasync.aar
+      - PKG=gitlab.com/Star95/keepass-deltasync/client/mobile
+      - gomobile bind -androidapi 21 -target=android -o $AAR $PKG
       - cd ../android/libs
       - unzip -o deltasync.aar classes.jar
       - mv classes.jar deltasync-classes.jar

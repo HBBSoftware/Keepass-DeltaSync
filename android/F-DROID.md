@@ -28,19 +28,26 @@ reproducible builds.
 
   Desuden er branchen ~2200 commits bagud for `master` og skal rebases.
 
-- **LØSNINGEN på krav 2 (verificeret 2026-07-27):** F-Droids build-server er
-  Debian **Trixie** (`config.vm.box = "debian/trixie64"` i fdroidservers
-  `buildserver/Vagrantfile`), og **trixie-backports har `golang-go` 1.26**
-  (`2:1.26~1~bpo13+1`). Der skal altså ikke nedgraderes noget — Debians egen
-  Go er ny nok. Den eneste blokering var at `client/go.mod` erklærede
-  `go 1.26.3`, altså en eksakt patch-version; det var blot den toolchain der
-  tilfældigvis var installeret da `go mod tidy` sidst kørte. Er Debians pakke
-  bygget fra en lavere patch, ville buildet fejle med
-  `requires go >= 1.26.3`. **`go.mod` er derfor slækket til `go 1.26.0`** —
-  verificeret med `GOTOOLCHAIN=go1.26.0`: `go build`, `go vet` og alle tests
-  passerer. Bemærk at det IKKE kunne løses ved at gå til 1.24/1.23:
+- **LØSNINGEN på krav 2 (implementeret 2026-07-28):** der findes en **Go-srclib**
+  i fdroiddata — `srclibs/go.yml` (lowercase; let at overse). Den kloner
+  `golang/go` og sætter `GOTOOLCHAIN=local` i `go.env`. Mønsteret linsui
+  henviste til findes i `metadata/com.android.xrayfa.yml` (også en
+  gomobile-app): `srclibs: - go@go1.X.Y`, derefter
+  `pushd $$go$$/src && ./make.bash && popd` og `export GOROOT=$$go$$`.
+  Debians `golang-go` fra trixie-backports installeres kun som
+  **bootstrap-toolchain** til `make.bash`. Vi bygger `go1.26.3`.
+- **`client/go.mod` slækket fra `go 1.26.3` til `go 1.26.0`** — den eksakte
+  patch-version var blot den toolchain der tilfældigvis var installeret da
+  `go mod tidy` sidst kørte, og den ville låse builds til én patch.
+  Verificeret med `GOTOOLCHAIN=go1.26.0`: `go build`, `go vet` og alle tests
+  passerer. Bemærk at man IKKE kan gå til 1.24/1.23:
   `golang.org/x/crypto@v0.52.0` og den pinnede `golang.org/x/mobile` kræver
-  begge ≥ 1.25, og bookworm-backports har kun 1.23.
+  begge ≥ 1.25.
+- **Buildserveren er Debian Trixie** (`config.vm.box = "debian/trixie64"` i
+  fdroidservers `buildserver/Vagrantfile`), og backports er allerede aktiveret
+  (`Suites: trixie trixie-updates trixie-backports` i
+  `provision-apt-get-install`) — recipes skal derfor IKKE selv tilføje en
+  `sources.list`-linje, bare bruge `-t trixie-backports`.
 - **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.0 (`commit: android/v0.4.0`); `CurrentVersion: 0.4.0` / `CurrentVersionCode: 5`. De gamle 0.1.0–0.3.1 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
 - **Ingen `AutoName:`/`Description:` i yml'en** — linsui: *"Don't add summary and description here. Add them in fastlane structure in your repo and they will be pulled from there."* App-navn og beskrivelse kommer udelukkende fra fastlane.
 - **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`5.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
@@ -86,30 +93,28 @@ udover det almindelige Gradle-flow. Det ligger i `.yml`'ens `sudo:`- og
 `build:`-felter; det svarer til:
 
 ```sh
-# 1. (sudo:) Go fra Debian, IKKE en downloadet tarball. F-Droid tillader ikke
-#    prebuilt binaries i buildet — derfor backports-pakken, som Debian selv
-#    har bygget fra kilde. trixie-backports har 1.26, og client/go.mod kræver
-#    kun `go 1.26.0`, så den passer.
-echo "deb https://deb.debian.org/debian trixie-backports main" \
-    > /etc/apt/sources.list.d/backports.list
+# 1. (sudo:) Debians Go — kun som BOOTSTRAP til at bygge Go fra kilde.
+#    Backports er allerede aktiveret på buildserveren; tilføj ikke sources.list.
 apt-get update
 apt-get install -y unzip
 apt-get install -y -t trixie-backports golang-go
 
-# 2. (build:) NDK kommer fra F-Droids ndk:-felt, eksponeret som $$NDK$$.
-#    GOTOOLCHAIN=local forhindrer Go i at hente en anden toolchain over nettet.
-export GOPATH=/tmp/go GOTOOLCHAIN=local
-export ANDROID_NDK_HOME=$$NDK$$
-
-# 3. Installér en SDK-platform: platforms/ er stadig tom på dette tidspunkt
-#    (Gradle installerer dem først senere), så gomobile bind ville ellers
-#    fejle med "failed to find android SDK platform".
+# 2. (prebuild:) Installér en SDK-platform: platforms/ er stadig tom på dette
+#    tidspunkt (Gradle installerer dem først senere), så gomobile bind ville
+#    ellers fejle med "failed to find android SDK platform".
 sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+# 3. (build:) Byg Go fra kilde. srclibs: go@go1.26.3 kloner golang/go og
+#    eksponerer den som $$go$$; srclibbens Prepare-step sætter selv
+#    GOTOOLCHAIN=local i go.env, så Go ikke henter en anden toolchain.
+pushd $$go$$/src && ./make.bash && popd
+export GOROOT=$$go$$ GOPATH="$HOME/go"
+export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+export ANDROID_NDK_HOME=$$NDK$$        # fra ndk:-feltet
 
 # 4. gomobile/gobind pinnet til client/go.mod's x/mobile-version.
 go install golang.org/x/mobile/cmd/gomobile@<pinned>
 go install golang.org/x/mobile/cmd/gobind@<pinned>
-export PATH=$GOPATH/bin:$PATH
 gomobile init
 
 # 5. Byg .aar fra Go-pakken (client/mobile). android/libs/ er gitignored →
@@ -127,6 +132,14 @@ mv classes.jar deltasync-classes.jar
 
 # 7. Standard Gradle-build (F-Droid kører selv assembleRelease).
 ```
+
+**Hold linjerne korte.** `fdroid rewritemeta` (2.4.5) ombryder kommandoer der
+overstiger ~80 tegn — og dens egen ombrydning efterlader **trailing spaces**,
+som `fdroid lint` derefter flagger. De to CI-jobs modsiger altså hinanden, hvis
+en linje er for lang. Løsningen er at holde hver kommando under grænsen, om
+nødvendigt ved at lægge lange strenge i shell-variabler først (`XM`, `XV`,
+`AAR`, `PKG` i recipen) — build-kommandoerne køres i én shell, så variabler
+overlever mellem linjer.
 
 **Hvorfor `build:` og ikke `prebuild:`** (linsui: *"Move build steps to
 build."*): F-Droids binær-scanner kører EFTER `prebuild:` men FØR `build:`.
