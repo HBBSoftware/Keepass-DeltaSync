@@ -226,6 +226,18 @@ build:android:
         echo "==> branch build of $VERSION (not a release)"
       fi
 
+      # Build from F-Droid's own path, not $CI_PROJECT_DIR. gomobile hands the
+      # Go toolchain a temporary gobind module that `replace`s our client
+      # module by absolute path, and that path lands in the binary's build info
+      # — the one thing -trimpath does not rewrite. `fdroid build` always uses
+      # /home/vagrant/build/<applicationId>, so we mirror it exactly; otherwise
+      # libgojni.so can never match theirs. git archive (not cp) so we build
+      # the committed tree, the same content F-Droid checks out.
+      BUILD_ROOT=/home/vagrant/build/dk.bjoerckbraun.deltasync
+      mkdir -p "$BUILD_ROOT"
+      git archive HEAD | tar -x -C "$BUILD_ROOT"
+      cd "$BUILD_ROOT"
+
       echo "==> gomobile bind (x/mobile $XMOBILE)"
       go install "golang.org/x/mobile/cmd/gomobile@$XMOBILE"
       go install "golang.org/x/mobile/cmd/gobind@$XMOBILE"
@@ -247,10 +259,13 @@ build:android:
       echo "==> assembleRelease"
       ( cd android && ./gradlew --no-daemon :app:assembleRelease )
 
-      mkdir -p dist
+      # Artifacts must land back under $CI_PROJECT_DIR — the build itself ran
+      # in $BUILD_ROOT.
+      mkdir -p "$CI_PROJECT_DIR/dist"
       APK=$(ls android/app/build/outputs/apk/release/*-release-unsigned.apk)
-      cp "$APK" "dist/DeltaSync-${VERSION}-unsigned.apk"
-      ( cd dist && sha256sum *.apk > SHA256SUMS-unsigned && cat SHA256SUMS-unsigned )
+      cp "$APK" "$CI_PROJECT_DIR/dist/DeltaSync-${VERSION}-unsigned.apk"
+      ( cd "$CI_PROJECT_DIR/dist" && sha256sum *.apk > SHA256SUMS-unsigned \
+          && cat SHA256SUMS-unsigned )
   artifacts:
     name: "deltasync-android-${CI_COMMIT_REF_SLUG}"
     paths:
