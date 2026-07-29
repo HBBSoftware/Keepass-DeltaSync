@@ -143,7 +143,11 @@ build:android:
   # jvmToolchain(21) to match Android Studio's bundled JBR, and bookworm only
   # ships JDK 17. Trixie is also what F-Droid's buildserver runs, so our build
   # and theirs sit on the same JDK.
-  image: golang:1.26-trixie
+  # Pinned to the exact patch release, not floating 1.26: the Go version string
+  # is compiled into libgojni.so, so our APK only reproduces F-Droid's if both
+  # sides use the same compiler. Bump this together with the `srclibs: go@...`
+  # line in metadata/dk.bjoerckbraun.deltasync.yml, never on its own.
+  image: golang:1.26.3-trixie
   rules:
     - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
     # Escape hatch for iterating on this job itself. Without it, the only way
@@ -151,7 +155,17 @@ build:android:
     # notices and dislikes. Push to a ci/android-* branch instead.
     - if: $CI_COMMIT_BRANCH =~ /^ci\/android/
   variables:
-    ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
+    # /opt/android-sdk, not a path under $CI_PROJECT_DIR: cgo hands the NDK
+    # path to clang, which writes it into libgojni.so's DWARF line table, so
+    # the SDK has to sit where F-Droid's builder keeps it. The path is
+    # hard-coded in fdroidserver's buildserver Vagrantfile.
+    #
+    # A symlink from /opt is NOT enough — clang resolves its own binary to
+    # find lib64/clang/*/include, so the physical path leaks back in. The SDK
+    # therefore installs into /opt on every run and is not cached; GitLab can
+    # only cache paths inside the project dir. That costs a few minutes on a
+    # job that only runs on android/v* tags and ci/android-* branches.
+    ANDROID_HOME: "/opt/android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
     JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
     # gomobile bind runs javac over the Java it generates, and that Java
@@ -172,7 +186,6 @@ build:android:
   cache:
     key: "android-$CMDLINE_TOOLS-$NDK_VERSION-$BUILD_TOOLS"
     paths:
-      - .android-sdk/
       - .go/pkg/mod/
       - .gradle-home/
   before_script:
@@ -222,14 +235,32 @@ build:android:
         echo "==> branch build of $VERSION (not a release)"
       fi
 
+      # Build from F-Droid's own path, not $CI_PROJECT_DIR. gomobile hands the
+      # Go toolchain a temporary gobind module that `replace`s our client
+      # module by absolute path, and that path lands in the binary's build info
+      # — the one thing -trimpath does not rewrite. `fdroid build` always uses
+      # /home/vagrant/build/<applicationId>, so we mirror it exactly; otherwise
+      # libgojni.so can never match theirs. git archive (not cp) so we build
+      # the committed tree, the same content F-Droid checks out.
+      BUILD_ROOT=/home/vagrant/build/dk.bjoerckbraun.deltasync
+      mkdir -p "$BUILD_ROOT"
+      git archive HEAD | tar -x -C "$BUILD_ROOT"
+      cd "$BUILD_ROOT"
+
       echo "==> gomobile bind (x/mobile $XMOBILE)"
       go install "golang.org/x/mobile/cmd/gomobile@$XMOBILE"
       go install "golang.org/x/mobile/cmd/gobind@$XMOBILE"
       gomobile init
       mkdir -p android/libs
-      ( cd client && gomobile bind -androidapi 21 -target=android \
-          -o ../android/libs/deltasync.aar \
-          gitlab.com/Star95/keepass-deltasync/client/mobile )
+      # -trimpath is what makes the .so reproducible: without it Go bakes the
+      # checkout path (/builds/... here, /home/vagrant/build/... on F-Droid's
+      # builder) and gomobile's random /tmp/gomobile-work-NNN into the binary.
+      # Keep it in sync with the same flag in the F-Droid build recipe.
+      # Same invocation as the F-Droid recipe, flag for flag: -target=android
+      # is gomobile's default and is left out there to keep the metadata line
+      # under the 80 columns fdroid rewritemeta wraps at.
+      ( cd client && gomobile bind -trimpath -androidapi 21 \
+          -o ../android/libs/deltasync.aar ./mobile )
 
       # :sync compiles against the bound classes only (compileOnly), so the
       # JNI layer stays out of the pure-JVM test classpath.
@@ -239,10 +270,13 @@ build:android:
       echo "==> assembleRelease"
       ( cd android && ./gradlew --no-daemon :app:assembleRelease )
 
-      mkdir -p dist
+      # Artifacts must land back under $CI_PROJECT_DIR — the build itself ran
+      # in $BUILD_ROOT.
+      mkdir -p "$CI_PROJECT_DIR/dist"
       APK=$(ls android/app/build/outputs/apk/release/*-release-unsigned.apk)
-      cp "$APK" "dist/DeltaSync-${VERSION}-unsigned.apk"
-      ( cd dist && sha256sum *.apk > SHA256SUMS-unsigned && cat SHA256SUMS-unsigned )
+      cp "$APK" "$CI_PROJECT_DIR/dist/DeltaSync-${VERSION}-unsigned.apk"
+      ( cd "$CI_PROJECT_DIR/dist" && sha256sum *.apk > SHA256SUMS-unsigned \
+          && cat SHA256SUMS-unsigned )
   artifacts:
     name: "deltasync-android-${CI_COMMIT_REF_SLUG}"
     paths:
