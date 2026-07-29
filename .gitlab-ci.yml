@@ -157,12 +157,15 @@ build:android:
   variables:
     # /opt/android-sdk, not a path under $CI_PROJECT_DIR: cgo hands the NDK
     # path to clang, which writes it into libgojni.so's DWARF line table, so
-    # the SDK has to live where F-Droid's builder keeps it. The path is
-    # hard-coded in fdroidserver's buildserver Vagrantfile. The cache still
-    # lives in the project dir (GitLab can't cache outside it) — before_script
-    # symlinks the two together.
+    # the SDK has to sit where F-Droid's builder keeps it. The path is
+    # hard-coded in fdroidserver's buildserver Vagrantfile.
+    #
+    # A symlink from /opt is NOT enough — clang resolves its own binary to
+    # find lib64/clang/*/include, so the physical path leaks back in. The SDK
+    # therefore installs into /opt on every run and is not cached; GitLab can
+    # only cache paths inside the project dir. That costs a few minutes on a
+    # job that only runs on android/v* tags and ci/android-* branches.
     ANDROID_HOME: "/opt/android-sdk"
-    ANDROID_SDK_CACHE: "$CI_PROJECT_DIR/.android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
     JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
     # gomobile bind runs javac over the Java it generates, and that Java
@@ -183,7 +186,6 @@ build:android:
   cache:
     key: "android-$CMDLINE_TOOLS-$NDK_VERSION-$BUILD_TOOLS"
     paths:
-      - .android-sdk/
       - .go/pkg/mod/
       - .gradle-home/
   before_script:
@@ -191,10 +193,6 @@ build:android:
     - apt-get install -y -qq --no-install-recommends openjdk-21-jdk-headless unzip
     - |
       set -eu
-      # Point /opt/android-sdk at the cached SDK. sdkmanager and clang only
-      # ever see the /opt path, which is what has to end up in the debug info.
-      mkdir -p "$ANDROID_SDK_CACHE"
-      ln -sfn "$ANDROID_SDK_CACHE" "$ANDROID_HOME"
       if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
         echo "==> installing Android cmdline-tools $CMDLINE_TOOLS"
         mkdir -p "$ANDROID_HOME/cmdline-tools"
