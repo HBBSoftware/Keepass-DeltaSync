@@ -155,7 +155,14 @@ build:android:
     # notices and dislikes. Push to a ci/android-* branch instead.
     - if: $CI_COMMIT_BRANCH =~ /^ci\/android/
   variables:
-    ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
+    # /opt/android-sdk, not a path under $CI_PROJECT_DIR: cgo hands the NDK
+    # path to clang, which writes it into libgojni.so's DWARF line table, so
+    # the SDK has to live where F-Droid's builder keeps it. The path is
+    # hard-coded in fdroidserver's buildserver Vagrantfile. The cache still
+    # lives in the project dir (GitLab can't cache outside it) — before_script
+    # symlinks the two together.
+    ANDROID_HOME: "/opt/android-sdk"
+    ANDROID_SDK_CACHE: "$CI_PROJECT_DIR/.android-sdk"
     GOPATH: "$CI_PROJECT_DIR/.go"
     JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
     # gomobile bind runs javac over the Java it generates, and that Java
@@ -184,6 +191,10 @@ build:android:
     - apt-get install -y -qq --no-install-recommends openjdk-21-jdk-headless unzip
     - |
       set -eu
+      # Point /opt/android-sdk at the cached SDK. sdkmanager and clang only
+      # ever see the /opt path, which is what has to end up in the debug info.
+      mkdir -p "$ANDROID_SDK_CACHE"
+      ln -sfn "$ANDROID_SDK_CACHE" "$ANDROID_HOME"
       if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
         echo "==> installing Android cmdline-tools $CMDLINE_TOOLS"
         mkdir -p "$ANDROID_HOME/cmdline-tools"
