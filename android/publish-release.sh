@@ -155,6 +155,14 @@ if [ -z "$CERTS" ]; then
     # when it succeeds — `verify` prints "Verifies" and still exits 1. Its exit
     # code is therefore worthless here; the signature is validated below by
     # reading the certificate back out of the finished APK instead.
+    # --alignment-preserved is what makes the F-Droid reproducible build work.
+    # Without it apksigner re-pads every stored entry (16K for .so, 4 bytes
+    # otherwise) while writing the signature, which changes the ZIP layout.
+    # F-Droid verifies by transplanting our signature onto their own build with
+    # apksigcopier, and apksigcopier cannot reproduce that re-padding — the
+    # transplanted APK then fails its integrity check and the build counts as
+    # unreproducible. Preserving the alignment zipalign already applied keeps
+    # the layout identical, and the APK still passes `zipalign -c -P 16 -v 4`.
     DELTASYNC_KS_PASS="$STORE_PASS" \
     DELTASYNC_KEY_PASS="$KEY_PASS" \
     "$APKSIGNER" sign \
@@ -162,6 +170,7 @@ if [ -z "$CERTS" ]; then
         --ks-pass env:DELTASYNC_KS_PASS \
         --ks-key-alias "$KEY_ALIAS" \
         --key-pass env:DELTASYNC_KEY_PASS \
+        --alignment-preserved \
         --out "$DIST/signed.apk" \
         "$DIST/aligned.apk" || true
     [ -s "$DIST/signed.apk" ] || die "apksigner produced no output — is JAVA_HOME correct? (${JAVA_HOME:-unset})"
