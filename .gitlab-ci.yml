@@ -143,7 +143,11 @@ build:android:
   # jvmToolchain(21) to match Android Studio's bundled JBR, and bookworm only
   # ships JDK 17. Trixie is also what F-Droid's buildserver runs, so our build
   # and theirs sit on the same JDK.
-  image: golang:1.26-trixie
+  # Pinned to the exact patch release, not floating 1.26: the Go version string
+  # is compiled into libgojni.so, so our APK only reproduces F-Droid's if both
+  # sides use the same compiler. Bump this together with the `srclibs: go@...`
+  # line in metadata/dk.bjoerckbraun.deltasync.yml, never on its own.
+  image: golang:1.26.3-trixie
   rules:
     - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
     # Escape hatch for iterating on this job itself. Without it, the only way
@@ -227,7 +231,11 @@ build:android:
       go install "golang.org/x/mobile/cmd/gobind@$XMOBILE"
       gomobile init
       mkdir -p android/libs
-      ( cd client && gomobile bind -androidapi 21 -target=android \
+      # -trimpath is what makes the .so reproducible: without it Go bakes the
+      # checkout path (/builds/... here, /home/vagrant/build/... on F-Droid's
+      # builder) and gomobile's random /tmp/gomobile-work-NNN into the binary.
+      # Keep it in sync with the same flag in the F-Droid build recipe.
+      ( cd client && gomobile bind -trimpath -androidapi 21 -target=android \
           -o ../android/libs/deltasync.aar \
           gitlab.com/Star95/keepass-deltasync/client/mobile )
 
