@@ -1,0 +1,4 @@
+Reproducible builds.
+
+• No functional changes. The app is identical to 0.4.0; only the way the release APK is built changed.
+• The release build is now byte-for-byte reproducible: anyone — including F-Droid — can rebuild this version from source and get exactly the APK published here, so the download can be verified independently.

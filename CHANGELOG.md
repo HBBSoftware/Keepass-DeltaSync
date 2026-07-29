@@ -71,6 +71,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [android/v0.4.1] — 2026-07-29
+
+No functional changes — the app is identical to 0.4.0. Only the release
+build changed, so that F-Droid can publish the APK signed with our own key
+instead of theirs.
+
+### Changed
+
+- **The release APK is byte-for-byte reproducible** against an `fdroid build`
+  of the same commit (verified: both sides produce
+  `sha256 a127e6d1…` before signing). Four sources of nondeterminism were
+  removed: the Go patch release is pinned to the one the F-Droid recipe's
+  `go` srclib builds, `gomobile bind` runs with `-trimpath` (which also drops
+  its random `/tmp/gomobile-work-NNN` work dir), the build runs from
+  `/home/vagrant/build/<applicationId>` because gomobile's generated `gobind`
+  module records our module's absolute path in the binary's build info, and
+  the Android SDK sits at `/opt/android-sdk` because cgo hands the NDK path
+  to clang, which writes it into `libgojni.so`'s debug info. A symlink is not
+  enough there — clang resolves its own binary to find its resource dir.
+- **`android/publish-release.sh` signs with `--alignment-preserved`.** F-Droid
+  verifies a reproducible build by transplanting our signature onto their own
+  build with `apksigcopier`; without the flag `apksigner` re-pads stored ZIP
+  entries while signing, `apksigcopier` cannot reproduce that, and the
+  verification fails. The signed APK still passes `zipalign -c -P 16 -v 4`.
+
 ## [server/v0.2.0] — 2026-07-01
 
 ### Added
