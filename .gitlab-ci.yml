@@ -247,9 +247,11 @@ build:android:
       # checkout path (/builds/... here, /home/vagrant/build/... on F-Droid's
       # builder) and gomobile's random /tmp/gomobile-work-NNN into the binary.
       # Keep it in sync with the same flag in the F-Droid build recipe.
-      ( cd client && gomobile bind -trimpath -androidapi 21 -target=android \
-          -o ../android/libs/deltasync.aar \
-          gitlab.com/Star95/keepass-deltasync/client/mobile )
+      # Same invocation as the F-Droid recipe, flag for flag: -target=android
+      # is gomobile's default and is left out there to keep the metadata line
+      # under the 80 columns fdroid rewritemeta wraps at.
+      ( cd client && gomobile bind -trimpath -androidapi 21 \
+          -o ../android/libs/deltasync.aar ./mobile )
 
       # :sync compiles against the bound classes only (compileOnly), so the
       # JNI layer stays out of the pure-JVM test classpath.
