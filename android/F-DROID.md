@@ -7,28 +7,13 @@ reproducible builds.
 ## Status
 
 - **Submittet:** [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). **Pipelinen er grøn hele vejen** — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer.
-- **⚠ Blokeret på os, ikke på F-Droid (tjekket 2026-07-27):** reviewer
-  **@linsui** bad 2026-06-30 om tre ændringer der aldrig blev besvaret — derfor
-  labelen `waiting-on-response`. Checkboksene i MR-beskrivelsen er sat
-  2026-07-27 (5 Required + 2 Strongly Recommended; de 3 Suggested står
-  bevidst tomme), men **det løser ikke de tre krav**:
-
-  1. *"Don't add summary and description here. Add them in fastlane structure
-     in your repo and they will be pulled from there."* → fjern `AutoName:`
-     og `Description:` fra `metadata/dk.bjoerckbraun.deltasync.yml`.
-     Ufarligt: `/fastlane/metadata/android/en-US/` er komplet.
-  2. *"Build Go from source. You can find examples in other metadata."* → den
-     tunge. Recipen henter i dag en **prebuilt** Go-tarball fra go.dev, hvilket
-     bryder F-Droids no-prebuilt-binaries-politik. Se
-     `metadata/com.nutomic.syncthingandroid.yml` for det gængse mønster:
-     `apt-get install -y -t bookworm-backports golang-go`. Der findes ingen
-     generisk `Go.yml`-srclib i fdroiddata.
-  3. Diff-tråd på `prebuild:`: *"Move build steps to build."* → flyt
-     gomobile-bind-trinnene til `build:`-feltet.
-
-  Desuden er branchen ~2200 commits bagud for `master` og skal rebases.
-
-- **LØSNINGEN på krav 2 (implementeret 2026-07-28):** der findes en **Go-srclib**
+- **Alle reviewkrav besvaret (2026-07-29).** linsuis punkter er lukket i
+  rækkefølge: summary/description fjernet (kommer fra fastlane), Go bygges fra
+  kilde via `go`-srclib'en, build-trinnene flyttet fra `prebuild:` til
+  `build:`, commit pinnet til fuld hash, mere specifikke kategorier, og shell-
+  variablerne i `build:` skrevet ud. Sidste krav er `Binaries` +
+  `AllowedAPKSigningKeys` til reproducible build — se afsnittet nedenfor.
+- **Go-srclib'en (implementeret 2026-07-28):** der findes en **Go-srclib**
   i fdroiddata — `srclibs/go.yml` (lowercase; let at overse). Den kloner
   `golang/go` og sætter `GOTOOLCHAIN=local` i `go.env`. Mønsteret linsui
   henviste til findes i `metadata/com.android.xrayfa.yml` (også en
@@ -48,11 +33,71 @@ reproducible builds.
   (`Suites: trixie trixie-updates trixie-backports` i
   `provision-apt-get-install`) — recipes skal derfor IKKE selv tilføje en
   `sources.list`-linje, bare bruge `-t trixie-backports`.
-- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.0 (`commit: android/v0.4.0`); `CurrentVersion: 0.4.0` / `CurrentVersionCode: 5`. De gamle 0.1.0–0.3.1 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
+- **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.1 (`commit:` = fuld hash, ikke tagnavn); `CurrentVersion: 0.4.1` / `CurrentVersionCode: 6`. De gamle 0.1.0–0.4.0 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
 - **Ingen `AutoName:`/`Description:` i yml'en** — linsui: *"Don't add summary and description here. Add them in fastlane structure in your repo and they will be pulled from there."* App-navn og beskrivelse kommer udelukkende fra fastlane.
 - **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`5.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
 - **NDK** leveres af F-Droids build-server via `ndk: 25.2.9519653`-feltet (eksponeret som `$$NDK$$`) — ikke længere en `curl`-download.
 - **gomobile/gobind pinnet** til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke `@latest`) — reproducerbarhedskrav.
+
+## Reproducible build
+
+Fra 0.4.1 er release-APK'en **byte-for-byte identisk** med det F-Droid selv
+bygger fra samme commit, så F-Droid kan udgive vores egen signerede APK
+(`Binaries:` + `AllowedAPKSigningKeys:`) i stedet for at signere med deres
+nøgle. Det betyder at Obtainium- og F-Droid-kanalen deler signatur, og at
+brugere kan skifte mellem dem uden at afinstallere.
+
+**Fire ting brød reproducerbarheden.** Alle fire lå i `libgojni.so`; resten af
+APK'en (dex, ressourcer, `.so` fra AndroidX) matchede fra starten:
+
+1. **Go-patchversion.** CI kørte `golang:1.26-trixie` (flydende, gav 1.26.5),
+   opskriften bygger `go@go1.26.3`. Versionsstrengen ligger i binæren. CI er
+   nu pinnet til `golang:1.26.3-trixie` — **bump den sammen med `srclibs:`,
+   aldrig alene**.
+2. **Checkout-stien og gomobiles temp-dir.** Løst med `-trimpath` på
+   `gomobile bind` (fjerner også det tilfældige `/tmp/gomobile-work-NNN`).
+3. **gomobiles `replace`-sti.** gomobile genererer et midlertidigt
+   `gobind`-modul der `replace`r vores modul ved absolut sti, og den sti
+   havner i Go's build info — `-trimpath` rører den ikke. CI bygger derfor fra
+   `/home/vagrant/build/dk.bjoerckbraun.deltasync`, som er hvor `fdroid build`
+   altid arbejder.
+4. **NDK-stien.** cgo giver NDK-stien til clang, som skriver den i DWARF-
+   linjetabellen. SDK'et skal derfor ligge i `/opt/android-sdk` (hardcodet i
+   fdroidservers `buildserver/Vagrantfile`). **Et symlink er ikke nok** —
+   clang resolver sin egen binærsti for at finde `lib64/clang/*/include`, så
+   den fysiske sti lækker igennem. SDK'et installeres derfor direkte i `/opt`
+   og caches ikke (GitLab kan kun cache stier under projektmappen).
+
+**Signering:** `android/publish-release.sh` bruger
+`apksigner sign --alignment-preserved`. Uden flaget om-padder apksigner alle
+stored ZIP-entries under signeringen (16K for `.so`, 4 bytes ellers), og
+`apksigcopier` — som F-Droid bruger til at transplantere vores signatur over
+på deres egen build — kan ikke gendanne den padding. Verifikationen fejler så,
+selvom builden er identisk. APK'en består stadig `zipalign -c -P 16 -v 4`.
+
+### Verificér reproducerbarheden uden Docker
+
+F-Droids MR-pipeline efterlader deres byggede APK som artifact, så de to kan
+sammenlignes direkte:
+
+```sh
+# deres build (fra jobbet "fdroid build" i MR-pipelinen)
+curl -sL -o fd.zip "https://gitlab.com/Star95/fdroiddata/-/jobs/<JOB_ID>/artifacts/download"
+unzip -p fd.zip tmp/dk.bjoerckbraun.deltasync_<VERSIONCODE>.apk > fdroid.apk
+
+# vores build (fra jobbet "build:android")
+curl -sL -o ci.zip "https://gitlab.com/Star95/keepass-deltasync/-/jobs/<JOB_ID>/artifacts/download"
+unzip -p ci.zip "dist/DeltaSync-<VERSION>-unsigned.apk" > ours.apk
+
+sha256sum fdroid.apk ours.apk        # skal være ens
+
+# og at signaturen kan transplanteres (det F-Droid gør ved udgivelse):
+pip install apksigcopier
+apksigcopier compare DeltaSync-<VERSION>.apk --unsigned fdroid.apk
+```
+
+Afviger de, så pak `libgojni.so` ud af begge og kig efter stier:
+`strings lib/arm64-v8a/libgojni.so | grep -E '/(builds|home|opt|tmp)/'`.
 
 ### Validér de tre metadata-jobs lokalt
 

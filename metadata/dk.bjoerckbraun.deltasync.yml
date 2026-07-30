@@ -14,15 +14,15 @@ AutoName: DeltaSync
 
 RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
+Binaries: https://github.com/HBBSoftware/Keepass-DeltaSync/releases/download/android/v%v/DeltaSync-%v.apk
 
 Builds:
-  - versionName: 0.4.0
-    versionCode: 5
-    commit: 46eb7764db1b1f6e5569db1850080ebb32a807a0
+  - versionName: 0.4.1
+    versionCode: 6
+    commit: 2c07a062a2a9787d276dc50b1d623eba91b89119
     subdir: android/app
     sudo:
       - apt-get update
-      - apt-get install -y unzip
       - apt-get install -y -t trixie-backports golang-go
     gradle:
       - yes
@@ -37,22 +37,20 @@ Builds:
       - export GOPATH="$HOME/go"
       - export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
       - export ANDROID_NDK_HOME=$$NDK$$
-      - XM=golang.org/x/mobile
-      - XV=v0.0.0-20260520154334-0e4426e1883d
-      - go install $XM/cmd/gomobile@$XV
-      - go install $XM/cmd/gobind@$XV
-      - gomobile init
       - cd ../../client
+      - go install golang.org/x/mobile/cmd/gomobile
+      - go install golang.org/x/mobile/cmd/gobind
+      - gomobile init
       - mkdir -p ../android/libs
-      - AAR=../android/libs/deltasync.aar
-      - PKG=gitlab.com/Star95/keepass-deltasync/client/mobile
-      - gomobile bind -androidapi 21 -target=android -o $AAR $PKG
+      - gomobile bind -trimpath -androidapi 21 -o deltasync.aar ./mobile
+      - mv deltasync.aar ../android/libs/
       - cd ../android/libs
-      - unzip -o deltasync.aar classes.jar
-      - mv classes.jar deltasync-classes.jar
+      - unzip -p deltasync.aar classes.jar > deltasync-classes.jar
     ndk: 25.2.9519653
+
+AllowedAPKSigningKeys: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$
-CurrentVersion: 0.4.0
-CurrentVersionCode: 5
+CurrentVersion: 0.4.1
+CurrentVersionCode: 6
