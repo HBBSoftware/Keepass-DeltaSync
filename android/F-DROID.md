@@ -34,8 +34,9 @@ reproducible builds.
   `provision-apt-get-install`) — recipes skal derfor IKKE selv tilføje en
   `sources.list`-linje, bare bruge `-t trixie-backports`.
 - **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.1 (`commit:` = fuld hash, ikke tagnavn); `CurrentVersion: 0.4.1` / `CurrentVersionCode: 6`. De gamle 0.1.0–0.4.0 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
+- **`Binaries:` og `AllowedAPKSigningKeys:` står med trailing space og værdien på næste linje.** Det ser ud som en fejl, men det ER `rewritemeta`s output for et langt top-niveau-felt, og upstream ser sådan ud (`cat -A metadata/SVS.pdfinspector.yml` → `Binaries: $`). Retter du det til én linje, skriver `rewritemeta`-jobbet det om og fejler. `AllowedAPKSigningKeys` som YAML-liste (`- <hash>`, som i `com.nononsenseapps.feeder.yml`) bliver også skrevet om til skalar af fdroidserver 2.4.5 — brug skalaren. `fdroid lint` advarer om trailing spaces på de to linjer, men exit-koden er 0, så jobbet passerer.
 - **Ingen `AutoName:`/`Description:` i yml'en** — linsui: *"Don't add summary and description here. Add them in fastlane structure in your repo and they will be pulled from there."* App-navn og beskrivelse kommer udelukkende fra fastlane.
-- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`5.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
+- **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`6.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
 - **NDK** leveres af F-Droids build-server via `ndk: 25.2.9519653`-feltet (eksponeret som `$$NDK$$`) — ikke længere en `curl`-download.
 - **gomobile/gobind pinnet** til `golang.org/x/mobile`-versionen fra `client/go.mod` (ikke `@latest`) — reproducerbarhedskrav.
 
@@ -140,8 +141,9 @@ udover det almindelige Gradle-flow. Det ligger i `.yml`'ens `sudo:`- og
 ```sh
 # 1. (sudo:) Debians Go — kun som BOOTSTRAP til at bygge Go fra kilde.
 #    Backports er allerede aktiveret på buildserveren; tilføj ikke sources.list.
+#    `unzip` installeres IKKE — den findes i imaget, og linsui bad om at
+#    linjen blev fjernet (tom `suggestion:-0+0` på MR'en, note 3617176222).
 apt-get update
-apt-get install -y unzip
 apt-get install -y -t trixie-backports golang-go
 
 # 2. (prebuild:) Installér en SDK-platform: platforms/ er stadig tom på dette
@@ -157,34 +159,39 @@ export GOROOT=$$go$$ GOPATH="$HOME/go"
 export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
 export ANDROID_NDK_HOME=$$NDK$$        # fra ndk:-feltet
 
-# 4. gomobile/gobind pinnet til client/go.mod's x/mobile-version.
-go install golang.org/x/mobile/cmd/gomobile@<pinned>
-go install golang.org/x/mobile/cmd/gobind@<pinned>
+# 4. gomobile/gobind UDEN @version: kommandoerne kører efter `cd ../../client`,
+#    så versionen kommer fra client/go.mod — stadig pinnet, blot implicit
+#    (linsui: "Don't use variables when it's not necessary...").
+cd ../../client
+go install golang.org/x/mobile/cmd/gomobile
+go install golang.org/x/mobile/cmd/gobind
 gomobile init
 
-# 5. Byg .aar fra Go-pakken (client/mobile). android/libs/ er gitignored →
-#    mappen findes ikke i en frisk klon, så opret den først.
-cd ../../client
+# 5. Byg .aar fra Go-pakken (./mobile). android/libs/ er gitignored →
+#    mappen findes ikke i en frisk klon, så opret den først. `-trimpath` er et
+#    reproducerbarhedskrav — se "Reproducible build".
 mkdir -p ../android/libs
-gomobile bind -androidapi 21 -target=android \
-    -o ../android/libs/deltasync.aar \
-    gitlab.com/Star95/keepass-deltasync/client/mobile
+gomobile bind -trimpath -androidapi 21 -o deltasync.aar ./mobile
+mv deltasync.aar ../android/libs/
 
-# 6. Udpak classes.jar til :sync's compileOnly-classpath.
+# 6. Udpak classes.jar til :sync's compileOnly-classpath. `unzip -p` skriver til
+#    stdout, så udpakning og omdøbning bliver én kommando i stedet for to.
 cd ../android/libs
-unzip -o deltasync.aar classes.jar
-mv classes.jar deltasync-classes.jar
+unzip -p deltasync.aar classes.jar > deltasync-classes.jar
 
 # 7. Standard Gradle-build (F-Droid kører selv assembleRelease).
 ```
 
-**Hold linjerne korte.** `fdroid rewritemeta` (2.4.5) ombryder kommandoer der
-overstiger ~80 tegn — og dens egen ombrydning efterlader **trailing spaces**,
-som `fdroid lint` derefter flagger. De to CI-jobs modsiger altså hinanden, hvis
-en linje er for lang. Løsningen er at holde hver kommando under grænsen, om
-nødvendigt ved at lægge lange strenge i shell-variabler først (`XM`, `XV`,
-`AAR`, `PKG` i recipen) — build-kommandoerne køres i én shell, så variabler
-overlever mellem linjer.
+**Hold linjerne korte — men ikke med shell-variabler.** `fdroid rewritemeta`
+(2.4.5) ombryder et felt der overstiger ~80 tegn, og dens egen ombrydning
+efterlader **trailing spaces** som `fdroid lint` derefter advarer om (kun en
+advarsel — lint exit'er 0, så jobbet passerer; se `Binaries:` og
+`AllowedAPKSigningKeys:` i yml'en, der begge ER ombrudt sådan). Recipen brugte
+tidligere `XM`/`XV`/`AAR`/`PKG` til at holde `build:`-linjerne korte, men
+linsui bad om at få dem fjernet (*"Don't use variables when it's not
+necessary..."*) — så løsningen er at gøre kommandoerne kortere i stedet: `cd`
+ind i mappen først og bruge relative stier (`./mobile`, `-o deltasync.aar` +
+`mv`) frem for absolutte pakke- og outputstier.
 
 **Hvorfor `build:` og ikke `prebuild:`** (linsui: *"Move build steps to
 build."*): F-Droids binær-scanner kører EFTER `prebuild:` men FØR `build:`.
@@ -195,19 +202,23 @@ dem som prebuilt binaries — hvilket den gamle recipe måtte dæmpe med
 og `scanignore:` er derfor fjernet helt. Ser scanneren dem alligevel, er det
 `scanignore:` der skal tilbage — ikke `prebuild:`.
 
-## Reproducible builds
+## Hvad der IKKE var et problem for reproducerbarheden
 
-For at F-Droid's verification-server kan bekræfte at vores release-APK
-matcher kildekoden:
+Nyttigt at vide, så man ikke fejlsøger de forkerte steder (verificeret ved at
+sammenligne entry for entry mellem F-Droids build og vores):
 
-1. Build skal være deterministisk. Vores Go-bind er deterministisk givet
-   samme Go-version + NDK-version (vi pinner begge).
-2. Gradle skal ikke embedde tidsstempler. Vi sætter
-   `archivesBaseName` og bruger `useReleaseTimestamps = false`.
-3. APK'en skal være v2-signeret med en stabil nøgle. Submitter'en
-   leverer signing-konfig separat.
-4. Ingen ProGuard/R8 endnu — vi har ikke en mappings-fil at fryse mod.
-   Tilføjes når v1 er stabil.
+- **Gradle-siden var deterministisk fra starten.** `classes*.dex`,
+  `resources.arsc` og AndroidX' `.so`-filer matchede i første forsøg. AGP
+  nulstiller selv ZIP-tidsstempler (alle entries står som `1981-01-01 01:01`),
+  så der er ingen `archivesBaseName`- eller timestamp-flag at sætte.
+- **R8/ProGuard er slået fra** (`isMinifyEnabled = false`), så der er ingen
+  mappings-fil at fryse. Slås minificering til senere, er det et nyt
+  reproducerbarhedsproblem der skal verificeres forfra.
+- **NDK-versionen** kommer fra `ndk:`-feltet og var aldrig i tvivl — det var
+  NDK'ets *sti*, ikke dets version, der lækkede ind i `libgojni.so`.
+
+Alt der faktisk brød reproducerbarheden lå i `libgojni.so` og er beskrevet
+under [Reproducible build](#reproducible-build).
 
 ## Inkluderede tredje-parts biblioteker
 

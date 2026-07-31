@@ -15,4 +15,8 @@ desktop.ini
 # Docker Compose env (contains DB_PASSWORD) — never commit
 .env
 
+# Release-artefakter hentet fra CI (usignerede APK'er m.m.) — publish-release.sh
+# læser og skriver her
+dist/
+
 # Build / language-specifikt sniges ind via komponent-mappers egne .gitignore
