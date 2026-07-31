@@ -49,8 +49,7 @@ Builds:
       - unzip -p deltasync.aar classes.jar > deltasync-classes.jar
     ndk: 25.2.9519653
 
-AllowedAPKSigningKeys: 
-  476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
+AllowedAPKSigningKeys: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$

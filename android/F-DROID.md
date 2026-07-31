@@ -34,7 +34,7 @@ reproducible builds.
   `provision-apt-get-install`) — recipes skal derfor IKKE selv tilføje en
   `sources.list`-linje, bare bruge `-t trixie-backports`.
 - **Metadata-fil:** [`/metadata/dk.bjoerckbraun.deltasync.yml`](../metadata/dk.bjoerckbraun.deltasync.yml) — én `Builds`-post for 0.4.1 (`commit:` = fuld hash, ikke tagnavn); `CurrentVersion: 0.4.1` / `CurrentVersionCode: 6`. De gamle 0.1.0–0.4.0 blev aldrig publiceret og er fjernet. Filen er på kanonisk form — kør ALTID `fdroid rewritemeta` og brug dens output som facit; den vil fx have lange `sudo:`/`build:`-kommandoer på ÉN linje, ikke ombrudt ved 80 tegn.
-- **`Binaries:` og `AllowedAPKSigningKeys:` står med trailing space og værdien på næste linje.** Det ser ud som en fejl, men det ER `rewritemeta`s output for et langt top-niveau-felt, og upstream ser sådan ud (`cat -A metadata/SVS.pdfinspector.yml` → `Binaries: $`). Retter du det til én linje, skriver `rewritemeta`-jobbet det om og fejler. `AllowedAPKSigningKeys` som YAML-liste (`- <hash>`, som i `com.nononsenseapps.feeder.yml`) bliver også skrevet om til skalar af fdroidserver 2.4.5 — brug skalaren. `fdroid lint` advarer om trailing spaces på de to linjer, men exit-koden er 0, så jobbet passerer.
+- **`Binaries:` står med trailing space og værdien på næste linje — `AllowedAPKSigningKeys:` gør IKKE.** Det ser ud som en inkonsekvens, men det er hvad CI'ens `rewritemeta` kræver: `Binaries:` er en URL med `%v`-pladsholdere der ombrydes, mens signeringsnøglen skal stå inline uanset længde. `fdroid lint` advarer om den trailing space på `Binaries:`, men exit-koden er uændret, så jobbet passerer. `AllowedAPKSigningKeys` som YAML-liste (`- <hash>`, som i `com.nononsenseapps.feeder.yml`) bliver skrevet om til skalar — brug skalaren.
 - **Ingen `AutoName:`/`Description:` i yml'en** — linsui: *"Don't add summary and description here. Add them in fastlane structure in your repo and they will be pulled from there."* App-navn og beskrivelse kommer udelukkende fra fastlane.
 - **Fastlane-beskrivelser:** [`/fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US/) — `title.txt`, `short_description.txt`, `full_description.txt`, changelogs `1.txt`–`6.txt`. F-Droid bruger DISSE til app-sidens tekst. Kun en-US findes; ingen dansk listing endnu.
 - **NDK** leveres af F-Droids build-server via `ndk: 25.2.9519653`-feltet (eksponeret som `$$NDK$$`) — ikke længere en `curl`-download.
@@ -47,6 +47,12 @@ bygger fra samme commit, så F-Droid kan udgive vores egen signerede APK
 (`Binaries:` + `AllowedAPKSigningKeys:`) i stedet for at signere med deres
 nøgle. Det betyder at Obtainium- og F-Droid-kanalen deler signatur, og at
 brugere kan skifte mellem dem uden at afinstallere.
+
+Bekræftet på F-Droids egen infrastruktur (MR !41661, job `fdroid build`):
+`dk.bjoerckbraun.deltasync_6.apk` og vores `build:android`-artefakt har begge
+sha256 `09963ea3f92dc593fa61d13b69f18f552f171bdd5d861b5f10571e718149a74d`, og
+jobbet logger `compared built binary to supplied reference binary
+successfully` + `supplied reference binary has allowed signer 476e556a…`.
 
 **Fire ting brød reproducerbarheden.** Alle fire lå i `libgojni.so`; resten af
 APK'en (dex, ressourcer, `.so` fra AndroidX) matchede fra starten:
@@ -104,8 +110,16 @@ Afviger de, så pak `libgojni.so` ud af begge og kig efter stier:
 
 `fdroid build` kan ikke køres uden for en provisioneret build-server, men de
 tre metadata-jobs (`fdroid lint`, `fdroid rewritemeta`, `schema validation`)
-kan valideres 100 % lokalt. `fdroid` er allerede installeret i WSL
-(`/usr/bin/fdroid`); kør fra Git Bash på Windows:
+kan køres lokalt. `fdroid` er allerede installeret i WSL (`/usr/bin/fdroid`);
+kør fra Git Bash på Windows:
+
+> **Lokal validering er en indikation, ikke et facit.** WSL har fdroidserver
+> **2.4.5**, mens CI-jobbene henter **master** friskt ved hver kørsel
+> (`curl .../fdroidserver/-/archive/master/...`). De to er ikke enige om
+> formateringen: 2.4.5 ombryder `AllowedAPKSigningKeys:` til to linjer og
+> kalder det idempotent, hvor master kræver den på én linje. Det kostede en
+> rød pipeline. Er den lokale kørsel grøn og CI rød, så er **CI facit** — læs
+> `rewritemeta`-jobbets diff og anvend den ordret.
 
 ```sh
 wsl -e sh -lc '
