@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="KeePass search">
+  <!-- Forstørrelsesglas: søgningen er hele pointen. -->
+  <circle cx="13" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="2.5" />
+  <line x1="18.5" y1="18.5" x2="26" y2="26" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+  <!-- Nøglehullet i midten binder det til KeePass. -->
+  <circle cx="13" cy="11" r="2.2" fill="currentColor" />
+  <path d="M12.1 12.8h1.8l-.5 4.2h-.8z" fill="currentColor" />
+</svg>

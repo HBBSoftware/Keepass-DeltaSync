@@ -1,0 +1,169 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+:root {
+  --bg: #ffffff;
+  --fg: #15141a;
+  --muted: #5b5b66;
+  --border: #d7d7db;
+  --accent: #0060df;
+  --accent-fg: #ffffff;
+  --hover: #f0f0f4;
+  --danger: #c50042;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b22;
+    --fg: #fbfbfe;
+    --muted: #b1b1bd;
+    --border: #3a3944;
+    --accent: #00ddff;
+    --accent-fg: #15141a;
+    --hover: #2b2a33;
+    --danger: #ff9aa2;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 24rem;
+  margin: 0;
+  font: menu;
+  font-size: 0.875rem;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+header {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+input[type="search"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+li:last-child {
+  border-bottom: none;
+}
+
+li:hover,
+li[aria-selected="true"] {
+  background: var(--hover);
+}
+
+li[data-navigable="false"] {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.meta .url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta .where {
+  flex: none;
+}
+
+.hint {
+  margin: 0;
+  padding: 0.6rem;
+  color: var(--muted);
+}
+
+.hint.error {
+  color: var(--danger);
+}
+
+section {
+  padding: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+form input {
+  flex: 1;
+}
+
+button {
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+footer button {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}

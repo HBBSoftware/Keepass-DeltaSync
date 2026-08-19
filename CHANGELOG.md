@@ -8,6 +8,26 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Firefox extension — search & go** (`extension/`) — search your KeePass
+  entries from Firefox' address bar (`kp` keyword) or a popup, and open the
+  entry's website. Filling in credentials deliberately stays with
+  KeePassXC-Browser; this closes the gap it does not cover, namely *finding*
+  the right page. The extension talks to a new `keepass-deltasync
+  browser-host` subcommand over native messaging and only ever receives
+  titles, URLs and group paths — an allow-list enforced in the host, so no
+  future bug in the extension can leak a field the host never sent. It
+  requests no host permissions at all.
+
+  The masterpassword does not pass through the browser: the host reads it from
+  the OS keyring itself, builds the index and wipes the key material again. A
+  database without a keyring entry falls back to a prompt in the popup, held in
+  the host's memory under an idle lock. Entries in the recycle bin and in
+  groups with searching disabled are excluded, and values that cannot be
+  navigated to (`{REF:…}` placeholders, `cmd://`, non-http schemes) never reach
+  `tabs.update`. `install-browser-host` / `uninstall-browser-host` register the
+  native messaging manifest on Linux, macOS and Windows. See
+  [`docs/browser-extension.md`](docs/browser-extension.md).
+
 - **QR-code enrollment (Android)** — the enrollment screen gains a *Scan QR
   code* button (ZXing, camera) that reads the enrollment QR shown by the web
   admin panel (`deltasync://enroll?server=…&token=…`) and fills the form, so a
