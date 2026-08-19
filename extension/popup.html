@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>KeePass search</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <input
+        id="query"
+        type="search"
+        placeholder="Search entries…"
+        autocomplete="off"
+        spellcheck="false"
+        disabled
+      />
+    </header>
+
+    <ul id="results" role="listbox" aria-label="Matching entries"></ul>
+
+    <p id="empty" class="hint" hidden></p>
+
+    <section id="unlock" hidden>
+      <p id="unlock-text" class="hint"></p>
+      <form id="unlock-form">
+        <input
+          id="password"
+          type="password"
+          placeholder="Masterpassword"
+          autocomplete="off"
+          hidden
+        />
+        <button type="submit" id="unlock-button">Unlock</button>
+      </form>
+    </section>
+
+    <footer>
+      <span id="footer-status"></span>
+      <button type="button" id="lock" hidden>Lock</button>
+    </footer>
+
+    <script src="search.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

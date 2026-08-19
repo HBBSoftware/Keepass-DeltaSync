@@ -10,6 +10,9 @@
 #   server/vX.Y.Z   → PHP server          (this pipeline builds + pushes a
 #                                          multi-arch Docker image to the GitLab
 #                                          Container Registry)
+#   extension/vX.Y.Z → Firefox extension   (this pipeline packages an UNSIGNED
+#                                          .xpi; signing happens outside CI —
+#                                          see build:extension below)
 #
 # Plain `vX.Y.Z` tags are LEGACY (v1.0.0 = old client line, v0.1.0 = a first
 # unified attempt that re-stamped the client as a lower number) and no longer
@@ -49,6 +52,27 @@ test:client:
   script:
     - go vet ./...
     - go test ./...
+
+# Mozillas egen linter. Kører kun når extension/ faktisk er rørt — et
+# npm-hentende job hører ikke til på hver eneste commit.
+#
+# --warnings-as-errors er med vilje: udvidelsen står på nul advarsler i dag, og
+# de advarsler der dukker op her kommer typisk fra en ÆNDRET AMO-politik
+# (`data_collection_permissions` blev fx pludselig påkrævet). Det vil vi vide
+# med det samme, ikke når en indsendelse bliver afvist.
+test:extension:
+  stage: test
+  image: node:22-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension\/v\d+\.\d+\.\d+$/
+    - changes:
+        - extension/**/*
+  script:
+    # --ignore-files holder linterens synsfelt identisk med det package.sh
+    # rent faktisk pakker: package.sh og README.md er værktøj og
+    # dokumentation, ikke udvidelsens indhold. Uden dette flagger linteren
+    # .sh-filen som "unnecessary", og --warnings-as-errors gør det fatalt.
+    - npx --yes web-ext lint --source-dir extension --ignore-files package.sh README.md --warnings-as-errors
 
 # ----------------------------------------------------------------------
 # Cross-compile binaries (only on client/vX.Y.Z tags)
@@ -282,6 +306,43 @@ build:android:
     paths:
       - dist/*.apk
       - dist/SHA256SUMS-unsigned
+    expire_in: never
+
+# ----------------------------------------------------------------------
+# Package the Firefox extension (only on extension/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# Producerer en USIGNERET .xpi. Signering — hos AMO eller med egen nøgle —
+# sker uden for CI, præcis som med Android-APK'en: signeringsnøglen kommer
+# aldrig i pipelinen.
+#
+# Arkivet er byte-reproducerbart (faste tidsstempler og rettigheder i
+# package.sh), så enhver kan bygge taggen og kontrollere at den .xpi de har
+# hentet svarer til kilden.
+build:extension:
+  stage: build
+  image: python:3-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension\/v\d+\.\d+\.\d+$/
+    # Escape hatch til at arbejde på selve jobbet uden at flytte et tag.
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/extension/
+  script:
+    - |
+      set -eu
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        # extension/v0.1.0 → 0.1.0. package.sh afviser at bygge hvis
+        # manifest.json siger noget andet end taggen.
+        VERSION="${CI_COMMIT_TAG#extension/v}"
+      else
+        VERSION=""
+        echo "==> branch build (not a release)"
+      fi
+      sh extension/package.sh $VERSION
+  artifacts:
+    name: "deltasync-extension-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - dist/*.xpi
+      - dist/SHA256SUMS-extension
     expire_in: never
 
 # ----------------------------------------------------------------------

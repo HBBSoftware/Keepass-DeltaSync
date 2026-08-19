@@ -8,6 +8,35 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Firefox extension — search & go** (`extension/`) — search your KeePass
+  entries from Firefox' address bar (`kp` keyword) or a popup, and open the
+  entry's website. Filling in credentials deliberately stays with
+  KeePassXC-Browser; this closes the gap it does not cover, namely *finding*
+  the right page. The extension talks to a new `keepass-deltasync
+  browser-host` subcommand over native messaging and only ever receives
+  titles, URLs and group paths — an allow-list enforced in the host, so no
+  future bug in the extension can leak a field the host never sent. It
+  requests no host permissions at all.
+
+  The masterpassword does not pass through the browser: the host reads it from
+  the OS keyring itself, builds the index and wipes the key material again. A
+  database without a keyring entry falls back to a prompt in the popup, held in
+  the host's memory under an idle lock. Entries in the recycle bin and in
+  groups with searching disabled are excluded, and values that cannot be
+  navigated to (`{REF:…}` placeholders, `cmd://`, non-http schemes) never reach
+  `tabs.update`. `install-browser-host` / `uninstall-browser-host` register the
+  native messaging manifest on Linux, macOS and Windows.
+
+  Entries with several URLs (KeePassXC' *Additional URLs*) are searchable on
+  every one of them. Such an entry takes one row with a `2 URLs` badge, and
+  selecting it unfolds every address beneath, best match first — so no address
+  is unreachable, and the result list is not padded with the same entry twice.
+  Which one counts as best depends on the search: a match carried by the title
+  keeps the primary address on top, while an address that matched harder than
+  the title wins. The extension carries the DeltaSync mark, rebuilt as SVG
+  from the Android launcher icon. See
+  [`docs/browser-extension.md`](docs/browser-extension.md).
+
 - **QR-code enrollment (Android)** — the enrollment screen gains a *Scan QR
   code* button (ZXing, camera) that reads the enrollment QR shown by the web
   admin panel (`deltasync://enroll?server=…&token=…`) and fills the form, so a

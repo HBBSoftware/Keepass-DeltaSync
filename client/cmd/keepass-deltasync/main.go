@@ -39,6 +39,9 @@ Commands:
   devices remove <id>         Revoke an enrolled device (its token becomes invalid)
   databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
+  browser-host                Native messaging host for the Firefox extension (search + open URL)
+  install-browser-host        Register the browser host with Firefox
+  uninstall-browser-host      Remove the browser host registration
   tui                         Interactive full-screen menu for the commands above
   admin <subcommand>          Admin commands (token-sql, user-create, user-list, ...)
 `
@@ -86,6 +89,12 @@ func main() {
 		exitOnError(runDatabases(os.Args[2:]))
 	case "log":
 		exitOnError(runLog(os.Args[2:]))
+	case "browser-host":
+		exitOnError(runBrowserHost(os.Args[2:]))
+	case "install-browser-host":
+		exitOnError(runInstallBrowserHost(os.Args[2:]))
+	case "uninstall-browser-host":
+		exitOnError(runUninstallBrowserHost(os.Args[2:]))
 	case "tui", "menu":
 		exitOnError(runTui(os.Args[2:]))
 	case "admin":

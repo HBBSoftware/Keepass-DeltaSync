@@ -67,6 +67,16 @@ type Group struct {
 	CreatedAt       time.Time
 	ModifiedAt      time.Time
 	LocationChanged time.Time
+
+	// EnableSearching er KDBX' per-gruppe søgeflag. nil betyder "arv fra
+	// forælder" (<EnableSearching>null</EnableSearching>, eller feltet
+	// mangler helt); default øverst i træet er true.
+	//
+	// Sync bruger det IKKE — en gruppe der er skjult fra søgning
+	// synkroniseres præcis som alle andre. Feltet eksponeres udelukkende
+	// for browser-host's indeksering, som skal respektere at brugeren har
+	// taget en gruppe ud af søgeresultater. Se docs/browser-extension.md.
+	EnableSearching *bool
 }
 
 // RootGroupUUID parser XML-eksporten og returnerer Root-gruppens UUID i
@@ -240,7 +250,23 @@ func buildGroup(g *group, parentRef string) (Group, error) {
 		CreatedAt:       parseKdbxTimeOrZero(g.Times.CreationTime),
 		ModifiedAt:      parseKdbxTimeOrZero(g.Times.LastModificationTime),
 		LocationChanged: parseKdbxTimeOrZero(g.Times.LocationChanged),
+		EnableSearching: parseTristateBool(g.EnableSearching),
 	}, nil
+}
+
+// parseTristateBool læser KDBX' tri-state-booleans ("True"/"False"/"null").
+// Alt andet — inklusive tom string, som betyder at elementet manglede
+// helt — giver nil, dvs. "arv fra forælder".
+func parseTristateBool(s string) *bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "true":
+		v := true
+		return &v
+	case "false":
+		v := false
+		return &v
+	}
+	return nil
 }
 
 // parseKdbxTimeOrZero er en lempelig variant af parseKdbxTime der returnerer
@@ -327,8 +353,10 @@ type group struct {
 	Notes   string     `xml:"Notes"`
 	IconID  string     `xml:"IconID"`
 	Times   groupTimes `xml:"Times"`
-	Entries []entry    `xml:"Entry"`
-	Groups  []group    `xml:"Group"`
+	// EnableSearching er "True", "False", "null" eller tom (fraværende).
+	EnableSearching string  `xml:"EnableSearching"`
+	Entries         []entry `xml:"Entry"`
+	Groups          []group `xml:"Group"`
 }
 
 type groupTimes struct {

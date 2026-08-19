@@ -10,13 +10,14 @@ The file format (`.kdbx`) is unchanged. Sync happens through a small server that
 
 ## Repository layout
 
-This monorepo contains four components, each with its own license:
+This monorepo contains five components, each with its own license:
 
 | Directory | Component | License | Language |
 |-----------|-----------|---------|----------|
 | [`server/`](server/) | Sync server | AGPL-3.0-or-later | PHP 8.2 + PostgreSQL |
 | [`client/`](client/) | Desktop sync agent | GPL-3.0-or-later | Go |
 | [`android/`](android/) | Android client | GPL-3.0-or-later | Go (gomobile) + Kotlin |
+| [`extension/`](extension/) | Firefox extension — search & go | GPL-3.0-or-later | JavaScript (WebExtension) |
 | [`docs/`](docs/) | Shared documentation | CC-BY-SA-4.0 | Markdown |
 
 Client and server only communicate over a well-defined HTTP API, so GPL/AGPL does not bleed across the boundary.
@@ -27,6 +28,7 @@ Client and server only communicate over a well-defined HTTP API, so GPL/AGPL doe
 
 - **Server** (PHP / PostgreSQL): live on shared hosting. Endpoints for enrollment, entries with 3-version history, restore, admin CLI, audit log.
 - **Desktop client** (Go): `enroll`, `init`, `init-shared`, `push`, `pull`, `sync`, `daemon` (fsnotify + polling), `versions`, `restore`, `share` / `unshare` / `shares`. Crypto: Argon2id → HKDF → XChaCha20-Poly1305 for entries; X25519 sealed-box for sharing. v3 canonical wire-format with dual-read of v1 legacy blobs during migration.
+- **Firefox extension**: search your entries from the address bar or a popup and open the entry's site; credential filling stays with KeePassXC-Browser. Talks to `keepass-deltasync browser-host` over native messaging and only ever receives titles, URLs and group paths — never secrets. Working, not yet signed for distribution — see [`extension/README.md`](extension/README.md).
 - **Android client**: sync core feature-complete (40 tests green), enrollment UI works, `:app` builds as installable debug APK. Kdbx file picker + actual sync trigger UI still to come — see [`android/README.md`](android/README.md). Built on top of `client/mobile/` via `gomobile bind` + kotpass.
 
 ## How it works
