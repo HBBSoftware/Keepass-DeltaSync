@@ -7,17 +7,16 @@
 // docs/browser-extension.md. Der er derfor ikke noget at søge i som er
 // hemmeligt, og hele søgningen kan køre lokalt uden at spørge hosten.
 //
-// Et SØGERESULTAT er et (entry, url)-par, ikke en entry. En entry med flere
-// adresser — KeePassXC' "Additional URLs", gemt som KP2A_URL_* under
-// Yderligere attributter — kan derfor optræde med en række pr. adresse der
-// matchede. Ellers ville man kun kunne nå den højest rangerede af dem.
+// Ét søgeresultat = én entry, også når entry'en har flere adresser
+// (KeePassXC' "Additional URLs", gemt som KP2A_URL_* under Yderligere
+// attributter). Hittet bærer den bedst matchende adresse i `url`, og
+// `urlScores` fortæller hvor godt hver enkelt adresse matchede, så
+// brugerfladen kan folde dem ud i rigtig rækkefølge når entry'en vælges.
+//
+// Adressen skal kunne vælges et sted — ellers er de øvrige uopnåelige — men
+// listen skal ikke fyldes med den samme entry flere gange.
 
 "use strict";
-
-// Loft for hvor mange rækker én entry må fylde. Uden det kunne et bredt
-// søgeord som "login" lade en enkelt entry med mange adresser fylde hele
-// resultatlisten.
-const MAX_ROWS_PER_ENTRY = 3;
 
 // hostOf trækker værtsnavnet ud af en URL uden at bygge et URL-objekt for
 // hvert opslag — søgningen kører på hvert tastetryk.
@@ -92,54 +91,37 @@ function scoreEntry(entry, tokens) {
   return { total, perUrl, textTotal };
 }
 
-// rowsFor oversætter én matchende entry til de rækker den skal fylde.
-function rowsFor(entry, { total, perUrl, textTotal }) {
+// bestURL udpeger den adresse et hit skal åbne som standard.
+//
+// Bar titlen matchet, peger søgningen på entry'en som helhed frem for på en
+// bestemt adresse — så vinder den primære. Ramte en konkret adresse hårdere
+// end titlen, er det den, brugeren ledte efter.
+function bestURL(entry, { perUrl, textTotal }) {
   const urls = entry.urls || [];
-  if (urls.length === 0) {
-    return [{ entry, url: null, score: total, matchedURL: false }];
-  }
+  if (urls.length === 0) return null;
 
   let bestIdx = 0;
   for (let i = 1; i < urls.length; i++) {
     if (perUrl[i] > perUrl[bestIdx]) bestIdx = i;
   }
-
-  // Bar titlen matchet, peger søgningen på entry'en som helhed frem for på en
-  // bestemt adresse — så skal den primære ligge øverst. Ramte en konkret
-  // adresse hårdere end titlen, er det den, brugeren ledte efter.
-  const titleCarried = textTotal >= perUrl[bestIdx];
-
-  // Den primære adresse er altid med: den er entry'ens hovedindgang, også når
-  // det var en anden af dens adresser der matchede.
-  const rows = [
-    {
-      entry,
-      url: urls[0],
-      score: titleCarried ? total : total + perUrl[0] - perUrl[bestIdx],
-      matchedURL: perUrl[0] > 0,
-    },
-  ];
-
-  // Hver ANDEN adresse der selv matchede får sin egen række, stærkeste først,
-  // så den kan vælges med piletasterne i stedet for at være uopnåelig.
-  const others = [];
-  for (let i = 1; i < urls.length; i++) {
-    if (perUrl[i] > 0) others.push(i);
-  }
-  others.sort((a, b) => perUrl[b] - perUrl[a]);
-
-  for (const i of others.slice(0, MAX_ROWS_PER_ENTRY - 1)) {
-    rows.push({
-      entry,
-      url: urls[i],
-      score: total + perUrl[i] - perUrl[bestIdx],
-      matchedURL: true,
-    });
-  }
-  return rows;
+  if (textTotal >= perUrl[bestIdx]) bestIdx = 0;
+  return urls[bestIdx];
 }
 
-// searchIndex returnerer de bedst matchende (entry, url)-par, bedste først.
+// rankedURLs returnerer entry'ens adresser i den rækkefølge de skal vises,
+// bedst matchende først. Alle er med — også dem der ikke matchede — for det
+// er hele pointen med udfoldningen: at kunne se og vælge dem alle.
+//
+// Array.sort er stabil, så adresser med samme score beholder deres
+// oprindelige rækkefølge, og den primære bliver liggende først blandt lige.
+function rankedURLs(entry, urlScores) {
+  return (entry.urls || [])
+    .map((url, i) => ({ url, score: urlScores[i] }))
+    .sort((a, b) => b.score - a.score);
+}
+
+// searchIndex returnerer de bedst matchende entries, bedste først — én
+// række pr. entry.
 function searchIndex(index, query, limit = 20) {
   const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return [];
@@ -147,16 +129,19 @@ function searchIndex(index, query, limit = 20) {
   const hits = [];
   for (const entry of index) {
     const scored = scoreEntry(entry, tokens);
-    if (scored) hits.push(...rowsFor(entry, scored));
+    if (!scored) continue;
+    hits.push({
+      entry,
+      score: scored.total,
+      url: bestURL(entry, scored),
+      urlScores: scored.perUrl,
+    });
   }
 
-  // Array.sort er stabil, og rowsFor lægger altid den primære adresse først.
-  // Går to rækker fra samme entry i lige score, bevarer den primære derfor
-  // sin plads øverst.
   hits.sort((a, b) => b.score - a.score || a.entry.title.localeCompare(b.entry.title));
   return hits.slice(0, limit);
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { searchIndex, scoreEntry, rowsFor, urlScore, textScore, hostOf };
+  module.exports = { searchIndex, scoreEntry, bestURL, rankedURLs, urlScore, textScore, hostOf };
 }

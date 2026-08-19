@@ -28,9 +28,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
   native messaging manifest on Linux, macOS and Windows.
 
   Entries with several URLs (KeePassXC' *Additional URLs*) are searchable on
-  every one of them, and a hit opens the URL the search actually matched —
-  unless the match came mainly from the title, in which case the entry's
-  primary URL wins. The extension carries the DeltaSync mark, rebuilt as SVG
+  every one of them. Such an entry takes one row with a `2 URLs` badge, and
+  selecting it unfolds every address beneath, best match first — so no address
+  is unreachable, and the result list is not padded with the same entry twice.
+  Which one counts as best depends on the search: a match carried by the title
+  keeps the primary address on top, while an address that matched harder than
+  the title wins. The extension carries the DeltaSync mark, rebuilt as SVG
   from the Android launcher icon. See
   [`docs/browser-extension.md`](docs/browser-extension.md).
 

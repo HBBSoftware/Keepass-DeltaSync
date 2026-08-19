@@ -19,7 +19,11 @@ const els = {
 };
 
 let hits = [];
-let selected = 0;
+// Markeringen er en identitet, ikke et indeks i den viste liste: `hit` peger
+// på entry'en, og `url` er -1 for selve entry-raekken eller nummeret på en
+// udfoldet adresse. Havde vi brugt et listeindeks, ville det skride hver gang
+// en udfoldning ændrede antallet af rækker.
+let selected = { hit: 0, url: -1 };
 let lockedDatabase = null;
 
 // send pakker baggrundssidens {ok, ...}-konvolut ud. Fejler noget, kaster vi
@@ -99,66 +103,118 @@ async function runSearch() {
     showHint(`Search failed: ${err.message}`, true);
     return;
   }
-  selected = 0;
+  selected = { hit: 0, url: -1 };
   render();
   showHint(hits.length ? "" : `No entry matches “${query}”.`);
+}
+
+// expandable siger hvor mange adresser en entry folder ud. Kun entries med
+// mere end én — en enkelt adresse står allerede på entry-rækken.
+function expandable(hitIndex) {
+  const hit = hits[hitIndex];
+  const n = hit ? hit.entry.urls.length : 0;
+  return n > 1 ? n : 0;
+}
+
+function entryRow(hit, i, expanded) {
+  const li = document.createElement("li");
+  li.setAttribute("role", "option");
+  li.setAttribute("aria-selected", String(i === selected.hit && selected.url === -1));
+  li.dataset.hit = String(i);
+  li.dataset.url = "-1";
+  li.dataset.navigable = String(Boolean(hit.url));
+
+  const title = document.createElement("span");
+  title.className = "title";
+  title.textContent = hit.entry.title || "(untitled)";
+
+  if (hit.entry.urls.length > 1) {
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = `${hit.entry.urls.length} URLs`;
+    title.append(" ", badge);
+  }
+  li.append(title);
+
+  const meta = document.createElement("span");
+  meta.className = "meta";
+
+  // Er entry'en foldet ud, står adresserne i underrækkerne — så ville det
+  // bare være støj at gentage en af dem her.
+  const url = document.createElement("span");
+  url.className = "url";
+  url.textContent = expanded ? "" : hit.url || "no usable URL";
+  meta.append(url);
+
+  const where = document.createElement("span");
+  where.className = "where";
+  where.textContent = hit.entry.group ? `${hit.entry.db}/${hit.entry.group}` : hit.entry.db;
+  meta.append(where);
+
+  li.append(meta);
+  return li;
+}
+
+function urlRow(hitIndex, k, url) {
+  const li = document.createElement("li");
+  li.className = "suburl";
+  li.setAttribute("role", "option");
+  li.setAttribute("aria-selected", String(hitIndex === selected.hit && k === selected.url));
+  li.dataset.hit = String(hitIndex);
+  li.dataset.url = String(k);
+  li.dataset.navigable = "true";
+  li.textContent = url;
+  return li;
 }
 
 function render() {
   els.results.textContent = "";
   hits.forEach((hit, i) => {
-    const { entry } = hit;
-    const li = document.createElement("li");
-    li.setAttribute("role", "option");
-    li.setAttribute("aria-selected", String(i === selected));
-    li.dataset.index = String(i);
-    li.dataset.navigable = String(Boolean(hit.url));
-
-    const title = document.createElement("span");
-    title.className = "title";
-    title.textContent = entry.title || "(untitled)";
-
-    // En entry med flere adresser kan optræde med en række pr. adresse der
-    // matchede, men ikke nødvendigvis dem alle. Badgen siger hvor mange den
-    // har i alt, så det er tydeligt at der findes flere end de viste.
-    if (entry.urls.length > 1) {
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = `${entry.urls.length} URLs`;
-      title.append(" ", badge);
-    }
-    li.append(title);
-
-    const meta = document.createElement("span");
-    meta.className = "meta";
-
-    const url = document.createElement("span");
-    url.className = "url";
-    url.textContent = hit.url || "no usable URL";
-    meta.append(url);
-
-    const where = document.createElement("span");
-    where.className = "where";
-    where.textContent = entry.group ? `${entry.db}/${entry.group}` : entry.db;
-    meta.append(where);
-
-    li.append(meta);
-    els.results.append(li);
+    const expanded = i === selected.hit && expandable(i) > 0;
+    els.results.append(entryRow(hit, i, expanded));
+    if (!expanded) return;
+    // Bedst matchende adresse først, så den øverste underrække altid er
+    // den, Enter på entry-rækken ville have åbnet.
+    rankedURLs(hit.entry, hit.urlScores).forEach((ranked, k) => {
+      els.results.append(urlRow(i, k, ranked.url));
+    });
   });
 
   const active = els.results.querySelector('[aria-selected="true"]');
   if (active) active.scrollIntoView({ block: "nearest" });
 }
 
+// urlAt oversætter en markering til den adresse der skal åbnes.
+function urlAt({ hit, url }) {
+  const target = hits[hit];
+  if (!target) return null;
+  if (url < 0) return target.url;
+  const ranked = rankedURLs(target.entry, target.urlScores);
+  return ranked[url] ? ranked[url].url : null;
+}
+
 function move(delta) {
   if (hits.length === 0) return;
-  selected = (selected + delta + hits.length) % hits.length;
+  selected = delta > 0 ? nextSelection(selected) : previousSelection(selected);
   render();
 }
 
-async function open(index, event) {
-  const hit = hits[index];
-  if (!hit || !hit.url) return;
+function nextSelection({ hit, url }) {
+  if (url + 1 < expandable(hit)) return { hit, url: url + 1 };
+  return { hit: hit + 1 < hits.length ? hit + 1 : 0, url: -1 };
+}
+
+function previousSelection({ hit, url }) {
+  if (url >= 0) return { hit, url: url - 1 };
+  const prev = hit - 1 >= 0 ? hit - 1 : hits.length - 1;
+  // expandable() er 0 når entry'en ikke folder ud, og så lander vi på -1,
+  // altså dens egen række.
+  return { hit: prev, url: expandable(prev) - 1 };
+}
+
+async function open(target, event) {
+  const url = urlAt(target);
+  if (!url) return;
 
   // Ctrl/Cmd-klik og midterklik åbner i ny fane, som alle andre steder i
   // browseren. Almindeligt klik genbruger den aktive fane, så
@@ -167,7 +223,7 @@ async function open(index, event) {
   try {
     await send({
       type: "open",
-      url: hit.url,
+      url,
       disposition: newTab ? "newForegroundTab" : "currentTab",
     });
   } catch (err) {
@@ -199,15 +255,32 @@ els.query.addEventListener("keydown", (event) => {
   }
 });
 
+function selectionOf(li) {
+  return { hit: Number(li.dataset.hit), url: Number(li.dataset.url) };
+}
+
 els.results.addEventListener("click", (event) => {
   const li = event.target.closest("li");
-  if (li) open(Number(li.dataset.index), event);
+  if (li) open(selectionOf(li), event);
 });
 
 els.results.addEventListener("auxclick", (event) => {
   if (event.button !== 1) return;
   const li = event.target.closest("li");
-  if (li) open(Number(li.dataset.index), event);
+  if (li) open(selectionOf(li), event);
+});
+
+// Musen skal kunne nå de udfoldede adresser, og udfoldningen følger
+// markeringen — så peger man på en række, bliver den markeret.
+// Underrækkerne dukker op UNDER den række markøren står på, så den
+// flytter sig ikke væk under fingeren.
+els.results.addEventListener("mouseover", (event) => {
+  const li = event.target.closest("li");
+  if (!li) return;
+  const next = selectionOf(li);
+  if (next.hit === selected.hit && next.url === selected.url) return;
+  selected = next;
+  render();
 });
 
 els.unlockForm.addEventListener("submit", async (event) => {
@@ -254,6 +327,7 @@ els.lock.addEventListener("click", async () => {
   }
   hits = [];
   els.query.value = "";
+  selected = { hit: 0, url: -1 };
   render();
   await refresh();
 });

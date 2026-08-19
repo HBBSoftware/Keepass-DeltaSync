@@ -190,21 +190,32 @@ function escapeXml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function suggestionFor(entry, url) {
+  const where = entry.group ? `${entry.db}/${entry.group}` : entry.db;
+  return {
+    content: url,
+    description: `${escapeXml(entry.title)} <dim>${escapeXml(where)}</dim> <url>${escapeXml(url)}</url>`,
+  };
+}
+
 browser.omnibox.onInputChanged.addListener(async (text, addSuggestions) => {
   if (!text.trim()) return;
   const hits = searchIndex(await allEntries(), text, 6).filter((h) => h.url);
-  addSuggestions(
-    hits.map((hit) => {
-      const { entry } = hit;
-      const where = entry.group ? `${entry.db}/${entry.group}` : entry.db;
-      // hit.url — ikke entry.urls[0]. Har entry'en flere adresser, og var det
-      // den anden der matchede, er det den vi skal foreslå.
-      return {
-        content: hit.url,
-        description: `${escapeXml(entry.title)} <dim>${escapeXml(where)}</dim> <url>${escapeXml(hit.url)}</url>`,
-      };
-    })
-  );
+
+  // Adresselinjen er en flad liste og kan ikke folde ud som popup'en. Skal en
+  // entry's øvrige adresser kunne nås herfra, må de have hvert sit forslag.
+  // De lægges bagest, så de aldrig fortrænger et andet hits hovedadresse.
+  const primary = [];
+  const extras = [];
+  for (const hit of hits) {
+    primary.push(suggestionFor(hit.entry, hit.url));
+    for (const alt of rankedURLs(hit.entry, hit.urlScores)) {
+      if (alt.url !== hit.url && alt.score > 0) {
+        extras.push(suggestionFor(hit.entry, alt.url));
+      }
+    }
+  }
+  addSuggestions(primary.concat(extras).slice(0, 6));
 });
 
 browser.omnibox.onInputEntered.addListener(async (text, disposition) => {

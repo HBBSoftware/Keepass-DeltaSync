@@ -213,22 +213,29 @@ adaptive-icon gør.
 - **Popup** med søgefelt for dem, der vil se en liste, plus en `commands`-genvej.
 - **Rangering**: host-match > titel-prefix > titel-substring > gruppe/tag.
 - Enter = samme fane, Ctrl+Enter eller midterklik = ny fane.
-- **Flere URL'er pr. entry**: et søgeresultat er et `(entry, url)`-par, ikke en
-  entry. Alle adresser er søgbare, og en entry optræder med en række pr.
-  adresse der matchede — op til tre. Det var den oprindelige mangel: begge
-  adresser blev fundet, men kun den højest rangerede kunne nås.
+- **Flere URL'er pr. entry**: én række pr. entry, med en badge der siger hvor
+  mange adresser den har. Vælges rækken, foldes alle adresserne ud under den,
+  bedst matchende først. Piletasterne går videre ned gennem dem, så den
+  øverste er den, Enter på entry-rækken selv ville have åbnet.
 
-  Den primære adresse er altid med, også når det var en anden der matchede;
-  den er entry'ens hovedindgang. Bar titlen matchet, ligger den primære
-  øverst, for så peger søgningen på entry'en som helhed frem for på én
-  bestemt adresse. Ramte en konkret adresse hårdere end titlen, er det den,
-  brugeren ledte efter, og den vinder.
+  Udfoldning frem for én række pr. adresse: begge dele gør de øvrige adresser
+  tilgængelige, men rækker pr. adresse fylder listen med den samme entry
+  igen og igen. Her koster det ingenting, før man faktisk er interesseret.
+
+  Hvilken adresse der er "bedst" afgøres pr. søgning. Bar titlen matchet,
+  vinder den primære — så peger søgningen på entry'en som helhed frem for på
+  én bestemt adresse. Ramte en konkret adresse hårdere end titlen, er det den,
+  brugeren ledte efter.
 
   Eksempel fra en rigtig database: entry'en `halmbox.localhost` har både
   `http://halmbox.localhost/login.php` og
-  `https://office.halmbox.dk/login.php`. `halmbox` viser begge med
-  localhost-adressen først (værtsnavnet starter med søgeordet); `office`
-  vender rækkefølgen.
+  `https://office.halmbox.dk/login.php`. Søger man `halmbox`, ligger
+  localhost-adressen øverst (værtsnavnet starter med søgeordet); søger man
+  `office`, vender rækkefølgen.
+
+  Adresselinjen kan ikke folde ud — den er en flad liste — så dér får de
+  øvrige adresser hvert sit forslag, lagt bagest så de ikke fortrænger et
+  andet hits hovedadresse.
 
 ## Faser
 

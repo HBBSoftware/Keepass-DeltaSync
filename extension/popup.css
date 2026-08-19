@@ -121,6 +121,24 @@ li[data-navigable="false"] {
   flex: none;
 }
 
+/* Underrækkerne: entry'ens øvrige adresser, foldet ud når den er valgt. */
+li.suburl {
+  padding: 0.25rem 0.6rem 0.25rem 1.4rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: none;
+  /* Streg i venstre margen binder adresserne visuelt til deres entry. */
+  box-shadow: inset 2px 0 0 var(--border);
+}
+
+li.suburl[aria-selected="true"] {
+  color: var(--fg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .hint {
   margin: 0;
   padding: 0.6rem;
