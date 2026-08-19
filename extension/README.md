@@ -57,12 +57,16 @@ holds it in memory until the idle lock expires.
 Search matches on host name, title and group. Hostname matches rank highest,
 since that is usually what you remember.
 
-**Entries with several URLs** — KeePassXC' *Additional URLs* — are fully
-searchable on every one of them, and the result opens the URL your search
-actually matched, not blindly the first one. A badge shows how many addresses
-an entry has. If your search matched mainly on the title, the primary URL wins:
-the search pointed at the entry as a whole rather than at one of its
-addresses.
+**Entries with several URLs** — KeePassXC' *Additional URLs*, stored as
+`KP2A_URL_*` custom attributes — are searchable on every one of them, and an
+entry appears once per address that matched, up to three. Arrow down to pick
+the other one; you are never stuck with whichever address happened to rank
+highest.
+
+The primary address is always listed, even when a different one matched. If
+your search matched mainly on the title it stays on top, since the search
+pointed at the entry as a whole rather than at one of its addresses. A badge
+shows the total number of addresses an entry has.
 
 ## What is not indexed
 

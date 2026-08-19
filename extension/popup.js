@@ -118,15 +118,13 @@ function render() {
     title.className = "title";
     title.textContent = entry.title || "(untitled)";
 
-    // Har entry'en flere adresser, siger badgen hvor mange — og om det var en
-    // af de øvrige, søgningen ramte. Ellers ville det se forkert ud at åbne
-    // noget andet end entry'ens primære URL.
+    // En entry med flere adresser kan optræde med en række pr. adresse der
+    // matchede, men ikke nødvendigvis dem alle. Badgen siger hvor mange den
+    // har i alt, så det er tydeligt at der findes flere end de viste.
     if (entry.urls.length > 1) {
       const badge = document.createElement("span");
       badge.className = "badge";
-      badge.textContent = hit.matchedURL && entry.urls[0] !== hit.url
-        ? `matched 1 of ${entry.urls.length} URLs`
-        : `${entry.urls.length} URLs`;
+      badge.textContent = `${entry.urls.length} URLs`;
       title.append(" ", badge);
     }
     li.append(title);

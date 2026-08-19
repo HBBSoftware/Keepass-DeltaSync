@@ -213,15 +213,22 @@ adaptive-icon gør.
 - **Popup** med søgefelt for dem, der vil se en liste, plus en `commands`-genvej.
 - **Rangering**: host-match > titel-prefix > titel-substring > gruppe/tag.
 - Enter = samme fane, Ctrl+Enter eller midterklik = ny fane.
-- **Flere URL'er pr. entry**: alle er søgbare, og hittet husker hvilken af dem
-  søgningen ramte — det er den, der vises og åbnes. Ellers ville et match på
-  entry'ens anden adresse sende brugeren til den første.
+- **Flere URL'er pr. entry**: et søgeresultat er et `(entry, url)`-par, ikke en
+  entry. Alle adresser er søgbare, og en entry optræder med en række pr.
+  adresse der matchede — op til tre. Det var den oprindelige mangel: begge
+  adresser blev fundet, men kun den højest rangerede kunne nås.
 
-  Undtagelsen er et match, der primært kom fra titlen: så peger søgningen på
-  entry'en som helhed, ikke på en bestemt adresse, og den primære URL vinder.
-  Søger man derimod på noget, der kun findes i den sekundære URL, er det den,
-  man vil hen til. En badge på resultatet viser, hvor mange adresser entry'en
-  har, så det ikke er overraskende, når en anden end den primære åbnes.
+  Den primære adresse er altid med, også når det var en anden der matchede;
+  den er entry'ens hovedindgang. Bar titlen matchet, ligger den primære
+  øverst, for så peger søgningen på entry'en som helhed frem for på én
+  bestemt adresse. Ramte en konkret adresse hårdere end titlen, er det den,
+  brugeren ledte efter, og den vinder.
+
+  Eksempel fra en rigtig database: entry'en `halmbox.localhost` har både
+  `http://halmbox.localhost/login.php` og
+  `https://office.halmbox.dk/login.php`. `halmbox` viser begge med
+  localhost-adressen først (værtsnavnet starter med søgeordet); `office`
+  vender rækkefølgen.
 
 ## Faser
 
