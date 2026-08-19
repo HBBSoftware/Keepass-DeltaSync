@@ -68,7 +68,11 @@ test:extension:
     - changes:
         - extension/**/*
   script:
-    - npx --yes web-ext lint --source-dir extension --warnings-as-errors
+    # --ignore-files holder linterens synsfelt identisk med det package.sh
+    # rent faktisk pakker: package.sh og README.md er værktøj og
+    # dokumentation, ikke udvidelsens indhold. Uden dette flagger linteren
+    # .sh-filen som "unnecessary", og --warnings-as-errors gør det fatalt.
+    - npx --yes web-ext lint --source-dir extension --ignore-files package.sh README.md --warnings-as-errors
 
 # ----------------------------------------------------------------------
 # Cross-compile binaries (only on client/vX.Y.Z tags)
