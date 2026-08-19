@@ -25,7 +25,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
   groups with searching disabled are excluded, and values that cannot be
   navigated to (`{REF:…}` placeholders, `cmd://`, non-http schemes) never reach
   `tabs.update`. `install-browser-host` / `uninstall-browser-host` register the
-  native messaging manifest on Linux, macOS and Windows. See
+  native messaging manifest on Linux, macOS and Windows.
+
+  Entries with several URLs (KeePassXC' *Additional URLs*) are searchable on
+  every one of them, and a hit opens the URL the search actually matched —
+  unless the match came mainly from the title, in which case the entry's
+  primary URL wins. The extension carries the DeltaSync mark, rebuilt as SVG
+  from the Android launcher icon. See
   [`docs/browser-extension.md`](docs/browser-extension.md).
 
 - **QR-code enrollment (Android)** — the enrollment screen gains a *Scan QR

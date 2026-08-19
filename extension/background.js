@@ -192,13 +192,16 @@ function escapeXml(s) {
 
 browser.omnibox.onInputChanged.addListener(async (text, addSuggestions) => {
   if (!text.trim()) return;
-  const hits = searchIndex(await allEntries(), text, 6).filter((h) => h.entry.urls.length > 0);
+  const hits = searchIndex(await allEntries(), text, 6).filter((h) => h.url);
   addSuggestions(
-    hits.map(({ entry }) => {
+    hits.map((hit) => {
+      const { entry } = hit;
       const where = entry.group ? `${entry.db}/${entry.group}` : entry.db;
+      // hit.url — ikke entry.urls[0]. Har entry'en flere adresser, og var det
+      // den anden der matchede, er det den vi skal foreslå.
       return {
-        content: entry.urls[0],
-        description: `${escapeXml(entry.title)} <dim>${escapeXml(where)}</dim> <url>${escapeXml(entry.urls[0])}</url>`,
+        content: hit.url,
+        description: `${escapeXml(entry.title)} <dim>${escapeXml(where)}</dim> <url>${escapeXml(hit.url)}</url>`,
       };
     })
   );
@@ -209,9 +212,9 @@ browser.omnibox.onInputEntered.addListener(async (text, disposition) => {
   // Så søger vi selv og tager det bedste hit.
   let url = text;
   if (!/^https?:\/\//i.test(url)) {
-    const hits = searchIndex(await allEntries(), text, 1).filter((h) => h.entry.urls.length > 0);
+    const hits = searchIndex(await allEntries(), text, 1).filter((h) => h.url);
     if (hits.length === 0) return;
-    url = hits[0].entry.urls[0];
+    url = hits[0].url;
   }
   await openEntry(url, disposition);
 });

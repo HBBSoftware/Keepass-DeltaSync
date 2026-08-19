@@ -197,14 +197,31 @@ Host-navnet skal matche `[a-z0-9_.]+`. `uninstall-browser-host` fjerner det
 igen. Manifestet indeholder den absolutte sti til binæren — kommandoen skal
 derfor køres igen, hvis binæren flyttes, og bør sige det.
 
+## Ikon
+
+`extension/icon.svg` er DeltaSync-mærket, med koordinater og farver kopieret
+1:1 fra `android/app/src/main/res/drawable/ic_launcher_foreground.xml`, som
+selv spejler `logo.svg` fra hjemmesiden. De tre skal følges ad — ændrer nogen
+mærket ét sted, skal de andre med. Browserversionen tegner baggrunden med som
+en afrundet flade, fordi en browser ikke maskerer ikonet, sådan som Androids
+adaptive-icon gør.
+
 ## UX
 
 - **omnibox-keyword `kp `** — skriv `kp gmail` i adresselinjen, se forslag,
   Enter. Bedste pasform i Firefox; én keyword pr. udvidelse.
 - **Popup** med søgefelt for dem, der vil se en liste, plus en `commands`-genvej.
 - **Rangering**: host-match > titel-prefix > titel-substring > gruppe/tag.
-- Enter = samme fane, Alt+Enter eller midterklik = ny fane.
-- Har entry'en flere URL'er, vises den primære med de øvrige som undermenu.
+- Enter = samme fane, Ctrl+Enter eller midterklik = ny fane.
+- **Flere URL'er pr. entry**: alle er søgbare, og hittet husker hvilken af dem
+  søgningen ramte — det er den, der vises og åbnes. Ellers ville et match på
+  entry'ens anden adresse sende brugeren til den første.
+
+  Undtagelsen er et match, der primært kom fra titlen: så peger søgningen på
+  entry'en som helhed, ikke på en bestemt adresse, og den primære URL vinder.
+  Søger man derimod på noget, der kun findes i den sekundære URL, er det den,
+  man vil hen til. En badge på resultatet viser, hvor mange adresser entry'en
+  har, så det ikke er overraskende, når en anden end den primære åbnes.
 
 ## Faser
 

@@ -93,6 +93,16 @@ li[data-navigable="false"] {
   font-weight: 600;
 }
 
+.badge {
+  padding: 0 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 .meta {
   display: flex;
   justify-content: space-between;

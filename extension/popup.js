@@ -106,16 +106,29 @@ async function runSearch() {
 
 function render() {
   els.results.textContent = "";
-  hits.forEach(({ entry }, i) => {
+  hits.forEach((hit, i) => {
+    const { entry } = hit;
     const li = document.createElement("li");
     li.setAttribute("role", "option");
     li.setAttribute("aria-selected", String(i === selected));
     li.dataset.index = String(i);
-    li.dataset.navigable = String(entry.urls.length > 0);
+    li.dataset.navigable = String(Boolean(hit.url));
 
     const title = document.createElement("span");
     title.className = "title";
     title.textContent = entry.title || "(untitled)";
+
+    // Har entry'en flere adresser, siger badgen hvor mange — og om det var en
+    // af de øvrige, søgningen ramte. Ellers ville det se forkert ud at åbne
+    // noget andet end entry'ens primære URL.
+    if (entry.urls.length > 1) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = hit.matchedURL && entry.urls[0] !== hit.url
+        ? `matched 1 of ${entry.urls.length} URLs`
+        : `${entry.urls.length} URLs`;
+      title.append(" ", badge);
+    }
     li.append(title);
 
     const meta = document.createElement("span");
@@ -123,7 +136,7 @@ function render() {
 
     const url = document.createElement("span");
     url.className = "url";
-    url.textContent = entry.urls[0] || "no usable URL";
+    url.textContent = hit.url || "no usable URL";
     meta.append(url);
 
     const where = document.createElement("span");
@@ -147,7 +160,7 @@ function move(delta) {
 
 async function open(index, event) {
   const hit = hits[index];
-  if (!hit || hit.entry.urls.length === 0) return;
+  if (!hit || !hit.url) return;
 
   // Ctrl/Cmd-klik og midterklik åbner i ny fane, som alle andre steder i
   // browseren. Almindeligt klik genbruger den aktive fane, så
@@ -156,7 +169,7 @@ async function open(index, event) {
   try {
     await send({
       type: "open",
-      url: hit.entry.urls[0],
+      url: hit.url,
       disposition: newTab ? "newForegroundTab" : "currentTab",
     });
   } catch (err) {

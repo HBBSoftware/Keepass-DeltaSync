@@ -57,6 +57,13 @@ holds it in memory until the idle lock expires.
 Search matches on host name, title and group. Hostname matches rank highest,
 since that is usually what you remember.
 
+**Entries with several URLs** — KeePassXC' *Additional URLs* — are fully
+searchable on every one of them, and the result opens the URL your search
+actually matched, not blindly the first one. A badge shows how many addresses
+an entry has. If your search matched mainly on the title, the primary URL wins:
+the search pointed at the entry as a whole rather than at one of its
+addresses.
+
 ## What is not indexed
 
 - Entries in the recycle bin.
