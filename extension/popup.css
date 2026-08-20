@@ -79,7 +79,9 @@ li:last-child {
   border-bottom: none;
 }
 
-li:hover,
+/* Kun rigtige rækker reagerer på musen — [data-hit] holder gruppe-overskrifter
+   udenfor, præcis som hændelseslytterne gør. */
+li[data-hit]:hover,
 li[aria-selected="true"] {
   background: var(--hover);
 }
@@ -103,22 +105,37 @@ li[data-navigable="false"] {
   white-space: nowrap;
 }
 
-.meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
+/* Adressen har nu hele rækkens bredde. Gruppen stod før på samme linje med
+   `flex: none` og tog sit fulde indhold FØRST, så en lang gruppesti kunne
+   skære adressen over midt i værtsnavnet — den står i overskriften i stedet. */
+.url {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 0.8125rem;
 }
 
-.meta .url {
+/* Gruppe-overskrift. Sticky, så man kan se hvilken gruppe man er nede i når
+   listen rulles — med 25 træffere er blokken man står i ellers rullet ud
+   over kanten. Baggrunden er nødvendig: uden den ville rækkerne kunne ses
+   igennem overskriften. */
+li.group {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.3rem 0.6rem;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: default;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.meta .where {
-  flex: none;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Underrækkerne: entry'ens øvrige adresser, foldet ud når den er valgt. */

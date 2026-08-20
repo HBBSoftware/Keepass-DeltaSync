@@ -25,6 +25,17 @@ let hits = [];
 // en udfoldning ændrede antallet af rækker.
 let selected = { hit: 0, url: -1 };
 let lockedDatabase = null;
+// Er kun én database låst op, er dens navn det samme på hver eneste række —
+// ren støj, og det står allerede i bundlinjen. Så viser vi kun gruppestien.
+let showDatabaseName = false;
+
+// displayURL er kun til øjet; det er hit.url der navigeres til. Skemaet er
+// ens på alle rækker og bærer derfor ingen information, men koster den plads
+// der ellers ville vise stien — som er dét der adskiller to adresser på
+// samme vært.
+function displayURL(raw) {
+  return raw.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 // send pakker baggrundssidens {ok, ...}-konvolut ud. Fejler noget, kaster vi
 // en rigtig Error her — så er der ét sted der skal fanges, og en fejl kan
@@ -68,6 +79,7 @@ async function refresh() {
 
   els.query.disabled = unlocked.length === 0;
   els.lock.hidden = unlocked.length === 0;
+  showDatabaseName = unlocked.length > 1;
   els.footerStatus.textContent = unlocked.length
     ? `${unlocked.reduce((n, db) => n + db.count, 0)} entries in ${unlocked.map((db) => db.name).join(", ")}`
     : "";
@@ -96,7 +108,7 @@ async function runSearch() {
   }
   try {
     const res = await send({ type: "search", query, limit: 25 });
-    hits = res.hits || [];
+    hits = clusterByGroup(res.hits || []);
   } catch (err) {
     hits = [];
     render();
@@ -114,6 +126,52 @@ function expandable(hitIndex) {
   const hit = hits[hitIndex];
   const n = hit ? hit.entry.urls.length : 0;
   return n > 1 ? n : 0;
+}
+
+// whereText er entry'ens plads i træet — overskriften over dens blok.
+// Databasenavnet kommer kun med når der er mere end én database at forveksle
+// den med; er der kun én, står den allerede i bundlinjen.
+function whereText(entry) {
+  if (!showDatabaseName) return entry.group || entry.db;
+  return entry.group ? `${entry.db}/${entry.group}` : entry.db;
+}
+
+// groupKey identificerer gruppen entydigt. IKKE whereText: den udelader
+// databasenavnet når kun én er låst op, og to databaser med en gruppe af
+// samme navn ville så smelte sammen til én blok.
+function groupKey(entry) {
+  return `${entry.db}\u0000${entry.group || ""}`;
+}
+
+// clusterByGroup samler træffere fra samme gruppe uden at flytte den bedste.
+// Grupperne kommer i den rækkefølge deres bedste medlem havde, og inden for
+// en gruppe beholder træfferne deres indbyrdes orden — så hits[0] er stadig
+// det bedste match, og Enter uden at røre piletasterne gør som før.
+//
+// Omordningen sker på selve `hits`, ikke kun i visningen: markeringen og
+// nextSelection/previousSelection vandrer gennem arrayet, så visuel orden og
+// array-orden SKAL være den samme, ellers hopper piletasterne rundt.
+function clusterByGroup(list) {
+  const order = [];
+  const buckets = new Map();
+  for (const hit of list) {
+    const key = groupKey(hit.entry);
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+      order.push(key);
+    }
+    buckets.get(key).push(hit);
+  }
+  return order.flatMap((key) => buckets.get(key));
+}
+
+function groupRow(label) {
+  const li = document.createElement("li");
+  li.className = "group";
+  // Ingen data-hit: hændelseslytterne matcher på li[data-hit], så en
+  // overskrift hverken markeres, åbnes eller fanger musen.
+  li.textContent = label;
+  return li;
 }
 
 function entryRow(hit, i, expanded) {
@@ -136,22 +194,16 @@ function entryRow(hit, i, expanded) {
   }
   li.append(title);
 
-  const meta = document.createElement("span");
-  meta.className = "meta";
-
   // Er entry'en foldet ud, står adresserne i underrækkerne — så ville det
-  // bare være støj at gentage en af dem her.
-  const url = document.createElement("span");
-  url.className = "url";
-  url.textContent = expanded ? "" : hit.url || "no usable URL";
-  meta.append(url);
-
-  const where = document.createElement("span");
-  where.className = "where";
-  where.textContent = hit.entry.group ? `${hit.entry.db}/${hit.entry.group}` : hit.entry.db;
-  meta.append(where);
-
-  li.append(meta);
+  // bare være støj at gentage en af dem her. Gruppen står i overskriften
+  // over blokken og gentages ikke på hver række.
+  const text = expanded ? "" : hit.url ? displayURL(hit.url) : "no usable URL";
+  if (text) {
+    const url = document.createElement("span");
+    url.className = "url";
+    url.textContent = text;
+    li.append(url);
+  }
   return li;
 }
 
@@ -163,13 +215,19 @@ function urlRow(hitIndex, k, url) {
   li.dataset.hit = String(hitIndex);
   li.dataset.url = String(k);
   li.dataset.navigable = "true";
-  li.textContent = url;
+  li.textContent = displayURL(url);
   return li;
 }
 
 function render() {
   els.results.textContent = "";
+  let openGroup = null;
   hits.forEach((hit, i) => {
+    const key = groupKey(hit.entry);
+    if (key !== openGroup) {
+      openGroup = key;
+      els.results.append(groupRow(whereText(hit.entry)));
+    }
     const expanded = i === selected.hit && expandable(i) > 0;
     els.results.append(entryRow(hit, i, expanded));
     if (!expanded) return;
@@ -260,13 +318,13 @@ function selectionOf(li) {
 }
 
 els.results.addEventListener("click", (event) => {
-  const li = event.target.closest("li");
+  const li = event.target.closest("li[data-hit]");
   if (li) open(selectionOf(li), event);
 });
 
 els.results.addEventListener("auxclick", (event) => {
   if (event.button !== 1) return;
-  const li = event.target.closest("li");
+  const li = event.target.closest("li[data-hit]");
   if (li) open(selectionOf(li), event);
 });
 
@@ -275,7 +333,7 @@ els.results.addEventListener("auxclick", (event) => {
 // Underrækkerne dukker op UNDER den række markøren står på, så den
 // flytter sig ikke væk under fingeren.
 els.results.addEventListener("mouseover", (event) => {
-  const li = event.target.closest("li");
+  const li = event.target.closest("li[data-hit]");
   if (!li) return;
   const next = selectionOf(li);
   if (next.hit === selected.hit && next.url === selected.url) return;
