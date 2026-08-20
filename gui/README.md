@@ -6,9 +6,10 @@ database) og giver derefter et simpelt **dashboard** til at synkronisere
 KeePass-databaser.
 
 Programmet kører på **Windows, Linux og macOS** og er skrevet i Go med
-[Fyne](https://fyne.io). Det er bevidst et **selvstændigt projekt** — det rører
-hverken krypto, server eller config selv, men kalder CLI'en som en subproces,
-præcis som projektets eksisterende terminal-menu (`keepass-deltasync tui`).
+[Fyne](https://fyne.io). Det er bevidst et **selvstændigt Go-modul** med sit
+eget toolchain (Go 1.23, CGO) — det rører hverken krypto, server eller config
+selv, men kalder CLI'en som en subproces, præcis som projektets eksisterende
+terminal-menu (`keepass-deltasync tui`).
 
 ```
 ┌─────────────────────┐        os/exec        ┌──────────────────────────┐
@@ -29,7 +30,7 @@ kan udvikles og udgives uafhængigt, og licenserne blandes ikke sammen.
 |------|---------|------|
 | **Go 1.23+** | Bygge GUI'en | `go version` |
 | **En C-compiler** | Fyne kræver CGO | Se nedenfor per OS |
-| **`keepass-deltasync`-CLI'en** | GUI'en kalder den | Byg fra `../Keepass-deltasync/client`, eller hent en release-binær |
+| **`keepass-deltasync`-CLI'en** | GUI'en kalder den | Byg fra `../client` i denne checkout, eller hent en release-binær |
 | **`keepassxc-cli`** | Bruges af CLI'en til selve sync-merge | Følger med [KeePassXC](https://keepassxc.org) |
 
 ### C-compiler per OS
@@ -49,7 +50,7 @@ kan udvikles og udgives uafhængigt, og licenserne blandes ikke sammen.
 ## 2. Byg
 
 ```sh
-# I denne mappe (keepass-deltasync-gui)
+# I denne mappe (gui/)
 go mod tidy
 go build -o keepass-deltasync-gui .       # .exe på Windows
 ```

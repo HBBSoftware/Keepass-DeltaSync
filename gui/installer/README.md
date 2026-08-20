@@ -18,8 +18,9 @@ Forudsætninger på byggemaskinen:
 - **Go** + **`fyne`**-værktøjet (`go install fyne.io/tools/cmd/fyne@latest`)
 - en **gcc (mingw-w64)** til CGO (Fyne kræver CGO) — stien sættes i `build.ps1`
 - **Inno Setup 6** (`ISCC.exe`)
-- søster-repo'et `Keepass-deltasync` klonet ved siden af dette (til CLI'en +
-  dens kildekode-zip)
+
+CLI'en tages fra `client/` i samme checkout — der er ikke længere noget
+søster-repo at klone ved siden af.
 
 Versionen tages automatisk fra `FyneApp.toml` (GUI) og seneste `client/v*`-tag
 (CLI).

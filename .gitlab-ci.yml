@@ -13,6 +13,10 @@
 #   extension/vX.Y.Z → Firefox extension   (this pipeline packages an UNSIGNED
 #                                          .xpi; signing happens outside CI —
 #                                          see build:extension below)
+#   gui/vX.Y.Z      → desktop Fyne GUI    (this pipeline builds + releases the
+#                                          Linux .tar.xz and Windows .exe; the
+#                                          combined Windows installer is built
+#                                          from gui/installer/ — see below)
 #
 # Plain `vX.Y.Z` tags are LEGACY (v1.0.0 = old client line, v0.1.0 = a first
 # unified attempt that re-stamped the client as a lower number) and no longer
@@ -73,6 +77,27 @@ test:extension:
     # dokumentation, ikke udvidelsens indhold. Uden dette flagger linteren
     # .sh-filen som "unnecessary", og --warnings-as-errors gør det fatalt.
     - npx --yes web-ext lint --source-dir extension --ignore-files package.sh README.md --warnings-as-errors
+
+# Fyne'ens desktop-driver kræver CGO + OpenGL/X11-headere for overhovedet at
+# kompilere, så dette job apt-installerer dem. Det kører derfor kun når gui/
+# faktisk er rørt — ligesom test:extension holder sit npm-hentende job væk fra
+# hver eneste commit.
+test:gui:
+  stage: test
+  image: golang:${GO_VERSION}-bookworm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/gui/
+    - changes:
+        - gui/**/*
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends
+        gcc pkg-config libgl1-mesa-dev xorg-dev
+    - cd gui
+  script:
+    - go vet ./...
+    - go build ./...
 
 # ----------------------------------------------------------------------
 # Cross-compile binaries (only on client/vX.Y.Z tags)
@@ -346,6 +371,96 @@ build:extension:
     expire_in: never
 
 # ----------------------------------------------------------------------
+# Build the desktop GUI (only on gui/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# The GUI is its own Go module (gui/go.mod, Go 1.23) and — unlike the pure-Go
+# client — needs CGO plus a C toolchain: Fyne's desktop driver binds OpenGL and
+# X11. Linux is built natively, Windows cross-compiled with mingw-w64.
+#
+# A macOS .app cannot be produced here: Fyne's darwin build needs the Xcode SDK,
+# which the shared Linux runners don't have. Mac users build locally with
+# `make package-darwin` (see gui/README.md).
+#
+# The `fyne` tool — not `go build` — does the packaging, because it embeds the
+# icon and the metadata from gui/FyneApp.toml into both artifacts.
+
+build:gui:
+  stage: build
+  image: golang:${GO_VERSION}-bookworm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
+    # Escape hatch til at arbejde på selve jobbet uden at flytte et tag —
+    # samme aftale som build:android og build:extension har.
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/gui/
+  variables:
+    GOPATH: "$CI_PROJECT_DIR/.go"
+  cache:
+    key: gui-go-cache
+    paths:
+      - .go/pkg/mod/
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends
+        gcc gcc-mingw-w64-x86-64 pkg-config libgl1-mesa-dev xorg-dev
+        tar xz-utils coreutils
+    - go install fyne.io/tools/cmd/fyne@latest
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+  script:
+    - |
+      set -eu
+      # gui/v0.4.0 → 0.4.0. Artefaktnavne må ikke indeholde en skråstreg, og
+      # FyneApp.toml's Version er den der ender inde i selve binæren.
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        VERSION="${CI_COMMIT_TAG#gui/v}"
+      else
+        VERSION="$(sed -n 's/^ *Version *= *"\([^"]*\)".*/\1/p' gui/FyneApp.toml)"
+        echo "==> branch build (not a release)"
+      fi
+      # Samme drift-tjek som build:android og build:extension laver mod deres
+      # respektive manifester: en tag og en indlejret version der er uenige
+      # giver en release hvor "Om"-dialogen lyver om hvad brugeren har hentet.
+      MANIFEST="$(sed -n 's/^ *Version *= *"\([^"]*\)".*/\1/p' gui/FyneApp.toml)"
+      if [ "$VERSION" != "$MANIFEST" ]; then
+        echo "tag siger $VERSION, gui/FyneApp.toml siger $MANIFEST" >&2
+        exit 1
+      fi
+      echo "VERSION=$VERSION" >> build.env
+      # Videregiv job-id'et, så release-jobbet kan bygge artefakt-URL'er der
+      # ikke afhænger af den (skråstregede) tag-ref.
+      echo "BUILD_JOB_ID=$CI_JOB_ID" >> build.env
+      mkdir -p dist
+
+      echo "==> Packaging Linux"
+      ( cd gui && fyne package -os linux )
+      mv gui/*.tar.xz "dist/keepass-deltasync-gui-${VERSION}-linux-amd64.tar.xz"
+
+      # Debians mingw-w64 hærder som standard (stack-protector +
+      # _FORTIFY_SOURCE), og -fno-stack-protector overtrumfer IKKE dens
+      # --enable-default-ssp her, så glfw's C-objekter bliver ved med at
+      # referere __stack_chk_fail / __stack_chk_guard / __chk_fail. Go's
+      # cgo-link henter ikke libssp (som leverer dem) af sig selv.
+      # Løsning: giv LINKEREN -fstack-protector, så gcc linker libssp.
+      # -U_FORTIFY_SOURCE i CFLAGS undgår runtime/cgo's -Werror-fejl
+      # "_FORTIFY_SOURCE redefined".
+      echo "==> Packaging Windows"
+      ( cd gui && CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc \
+          CGO_CFLAGS="-U_FORTIFY_SOURCE" \
+          CGO_LDFLAGS="-fstack-protector" \
+          fyne package -os windows )
+      mv gui/*.exe "dist/keepass-deltasync-gui-${VERSION}-windows-amd64.exe"
+    - cd dist && sha256sum keepass-deltasync-gui-* > SHA256SUMS-gui && cat SHA256SUMS-gui
+  artifacts:
+    name: "keepass-deltasync-gui-${CI_COMMIT_REF_SLUG}"
+    reports:
+      dotenv: build.env
+    paths:
+      - dist/keepass-deltasync-gui-*-linux-amd64.tar.xz
+      - dist/keepass-deltasync-gui-*-windows-amd64.exe
+      - dist/SHA256SUMS-gui
+    expire_in: never
+
+# ----------------------------------------------------------------------
 # Build + push the server Docker image (only on server/vX.Y.Z tags)
 # ----------------------------------------------------------------------
 #
@@ -471,6 +586,44 @@ release:client:
           link_type: 'package'
         - name: 'SHA256SUMS'
           url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS'
+          link_type: 'other'
+
+# ----------------------------------------------------------------------
+# Publish a GitLab Release for the GUI (gui/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+
+release:gui:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
+  needs:
+    - job: build:gui
+      artifacts: true
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG} (gui ${VERSION})"
+  release:
+    name: 'keepass-deltasync GUI ${VERSION}'
+    description: |
+      Pre-built keepass-deltasync GUI binaries for ${VERSION}.
+
+      The GUI calls the keepass-deltasync CLI — put the matching client binary
+      next to it, or point at it under Settings. Windows users can instead take
+      the combined installer, which ships both in one file.
+
+      Verify integrity with SHA256SUMS-gui. Build from source / macOS: see
+      gui/README.md.
+    tag_name: '${CI_COMMIT_TAG}'
+    assets:
+      links:
+        - name: 'Linux (amd64) — .tar.xz'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/keepass-deltasync-gui-${VERSION}-linux-amd64.tar.xz'
+          link_type: 'package'
+        - name: 'Windows (amd64) — .exe'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/keepass-deltasync-gui-${VERSION}-windows-amd64.exe'
+          link_type: 'package'
+        - name: 'SHA256SUMS-gui'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS-gui'
           link_type: 'other'
 
 # ----------------------------------------------------------------------

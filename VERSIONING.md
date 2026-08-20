@@ -1,6 +1,6 @@
 # Versioning
 
-keepass-deltasync is a **monorepo** with four components that mature at
+keepass-deltasync is a **monorepo** with five components that mature at
 different rates. Each is versioned **independently**, and release tags are
 **namespaced by component** so their version lines can never collide:
 
@@ -10,6 +10,7 @@ different rates. Each is versioned **independently**, and release tags are
 | Android app (`android/`) | `android/vX.Y.Z` | CI builds an **unsigned** APK; `android/publish-release.sh` signs it locally and publishes it (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
 | Server (PHP, `server/`) | `server/vX.Y.Z` | Deployed directly; the tag is a marker only — no build artifact |
 | Firefox extension (`extension/`) | `extension/vX.Y.Z` | CI packages an **unsigned**, byte-reproducible `.xpi` via `extension/package.sh`; signing happens outside CI. The extension also carries its own `version` in `extension/manifest.json` |
+| Desktop GUI (Go/Fyne, `gui/`) | `gui/vX.Y.Z` | CI cross-compiles the Linux `.tar.xz` + Windows `.exe` and publishes a GitLab Release. The GUI also carries its own `Version` in `gui/FyneApp.toml`. The combined Windows installer (GUI + CLI in one `setup.exe`) is built from `gui/installer/` — see below |
 
 The components do **not** share a number. The desktop client being at `1.x`
 while the Android app is at `0.x` is correct and expected — they are different
@@ -74,6 +75,33 @@ in one commit. What keeps them honest is the extension ID, which appears in
 the host will silently refuse to talk to the extension. See
 [`docs/browser-extension.md`](docs/browser-extension.md).
 
+**Desktop GUI**: bump `Version` in `gui/FyneApp.toml`, commit, then tag:
+
+```
+git tag gui/v0.4.0
+git push origin gui/v0.4.0
+```
+
+`build:gui` cross-compiles both binaries and `release:gui` attaches them to a
+GitLab Release. Like the other two, the job refuses to build if the tag and
+`FyneApp.toml` disagree.
+
+The GUI's version line **continues** the one from its old standalone repo
+(`gitlab.com/Star95/keepass-deltasync-gui`, archived): that project's last
+release was a bare `v0.3.1`, so the first tag here is `gui/v0.3.2` or later.
+Its old bare `vX.Y.Z` tags were **not** imported — a bare `v0.1.0` already
+means something else in this repo (see *Legacy tags* below), and that
+collision is exactly what the namespaced scheme exists to prevent.
+
+The GUI is a **separate Go module** (`gui/go.mod`, Go 1.23 + CGO) from the
+client (Go 1.26, pure Go) — it does not import the client, it shells out to
+the `keepass-deltasync` binary. What ties them together is the combined
+Windows installer in [`gui/installer/`](gui/installer/), which puts both
+executables in one directory; the GUI then finds the CLI next to itself
+(`locateCLI` in `gui/cli.go`), no PATH setup needed. That installer reads the
+GUI's version from `gui/FyneApp.toml` and the CLI's from the latest `client/v*`
+tag, so it pairs whatever the two components are standing at.
+
 **Server**: deploy `server/`, then tag for the record:
 
 ```
@@ -95,4 +123,4 @@ Two bare `vX.Y.Z` tags predate this scheme and are kept for history only. They
   per-component scheme; do not build on it.
 
 **Rule of thumb:** never create a bare `vX.Y.Z` tag again — always prefix it
-with the component (`client/`, `android/`, `server/`, `extension/`).
+with the component (`client/`, `android/`, `server/`, `extension/`, `gui/`).
