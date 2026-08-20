@@ -522,6 +522,10 @@ build:installer-stage:
       CLI_VERSION="$(git describe --tags --match 'client/*' 2>/dev/null | sed 's|^client/||' || true)"
       [ -n "$CLI_VERSION" ] || CLI_VERSION="unversioned"
       echo "CLI_VERSION=$CLI_VERSION" >> installer.env
+      # VERSION kommer fra build:gui's dotenv og arves IKKE videre af sig selv:
+      # build:installer har kun dette job i sin `needs`, og dotenv-variabler
+      # følger kun ét led ad gangen. Send den derfor med herfra.
+      echo "VERSION=$VERSION" >> installer.env
       echo "==> bundling CLI $CLI_VERSION with GUI $VERSION"
       ( cd client && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
           -trimpath -ldflags="-s -w -X main.version=${CLI_VERSION}" \
