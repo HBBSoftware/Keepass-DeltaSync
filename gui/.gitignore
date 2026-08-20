@@ -1,0 +1,15 @@
+# Byggede binærer
+/keepass-deltasync-gui
+/keepass-deltasync-gui.exe
+/dist/
+*.exe
+*.app
+*.dmg
+
+# Bundlet CLI (kopieres ind ved release, hører ikke i git)
+/keepass-deltasync
+/keepass-deltasync.exe
+
+# OS-skrald
+.DS_Store
+Thumbs.db
