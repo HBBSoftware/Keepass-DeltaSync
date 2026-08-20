@@ -10,13 +10,19 @@
   --hover: #f0f0f4;
   --danger: #c50042;
 
-  /* Gruppe-overskrifter i mærkets egne farver: sync-pilenes blå (#38BDF8) og
-     nøglens guld (#FDE047 → #F59E0B). Begge er tegnet til mørk navy i logoet
-     og er ulæselige som tekst på lys baggrund — nøglens gule giver 1,16:1 —
-     så guldet mørknes her til 5,6:1, og den blå stribe til 3,2:1. */
-  --group-bg: #d2e7f4;
-  --group-fg: #92400e;
-  --group-bar: #0284c7;
+  /* Gruppe-overskrifter i mærkets egne farver: sync-pilenes blå som bånd, med
+     logo-baggrundens navy som tekst (7,8:1). Hverken guld eller hvidt kan stå
+     på denne blå — den er selv for lys, så de lander på 1,5:1 og 2,1:1. Det
+     mørke tema vender parret om og bruger guldet dér, hvor det virker. */
+  --group-bg: #38bdf8;
+  --group-fg: #111d3b;
+  --group-bar: #1e3a8a;
+
+  /* Den markerede række. Den gamle værdi var --hover, som kun ligger 1,14:1
+     fra baggrunden — det er nærmest ingen forskel, og derfor var det svært at
+     følge med når man kørte op og ned med piletasterne. */
+  --selected-bg: #bfdbfe;
+  --selected-bar: #1e3a8a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,10 +36,14 @@
     --hover: #2b2a33;
     --danger: #ff9aa2;
 
-    /* På mørk baggrund kan begge farver stå som logoet tegner dem. */
-    --group-bg: #2c3e4e;
-    --group-fg: #fde047;
+    /* Mørkere navy og nøglens amber — 7,7:1. Bandet må gerne være mørkere end
+       det lyse temas, så det ikke lyser i en i forvejen mørk popup. */
+    --group-bg: #111d3b;
+    --group-fg: #f59e0b;
     --group-bar: #38bdf8;
+
+    --selected-bg: #2c3a5c;
+    --selected-bar: #38bdf8;
   }
 }
 
@@ -51,6 +61,8 @@ body {
 }
 
 header {
+  /* Bærer søgeikonet nedenfor. */
+  position: relative;
   padding: 0.5rem;
   border-bottom: 1px solid var(--border);
 }
@@ -64,6 +76,39 @@ input[type="password"] {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 0.25rem;
+}
+
+/* Forstørrelsesglasset ligger på <header>, ikke i HTML'en: headeren indeholder
+   kun søgefeltet, så den kan bære ikonet uden at markup'en skal røres — og som
+   maske farves det med --muted og følger dermed temaet.
+   `left` er regnet ud, ikke gættet: headerens 0,5rem polstring + feltets 1px
+   kant + feltets 0,55rem polstring er præcis dér, teksten ellers ville stå. */
+header::before {
+  content: "";
+  position: absolute;
+  left: calc(0.5rem + 0.55rem + 1px);
+  top: 50%;
+  width: 0.85rem;
+  height: 0.85rem;
+  transform: translateY(-50%);
+  background-color: var(--muted);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='6.8' cy='6.8' r='4.3'/%3E%3Cpath d='M10.1 10.1 13.8 13.8'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  /* Uden dette ville et klik på ikonet ikke give feltet fokus. */
+  pointer-events: none;
+}
+
+/* Feltet er slået fra indtil en database er låst op — så skal ikonet heller
+   ikke se aktivt ud. */
+header:has(input:disabled)::before {
+  opacity: 0.45;
+}
+
+/* Kun søgefeltet rykker teksten ind; masterpassword-feltet har intet ikon. */
+input[type="search"] {
+  padding-left: 1.65rem;
 }
 
 input:focus-visible {
@@ -98,9 +143,17 @@ li:last-child {
 
 /* Kun rigtige rækker reagerer på musen — [data-hit] holder gruppe-overskrifter
    udenfor, præcis som hændelseslytterne gør. */
-li[data-hit]:hover,
-li[aria-selected="true"] {
+li[data-hit]:hover {
   background: var(--hover);
+}
+
+/* Markeringen skal kunne findes med et blik, ikke ledes efter. Baggrunden
+   alene er et svagt signal; striben i venstre margen er en hård kant øjet
+   låser fast på, og den koster ingen læsbarhed, fordi der ikke står tekst
+   oven på den. */
+li[aria-selected="true"] {
+  background: var(--selected-bg);
+  box-shadow: inset 3px 0 0 var(--selected-bar);
 }
 
 li[data-navigable="false"] {
@@ -146,8 +199,11 @@ li.group {
   padding: 0.3rem 0.6rem 0.3rem 0.75rem;
   background: var(--group-bg);
   color: var(--group-fg);
-  font-size: 0.75rem;
-  font-weight: 600;
+  /* 13px fed frem for 12px halvfed: farvet tekst på farvet bund læses tungere
+     end sort på hvidt, uanset kontrasttallet, og et par tiendedele millimeter
+     koster ingenting i en overskrift der alligevel står alene på linjen. */
+  font-size: 0.8125rem;
+  font-weight: 700;
   cursor: default;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -158,8 +214,62 @@ li.group {
   box-shadow: inset 3px 0 0 var(--group-bar);
 }
 
+/* Ikonerne er mask-image, ikke background-image: masken farves med
+   currentColor, så de følger temaets tekstfarve helt af sig selv og skal ikke
+   tegnes i to udgaver. Data-URI frem for filer — så er der ikke noget at
+   glemme i package.sh' FILES-liste. */
+
+li.group::before {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.12em;
+  background-color: currentColor;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 4A1.5 1.5 0 0 1 3 2.5h3.2L7.7 4H13A1.5 1.5 0 0 1 14.5 5.5v6A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5z'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  margin-right: 0.4em;
+}
+
+li.suburl::before {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  vertical-align: -0.12em;
+  background-color: currentColor;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  margin-right: 0.35em;
+  opacity: 0.75;
+}
+
+/* En række uden brugbar adresse kunne før kun kendes på at den var lidt
+   gennemsigtig. Trekanten sidder inde i titlen, ikke på rækken: som direkte
+   barn ville den blive et flex-element og skubbe titlen ned på næste linje. */
+li[data-navigable="false"] .title::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  vertical-align: -0.12em;
+  background-color: var(--danger);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.2 15 14H1z' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M8 6.3v3.4' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.9' r='.95'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  margin-right: 0.35em;
+}
+
 /* Underrækkerne: entry'ens øvrige adresser, foldet ud når den er valgt. */
 li.suburl {
+  /* `block`, ikke arvet flex-kolonne: ellers ville ::before-pilen blive sit
+     eget flex-element og lande på sin egen linje over adressen. */
+  display: block;
   padding: 0.25rem 0.6rem 0.25rem 1.4rem;
   color: var(--muted);
   font-size: 0.8125rem;
