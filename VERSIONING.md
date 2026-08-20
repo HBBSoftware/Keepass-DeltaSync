@@ -90,7 +90,7 @@ git push origin gui/v0.4.0
 jobs, `build:gui` refuses to build if the tag and `FyneApp.toml` disagree.
 
 The GUI's version line **continues** the one from its old standalone repo
-(`gitlab.com/Star95/keepass-deltasync-gui`, archived): that project's last
+(`gitlab.com/Star95/keepass-deltasync-gui`, no longer developed): that project's last
 release was a bare `v0.3.1`, so the first tag here is `gui/v0.3.2` or later.
 Its old bare `vX.Y.Z` tags were **not** imported — a bare `v0.1.0` already
 means something else in this repo (see *Legacy tags* below), and that

@@ -8,40 +8,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Desktop GUI moved into the monorepo** (`gui/`) — the Fyne GUI that wraps
-  the command-line client used to live in its own repository
-  (`gitlab.com/Star95/keepass-deltasync-gui`, now archived); its history came
-  along via `git subtree`. It is the sixth component here and stays its own Go
-  module (Go 1.23 + CGO, against the client's Go 1.26 pure-Go build) — it does
-  not import the client, it shells out to the binary.
-
-  The move closes a dependency that was real but written down nowhere: the
-  combined Windows installer, `gui/installer/build.ps1`, resolved the CLI as
-  `..\..\Keepass-deltasync` — so `KeePass-Delta-Sync-Setup-<ver>.exe`, the file
-  users actually download, could only be built on a machine that happened to
-  have both repositories cloned side by side under exactly those directory
-  names. It now reads `client/` from the same checkout, and takes both source
-  zips out of one `git archive`. Because the GUI's version comes from
-  `gui/FyneApp.toml` and the CLI's from the latest `client/v*` tag, an
-  installer is pinned to whatever the two components are standing at in the
-  commit it was built from.
-
-  Releases move to `gui/vX.Y.Z` tags, continuing the version line from the old
-  repository (last release there: a bare `v0.3.1`). `build:gui` cross-compiles
-  the Linux `.tar.xz` and Windows `.exe` with the `fyne` tool, and `test:gui`
-  vets the module whenever `gui/` is touched. The old bare `vX.Y.Z` tags were
-  deliberately not imported: `v0.1.0` already means something else here.
-
-  The installer is now built by the same tag, so it stops being a thing only
-  one machine can produce. `build:installer-stage` assembles what the Inno
-  Setup script expects — the packaged GUI, a fresh Windows CLI, a source zip
-  per component out of `git archive`, and the icon — and `build:installer`
-  compiles it, running Inno Setup under wine because ISCC is a Windows program.
-  `release:gui` attaches the installer alongside the bare binaries and names it
-  first: it is what Windows users should take. `build.ps1` still builds the
-  same installer locally and is unchanged apart from the path fix. See
-  [`VERSIONING.md`](VERSIONING.md) and [`gui/README.md`](gui/README.md).
-
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
@@ -133,6 +99,49 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [gui/v0.3.2] — 2026-08-20
+
+The first GUI release out of the monorepo, and the first whose Windows
+installer is built by CI instead of by hand on one machine. The application
+itself is unchanged from 0.3.1 — only where it is built from, and how it
+reaches you, is different.
+
+### Added
+
+- **Desktop GUI moved into the monorepo** (`gui/`) — the Fyne GUI that wraps
+  the command-line client used to live in its own repository
+  (`gitlab.com/Star95/keepass-deltasync-gui`, no longer developed); its history came
+  along via `git subtree`. It is the sixth component here and stays its own Go
+  module (Go 1.23 + CGO, against the client's Go 1.26 pure-Go build) — it does
+  not import the client, it shells out to the binary.
+
+  The move closes a dependency that was real but written down nowhere: the
+  combined Windows installer, `gui/installer/build.ps1`, resolved the CLI as
+  `..\..\Keepass-deltasync` — so `KeePass-Delta-Sync-Setup-<ver>.exe`, the file
+  users actually download, could only be built on a machine that happened to
+  have both repositories cloned side by side under exactly those directory
+  names. It now reads `client/` from the same checkout, and takes both source
+  zips out of one `git archive`. Because the GUI's version comes from
+  `gui/FyneApp.toml` and the CLI's from the latest `client/v*` tag, an
+  installer is pinned to whatever the two components are standing at in the
+  commit it was built from.
+
+  Releases move to `gui/vX.Y.Z` tags, continuing the version line from the old
+  repository (last release there: a bare `v0.3.1`). `build:gui` cross-compiles
+  the Linux `.tar.xz` and Windows `.exe` with the `fyne` tool, and `test:gui`
+  vets the module whenever `gui/` is touched. The old bare `vX.Y.Z` tags were
+  deliberately not imported: `v0.1.0` already means something else here.
+
+  The installer is now built by the same tag, so it stops being a thing only
+  one machine can produce. `build:installer-stage` assembles what the Inno
+  Setup script expects — the packaged GUI, a fresh Windows CLI, a source zip
+  per component out of `git archive`, and the icon — and `build:installer`
+  compiles it, running Inno Setup under wine because ISCC is a Windows program.
+  `release:gui` attaches the installer alongside the bare binaries and names it
+  first: it is what Windows users should take. `build.ps1` still builds the
+  same installer locally and is unchanged apart from the path fix. See
+  [`VERSIONING.md`](VERSIONING.md) and [`gui/README.md`](gui/README.md).
 
 ## [android/v0.4.1] — 2026-07-29
 
