@@ -502,7 +502,13 @@ build:installer-stage:
       set -eu
       # Præcis det træ keepass-deltasync.iss forventer at finde (se dens
       # hoved-kommentar). VERSION kommer fra build:gui's dotenv.
-      STAGE="dist/installer-stage"
+      # Bevidst UDEN FOR dist/. To grunde: dist/ er hvor færdige, publicerbare
+      # artefakter ligger i dette repo, og staging-træet er ikke et af dem —
+      # og build:installer skal kunne flytte træet rundt. Artefakt-udpakningen
+      # laver mapperne som root, mens innosetup-imaget kører som en anden
+      # bruger, så en omdøbning INDE i dist/ ville være Permission denied
+      # (byggemappens rod er derimod skrivbar).
+      STAGE="installer-stage"
       mkdir -p "$STAGE/app" "$STAGE/source"
 
       # GUI'en: genbrug den exe build:gui allerede pakkede med `fyne package`,
@@ -537,7 +543,7 @@ build:installer-stage:
     reports:
       dotenv: installer.env
     paths:
-      - dist/installer-stage
+      - installer-stage
     # Mellemtrin. Selve installeren nedenfor gemmes for evigt; dette træ er
     # blot de samme binærer en gang til.
     expire_in: 1 day
@@ -549,9 +555,11 @@ build:installer:
     # ISCC er. `entrypoint: [""]` skal med, fordi imaget ellers kører iscc
     # direkte og aldrig når GitLabs script.
     #
-    # PIN DENNE når første grønne kørsel har vist hvilken version den løser
-    # til; resten af pipelinen pinner sine images (jf. build:android).
-    name: amake/innosetup:latest
+    # Pinnet til major-versionen, ikke `latest`: keepass-deltasync.iss er
+    # skrevet til Inno Setup 6 (bl.a. `compiler:Languages\Danish.isl`), og den
+    # skal ikke følge med over i en 7'er af sig selv. De to tags peger på det
+    # samme image i dag.
+    name: amake/innosetup:innosetup6
     entrypoint: [""]
   rules:
     - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
@@ -574,8 +582,10 @@ build:installer:
       # skal oversætte Unix-stier til noget wine forstår.
       mkdir -p work
       cp gui/installer/keepass-deltasync.iss work/
-      mv dist/installer-stage work/dist
+      mv installer-stage work/dist
       ( cd work && iscc "/DAppVer=$VERSION" "/DCliVer=$CLI_VERSION" keepass-deltasync.iss )
+      # dist/ findes ikke i dette job (kun build:installer-stage's artefakt kom
+      # med), så vi laver den selv og ejer den derfor.
       mkdir -p dist
       mv work/out/*.exe dist/
       cd dist && sha256sum KeePass-Delta-Sync-Setup-*.exe > SHA256SUMS-installer
