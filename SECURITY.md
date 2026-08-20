@@ -21,7 +21,8 @@ Please include:
 
 - a description of the issue and its impact,
 - steps to reproduce (a proof of concept if you have one),
-- the affected component and version (server / desktop client / Android),
+- the affected component and version (server / desktop client / desktop GUI /
+  Android / Firefox extension),
 - any suggested remediation.
 
 ## What to expect

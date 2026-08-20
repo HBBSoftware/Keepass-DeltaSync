@@ -1,8 +1,10 @@
 # Versioning
 
-keepass-deltasync is a **monorepo** with five components that mature at
-different rates. Each is versioned **independently**, and release tags are
-**namespaced by component** so their version lines can never collide:
+keepass-deltasync is a **monorepo** with five *versioned* components that
+mature at different rates. (The README counts six, because `docs/` is a
+component with its own license but no version line of its own.) Each is
+versioned **independently**, and release tags are **namespaced by component**
+so their version lines can never collide:
 
 | Component | Tag format | Released by |
 |-----------|------------|-------------|
