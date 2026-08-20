@@ -11,7 +11,7 @@ so their version lines can never collide:
 | Desktop client (Go, `client/`) | `client/vX.Y.Z` | GitLab CI → cross-compiled binaries + GitLab Release |
 | Android app (`android/`) | `android/vX.Y.Z` | CI builds an **unsigned** APK; `android/publish-release.sh` signs it locally and publishes it (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
 | Server (PHP, `server/`) | `server/vX.Y.Z` | Deployed directly; the tag is a marker only — no build artifact |
-| Firefox extension (`extension/`) | `extension/vX.Y.Z` | CI packages an **unsigned**, byte-reproducible `.xpi` via `extension/package.sh`; signing happens outside CI. The extension also carries its own `version` in `extension/manifest.json` |
+| Firefox extension (`extension/`) | `extension/vX.Y.Z` | CI packages an **unsigned**, byte-reproducible `.xpi` via `extension/package.sh` and attaches it to a GitLab Release; signing happens outside CI. The extension also carries its own `version` in `extension/manifest.json` |
 | Desktop GUI (Go/Fyne, `gui/`) | `gui/vX.Y.Z` | CI cross-compiles the Linux `.tar.xz` + Windows `.exe` and publishes a GitLab Release. The GUI also carries its own `Version` in `gui/FyneApp.toml`. The same tag also builds the combined Windows installer (GUI + CLI in one `setup.exe`) — see below |
 
 The components do **not** share a number. The desktop client being at `1.x`
@@ -64,9 +64,18 @@ git tag extension/v0.2.0
 git push origin extension/v0.2.0
 ```
 
-`build:extension` packages `dist/keepass-deltasync-extension-<version>.xpi`.
-The job refuses to build if the tag and `manifest.json` disagree — the same
-drift check `build:android` does against `build.gradle.kts`.
+`build:extension` packages `dist/keepass-deltasync-extension-<version>.xpi` and
+`release:extension` attaches it to a GitLab Release. The job refuses to build
+if the tag and `manifest.json` disagree — the same drift check `build:android`
+does against `build.gradle.kts`.
+
+What gets published is **unsigned**, and deliberately so: that is what the
+permanent-install route needs on the Firefox channels that allow unsigned
+add-ons. Ordinary Firefox installs only a signed build from
+addons.mozilla.org, and AMO signs what you upload there — the signing key
+never enters CI, the same rule the Android keystore follows. A version number
+is also consumed permanently at AMO, even if the version is deleted, so a
+rejected or superseded upload always needs the next number.
 
 The extension is versioned separately from the desktop client even though the
 two must be protocol-compatible: the native messaging host is a subcommand of

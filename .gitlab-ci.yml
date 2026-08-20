@@ -11,8 +11,9 @@
 #                                          multi-arch Docker image to the GitLab
 #                                          Container Registry)
 #   extension/vX.Y.Z → Firefox extension   (this pipeline packages an UNSIGNED
-#                                          .xpi; signing happens outside CI —
-#                                          see build:extension below)
+#                                          .xpi and publishes it; signing
+#                                          happens outside CI — see
+#                                          build:extension below)
 #   gui/vX.Y.Z      → desktop Fyne GUI    (this pipeline builds + releases the
 #                                          Linux .tar.xz, the Windows .exe, and
 #                                          the combined GUI+CLI Windows
@@ -363,8 +364,14 @@ build:extension:
         echo "==> branch build (not a release)"
       fi
       sh extension/package.sh $VERSION
+      # Videre til release:extension. Job-id'et bruges til artefakt-URL'er der
+      # ikke afhænger af den skråstregede tag-ref, ligesom hos client og gui.
+      echo "VERSION=$VERSION" >> build.env
+      echo "BUILD_JOB_ID=$CI_JOB_ID" >> build.env
   artifacts:
     name: "deltasync-extension-${CI_COMMIT_REF_SLUG}"
+    reports:
+      dotenv: build.env
     paths:
       - dist/*.xpi
       - dist/SHA256SUMS-extension
@@ -785,6 +792,52 @@ release:gui:
           url: '${CI_PROJECT_URL}/-/jobs/${INSTALLER_JOB_ID}/artifacts/raw/dist/SHA256SUMS-installer'
           link_type: 'other'
 
+# ----------------------------------------------------------------------
+# Publish a GitLab Release for the extension (extension/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# The .xpi is UNSIGNED, and that is the point of publishing it: it gives the
+# permanent-install route somewhere to download from, on the Firefox channels
+# that allow unsigned add-ons. Ordinary Firefox still needs a signed build from
+# addons.mozilla.org — signing happens outside CI, the same rule the Android
+# keystore follows.
+
+release:extension:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension\/v\d+\.\d+\.\d+$/
+  needs:
+    - job: build:extension
+      artifacts: true
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG} (extension ${VERSION})"
+  release:
+    name: 'DeltaSync Firefox extension ${VERSION}'
+    description: |
+      Search your KeePass entries from Firefox' address bar and open the
+      entry's site. Filling in credentials stays with KeePassXC-Browser.
+
+      **This .xpi is unsigned.** Firefox only installs unsigned add-ons
+      permanently on Developer Edition, Nightly and ESR, with
+      `xpinstall.signatures.required` set to `false`. On ordinary Firefox,
+      load it as a temporary add-on from `about:debugging`, or wait for the
+      signed build on addons.mozilla.org.
+
+      It needs the `keepass-deltasync` client, and no server or account:
+      https://deltasync.bjoerck-braun.dk/firefox.html
+
+      The package is byte-reproducible — the files inside it are the sources
+      verbatim. Verify with SHA256SUMS-extension.
+    tag_name: '${CI_COMMIT_TAG}'
+    assets:
+      links:
+        - name: 'Firefox extension — .xpi (unsigned)'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/keepass-deltasync-extension-${VERSION}.xpi'
+          link_type: 'package'
+        - name: 'SHA256SUMS-extension'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS-extension'
+          link_type: 'other'
 # ----------------------------------------------------------------------
 # Mirror the client release to GitHub Releases (optional)
 # ----------------------------------------------------------------------
