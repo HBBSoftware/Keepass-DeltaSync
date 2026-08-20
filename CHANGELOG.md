@@ -28,10 +28,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
   Releases move to `gui/vX.Y.Z` tags, continuing the version line from the old
   repository (last release there: a bare `v0.3.1`). `build:gui` cross-compiles
-  the Linux `.tar.xz` and Windows `.exe` with the `fyne` tool, `release:gui`
-  attaches them to a GitLab Release, and `test:gui` vets the module whenever
-  `gui/` is touched. The old bare `vX.Y.Z` tags were deliberately not imported:
-  `v0.1.0` already means something else here. See
+  the Linux `.tar.xz` and Windows `.exe` with the `fyne` tool, and `test:gui`
+  vets the module whenever `gui/` is touched. The old bare `vX.Y.Z` tags were
+  deliberately not imported: `v0.1.0` already means something else here.
+
+  The installer is now built by the same tag, so it stops being a thing only
+  one machine can produce. `build:installer-stage` assembles what the Inno
+  Setup script expects — the packaged GUI, a fresh Windows CLI, a source zip
+  per component out of `git archive`, and the icon — and `build:installer`
+  compiles it, running Inno Setup under wine because ISCC is a Windows program.
+  `release:gui` attaches the installer alongside the bare binaries and names it
+  first: it is what Windows users should take. `build.ps1` still builds the
+  same installer locally and is unchanged apart from the path fix. See
   [`VERSIONING.md`](VERSIONING.md) and [`gui/README.md`](gui/README.md).
 
 - **Firefox extension — search & go** (`extension/`) — search your KeePass

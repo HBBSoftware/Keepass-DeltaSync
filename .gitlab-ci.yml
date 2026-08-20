@@ -14,9 +14,9 @@
 #                                          .xpi; signing happens outside CI —
 #                                          see build:extension below)
 #   gui/vX.Y.Z      → desktop Fyne GUI    (this pipeline builds + releases the
-#                                          Linux .tar.xz and Windows .exe; the
-#                                          combined Windows installer is built
-#                                          from gui/installer/ — see below)
+#                                          Linux .tar.xz, the Windows .exe, and
+#                                          the combined GUI+CLI Windows
+#                                          installer — see build:installer)
 #
 # Plain `vX.Y.Z` tags are LEGACY (v1.0.0 = old client line, v0.1.0 = a first
 # unified attempt that re-stamped the client as a lower number) and no longer
@@ -461,6 +461,134 @@ build:gui:
     expire_in: never
 
 # ----------------------------------------------------------------------
+# Build the combined Windows installer (only on gui/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# KeePass-Delta-Sync-Setup-<ver>.exe installs the GUI and the CLI into the SAME
+# directory, which is the whole trick: the GUI finds the CLI next to itself
+# (locateCLI in gui/cli.go), so there is no PATH to set up. Until the GUI moved
+# in here, this artifact — the one Windows users actually download — could only
+# be built on a machine with both repositories cloned side by side, because
+# gui/installer/build.ps1 resolved the CLI as `..\..\Keepass-deltasync`. That
+# is what these two jobs replace.
+#
+# Split in two on purpose. The staging job needs Go and ImageMagick; the
+# compile job needs Inno Setup, which is a Windows program and runs under wine.
+# Neither image has the other's tools, and the split also lets the intermediate
+# staging tree — some 80 MB of executables that are already published on their
+# own — expire, while the installer itself is kept forever.
+#
+# gui/installer/build.ps1 does the same thing on Windows and stays the local
+# path; keep the two in step if the staging layout changes.
+
+build:installer-stage:
+  stage: build
+  image: golang:${GO_VERSION}-bookworm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/gui/
+  needs:
+    - job: build:gui
+      artifacts: true
+  variables:
+    # `git describe --match 'client/*'` has to reach a client tag, and the
+    # default shallow clone usually cannot. Tags only; this job is cheap.
+    GIT_DEPTH: "0"
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends imagemagick
+  script:
+    - |
+      set -eu
+      # Præcis det træ keepass-deltasync.iss forventer at finde (se dens
+      # hoved-kommentar). VERSION kommer fra build:gui's dotenv.
+      STAGE="dist/installer-stage"
+      mkdir -p "$STAGE/app" "$STAGE/source"
+
+      # GUI'en: genbrug den exe build:gui allerede pakkede med `fyne package`,
+      # frem for at oversætte Fyne + mingw en gang til.
+      cp "dist/keepass-deltasync-gui-${VERSION}-windows-amd64.exe" \
+         "$STAGE/app/keepass-deltasync-gui.exe"
+
+      # CLI'en: ren Go, ingen CGO. Versionen tages fra seneste client/*-tag
+      # ligesom build.ps1 gør, så installeren parrer GUI'en med den CLI dette
+      # commit rent faktisk står på.
+      CLI_VERSION="$(git describe --tags --match 'client/*' 2>/dev/null | sed 's|^client/||' || true)"
+      [ -n "$CLI_VERSION" ] || CLI_VERSION="unversioned"
+      echo "CLI_VERSION=$CLI_VERSION" >> installer.env
+      echo "==> bundling CLI $CLI_VERSION with GUI $VERSION"
+      ( cd client && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+          -trimpath -ldflags="-s -w -X main.version=${CLI_VERSION}" \
+          -o "../$STAGE/app/keepass-deltasync.exe" ./cmd/keepass-deltasync )
+
+      # Kildekode-komponenten. `HEAD:gui` / `HEAD:client` arkiverer netop den
+      # ene komponents undertræ, med stier relative til den — samme to zips som
+      # dengang de var hvert sit repo, og kun git-sporet indhold.
+      git archive --format=zip -o "$STAGE/source/keepass-deltasync-gui-src.zip" HEAD:gui
+      git archive --format=zip -o "$STAGE/source/keepass-deltasync-src.zip" HEAD:client
+
+      cp gui/LICENSE "$STAGE/LICENSE"
+      # Ikonet til selve setup.exe'en. build.ps1 gør dette med System.Drawing;
+      # her er ImageMagick det tilsvarende. Vista+ tager et PNG inde i en ICO.
+      convert gui/icon.png -resize 256x256 -define icon:auto-resize=256 "$STAGE/icon.ico"
+      ls -R "$STAGE"
+  artifacts:
+    name: "installer-stage-${CI_COMMIT_REF_SLUG}"
+    reports:
+      dotenv: installer.env
+    paths:
+      - dist/installer-stage
+    # Mellemtrin. Selve installeren nedenfor gemmes for evigt; dette træ er
+    # blot de samme binærer en gang til.
+    expire_in: 1 day
+
+build:installer:
+  stage: build
+  image:
+    # amake/innosetup er Inno Setup under wine — det er det Windows-værktøj
+    # ISCC er. `entrypoint: [""]` skal med, fordi imaget ellers kører iscc
+    # direkte og aldrig når GitLabs script.
+    #
+    # PIN DENNE når første grønne kørsel har vist hvilken version den løser
+    # til; resten af pipelinen pinner sine images (jf. build:android).
+    name: amake/innosetup:latest
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^gui\/v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/gui/
+  needs:
+    - job: build:installer-stage
+      artifacts: true
+  variables:
+    WINEDEBUG: "-all"
+  script:
+    - |
+      set -eu
+      echo "INSTALLER_JOB_ID=$CI_JOB_ID" >> installer-job.env
+      # Fejler imaget på et andet navn eller en anden sti, så sig det her frem
+      # for at falde over en uforståelig "not found" midt i wine.
+      command -v iscc
+      # ISCC oversætter relative stier i .iss'en i forhold til dens EGEN mappe,
+      # ikke arbejdsmappen. Ved at lægge scriptet oven på staging-træet passer
+      # dens indbyggede standarder (StageDir="dist", OutDir="out") uden at vi
+      # skal oversætte Unix-stier til noget wine forstår.
+      mkdir -p work
+      cp gui/installer/keepass-deltasync.iss work/
+      mv dist/installer-stage work/dist
+      ( cd work && iscc "/DAppVer=$VERSION" "/DCliVer=$CLI_VERSION" keepass-deltasync.iss )
+      mkdir -p dist
+      mv work/out/*.exe dist/
+      cd dist && sha256sum KeePass-Delta-Sync-Setup-*.exe > SHA256SUMS-installer
+      cat SHA256SUMS-installer
+  artifacts:
+    name: "keepass-delta-sync-setup-${CI_COMMIT_REF_SLUG}"
+    reports:
+      dotenv: installer-job.env
+    paths:
+      - dist/KeePass-Delta-Sync-Setup-*.exe
+      - dist/SHA256SUMS-installer
+    expire_in: never
+# ----------------------------------------------------------------------
 # Build + push the server Docker image (only on server/vX.Y.Z tags)
 # ----------------------------------------------------------------------
 #
@@ -600,22 +728,31 @@ release:gui:
   needs:
     - job: build:gui
       artifacts: true
+    - job: build:installer
+      artifacts: true
   script:
-    - echo "Creating release for ${CI_COMMIT_TAG} (gui ${VERSION})"
+    - echo "Creating release for ${CI_COMMIT_TAG} (gui ${VERSION}, CLI ${CLI_VERSION})"
   release:
     name: 'keepass-deltasync GUI ${VERSION}'
     description: |
       Pre-built keepass-deltasync GUI binaries for ${VERSION}.
 
-      The GUI calls the keepass-deltasync CLI — put the matching client binary
-      next to it, or point at it under Settings. Windows users can instead take
-      the combined installer, which ships both in one file.
+      **Windows users want the installer.** It puts the GUI and the
+      keepass-deltasync CLI (${CLI_VERSION}) in the same directory, which is
+      what lets the GUI find the CLI with no PATH setup, and it needs no
+      administrator.
 
-      Verify integrity with SHA256SUMS-gui. Build from source / macOS: see
-      gui/README.md.
+      The bare binaries below are for everyone else: put the matching client
+      binary next to the GUI, or point at it under Settings.
+
+      Verify integrity with SHA256SUMS-gui / SHA256SUMS-installer. Build from
+      source / macOS: see gui/README.md.
     tag_name: '${CI_COMMIT_TAG}'
     assets:
       links:
+        - name: 'Windows installer (GUI + CLI) — .exe'
+          url: '${CI_PROJECT_URL}/-/jobs/${INSTALLER_JOB_ID}/artifacts/raw/dist/KeePass-Delta-Sync-Setup-${VERSION}.exe'
+          link_type: 'package'
         - name: 'Linux (amd64) — .tar.xz'
           url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/keepass-deltasync-gui-${VERSION}-linux-amd64.tar.xz'
           link_type: 'package'
@@ -624,6 +761,9 @@ release:gui:
           link_type: 'package'
         - name: 'SHA256SUMS-gui'
           url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS-gui'
+          link_type: 'other'
+        - name: 'SHA256SUMS-installer'
+          url: '${CI_PROJECT_URL}/-/jobs/${INSTALLER_JOB_ID}/artifacts/raw/dist/SHA256SUMS-installer'
           link_type: 'other'
 
 # ----------------------------------------------------------------------

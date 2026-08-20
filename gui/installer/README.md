@@ -7,8 +7,18 @@ sig selv (`locateCLI` i `cli.go`) — ingen PATH-opsætning nødvendig.
 
 ## Byg
 
+Til en **release** behøver du ikke gøre noget: `gui/vX.Y.Z`-taggen får CI til at
+bygge installeren (`build:installer-stage` + `build:installer` i
+`.gitlab-ci.yml`) og hæfte den på GitLab-releasen. `build.ps1` nedenfor er den
+lokale vej — til at prøve en ændring af selve installeren af, eller til at lave
+en installer uden for et tag.
+
+Vil du arbejde på CI-jobbene i stedet, så skub til en `ci/gui-*`-branch; de tre
+GUI-jobs har den escape hatch, præcis som Android- og extension-jobbene, så du
+ikke skal flytte et offentliggjort tag for at afprøve en pipeline.
+
 ```powershell
-cd installer
+cd gui\installer
 pwsh -File build.ps1
 # → out\KeePass-Delta-Sync-Setup-<version>.exe
 ```

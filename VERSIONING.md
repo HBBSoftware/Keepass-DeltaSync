@@ -10,7 +10,7 @@ different rates. Each is versioned **independently**, and release tags are
 | Android app (`android/`) | `android/vX.Y.Z` | CI builds an **unsigned** APK; `android/publish-release.sh` signs it locally and publishes it (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
 | Server (PHP, `server/`) | `server/vX.Y.Z` | Deployed directly; the tag is a marker only — no build artifact |
 | Firefox extension (`extension/`) | `extension/vX.Y.Z` | CI packages an **unsigned**, byte-reproducible `.xpi` via `extension/package.sh`; signing happens outside CI. The extension also carries its own `version` in `extension/manifest.json` |
-| Desktop GUI (Go/Fyne, `gui/`) | `gui/vX.Y.Z` | CI cross-compiles the Linux `.tar.xz` + Windows `.exe` and publishes a GitLab Release. The GUI also carries its own `Version` in `gui/FyneApp.toml`. The combined Windows installer (GUI + CLI in one `setup.exe`) is built from `gui/installer/` — see below |
+| Desktop GUI (Go/Fyne, `gui/`) | `gui/vX.Y.Z` | CI cross-compiles the Linux `.tar.xz` + Windows `.exe` and publishes a GitLab Release. The GUI also carries its own `Version` in `gui/FyneApp.toml`. The same tag also builds the combined Windows installer (GUI + CLI in one `setup.exe`) — see below |
 
 The components do **not** share a number. The desktop client being at `1.x`
 while the Android app is at `0.x` is correct and expected — they are different
@@ -82,9 +82,10 @@ git tag gui/v0.4.0
 git push origin gui/v0.4.0
 ```
 
-`build:gui` cross-compiles both binaries and `release:gui` attaches them to a
-GitLab Release. Like the other two, the job refuses to build if the tag and
-`FyneApp.toml` disagree.
+`build:gui` cross-compiles both binaries, `build:installer-stage` +
+`build:installer` produce `KeePass-Delta-Sync-Setup-<version>.exe`, and
+`release:gui` attaches all three to a GitLab Release. Like the other two build
+jobs, `build:gui` refuses to build if the tag and `FyneApp.toml` disagree.
 
 The GUI's version line **continues** the one from its old standalone repo
 (`gitlab.com/Star95/keepass-deltasync-gui`, archived): that project's last
@@ -98,9 +99,12 @@ client (Go 1.26, pure Go) — it does not import the client, it shells out to
 the `keepass-deltasync` binary. What ties them together is the combined
 Windows installer in [`gui/installer/`](gui/installer/), which puts both
 executables in one directory; the GUI then finds the CLI next to itself
-(`locateCLI` in `gui/cli.go`), no PATH setup needed. That installer reads the
-GUI's version from `gui/FyneApp.toml` and the CLI's from the latest `client/v*`
-tag, so it pairs whatever the two components are standing at.
+(`locateCLI` in `gui/cli.go`), no PATH setup needed. It reads the GUI's version
+from `gui/FyneApp.toml` and the CLI's from the latest `client/v*` tag, so it
+pairs whatever the two components are standing at in the commit it was built
+from. `gui/installer/build.ps1` builds the same thing on Windows and is still
+the way to produce one off a tag — keep it and the CI jobs in step if the
+staging layout changes.
 
 **Server**: deploy `server/`, then tag for the record:
 
