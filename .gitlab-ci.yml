@@ -503,11 +503,11 @@ build:installer-stage:
       # Præcis det træ keepass-deltasync.iss forventer at finde (se dens
       # hoved-kommentar). VERSION kommer fra build:gui's dotenv.
       # Bevidst UDEN FOR dist/. To grunde: dist/ er hvor færdige, publicerbare
-      # artefakter ligger i dette repo, og staging-træet er ikke et af dem —
-      # og build:installer skal kunne flytte træet rundt. Artefakt-udpakningen
-      # laver mapperne som root, mens innosetup-imaget kører som en anden
-      # bruger, så en omdøbning INDE i dist/ ville være Permission denied
-      # (byggemappens rod er derimod skrivbar).
+      # artefakter ligger i dette repo, og et staging-træ er ikke et af dem —
+      # og build:installer skal kunne lave sin EGEN dist/ til setup.exe'en.
+      # Kom staging-træet ind som dist/, ville den mappe være root-ejet fra
+      # artefakt-udpakningen, og et job der kører som en anden bruger kan ikke
+      # skrive i den.
       STAGE="installer-stage"
       mkdir -p "$STAGE/app" "$STAGE/source"
 
@@ -582,7 +582,12 @@ build:installer:
       # skal oversætte Unix-stier til noget wine forstår.
       mkdir -p work
       cp gui/installer/keepass-deltasync.iss work/
-      mv installer-stage work/dist
+      # `cp -R`, ikke `mv`: at flytte en MAPPE til en ny forælder kræver
+      # skriverettighed på mappen selv, fordi kernen skal opdatere dens
+      # `..`-post. Artefakt-udpakningen laver installer-stage som root, og
+      # dette image kører som en anden bruger, så `mv` giver Permission denied
+      # uanset at byggemappen selv er skrivbar. At læse den må vi gerne.
+      cp -R installer-stage work/dist
       ( cd work && iscc "/DAppVer=$VERSION" "/DCliVer=$CLI_VERSION" keepass-deltasync.iss )
       # dist/ findes ikke i dette job (kun build:installer-stage's artefakt kom
       # med), så vi laver den selv og ejer den derfor.
