@@ -9,6 +9,14 @@
   --accent-fg: #ffffff;
   --hover: #f0f0f4;
   --danger: #c50042;
+
+  /* Gruppe-overskrifter i mærkets egne farver: sync-pilenes blå (#38BDF8) og
+     nøglens guld (#FDE047 → #F59E0B). Begge er tegnet til mørk navy i logoet
+     og er ulæselige som tekst på lys baggrund — nøglens gule giver 1,16:1 —
+     så guldet mørknes her til 5,6:1, og den blå stribe til 3,2:1. */
+  --group-bg: #d2e7f4;
+  --group-fg: #92400e;
+  --group-bar: #0284c7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +29,11 @@
     --accent-fg: #15141a;
     --hover: #2b2a33;
     --danger: #ff9aa2;
+
+    /* På mørk baggrund kan begge farver stå som logoet tegner dem. */
+    --group-bg: #2c3e4e;
+    --group-fg: #fde047;
+    --group-bar: #38bdf8;
   }
 }
 
@@ -62,7 +75,11 @@ ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 22rem;
+  /* Firefox tillader en popup på 600 px. Med søgefelt (~47 px) og bundlinje
+     (~38 px) holder 28rem den på omkring 533 px — plads til de rækker
+     gruppe-overskrifterne koster, uden at Firefox lægger sin egen rullebjælke
+     om hele popup'en. */
+  max-height: 28rem;
   overflow-y: auto;
 }
 
@@ -126,9 +143,9 @@ li.group {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 0.3rem 0.6rem;
-  background: var(--hover);
-  color: var(--muted);
+  padding: 0.3rem 0.6rem 0.3rem 0.75rem;
+  background: var(--group-bg);
+  color: var(--group-fg);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: default;
@@ -136,6 +153,9 @@ li.group {
   text-overflow: ellipsis;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
+  /* Samme greb som underrækkerne bruger: en stribe i venstre margen binder
+     blokken sammen, uden at koste bredde til adresserne. */
+  box-shadow: inset 3px 0 0 var(--group-bar);
 }
 
 /* Underrækkerne: entry'ens øvrige adresser, foldet ud når den er valgt. */
