@@ -8,6 +8,42 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The Firefox extension works without a server** — `add-local <name>
+  <path.kdbx>` registers a database for local search only. Until now the sole
+  way into the client's config was `init`, which requires enrollment, so
+  someone who just wanted to find the right tab had to hand-edit
+  `config.toml`. The binding gets no `remote_id`, and every command that talks
+  to the server refuses it by name rather than sending an empty UUID; `daemon`
+  skips such databases instead of failing on them. The keyring is keyed on the
+  server UUID, which a local-only database does not have, so `add-local` mints
+  a local id for that slot — without it every local-only database would share
+  one keyring entry. `--save-password` verifies the masterpassword by opening
+  the database before storing it. `databases` no longer requires enrollment
+  when there is something local to show. See
+  [`docs/install-browser.md`](docs/install-browser.md).
+
+- **`install-browser-host` registers with every Firefox it finds.** On Linux
+  `~/.mozilla/native-messaging-hosts` is only correct for a packaged Firefox: a
+  snap reads `~/snap/firefox/common/…` and a flatpak reads
+  `~/.var/app/org.mozilla.firefox/…`. The command used to write one path and
+  print "Installed browser host for Firefox" regardless, leaving snap and
+  flatpak users with a success message, a file on disk, and an extension that
+  still could not start the host. It now writes one manifest and launcher per
+  detected variant, prints which ones, and carries the variant-specific catch:
+  the flatpak launcher goes through `flatpak-spawn --host` and prints the
+  `flatpak override` that the sandbox requires, the snap note explains why the
+  binary must stay out of dot-directories, and macOS prints the `xattr` command
+  that clears Gatekeeper's quarantine on a downloaded binary.
+  `uninstall-browser-host` cleans up every variant, including ones since
+  removed. `--all` installs for variants that are not present yet.
+
+- **A setup button in the extension's popup** (0.2.0) — the two dead ends
+  ("cannot start the native host" and "no databases are registered") now say
+  what is wrong in a sentence and offer a button to the setup guide, instead of
+  printing a raw CLI command. The guide deliberately lives outside the
+  extension: a signed add-on cannot be corrected without another AMO review,
+  and sandbox paths are exactly the kind of instruction that goes stale.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with

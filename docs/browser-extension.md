@@ -249,6 +249,29 @@ adaptive-icon gør.
 5. ✅ `changed`-push via fsnotify, debounced.
 6. Udestår: signering og distribution, Chromium-manifest, Firefox for Android.
 
+Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
+
+7. **`add-local`** — registrering af en `.kdbx` uden server. Indtil da var
+   `init` den eneste vej ind i config'en, og den kræver enrollment; en bruger
+   der kun ville søge havde altså ingen understøttet vej. Bindingen får intet
+   `remote_id`, og alt der taler med serveren afviser den (`LocalOnly()`).
+   Keyring-nøglen kommer fra et lokalt genereret `local_id`, fordi keyringen
+   ellers er nøglet på server-UUID'en — uden det ville alle lokal-kun
+   databaser dele ét slot.
+8. **Flere manifest-mål pr. platform** — `install-browser-host` skriver nu til
+   hver Firefox-variant den finder. På Linux er ~/.mozilla kun rigtigt for en
+   pakket Firefox; snap og flatpak læser hver deres mappe. Før dette meldte
+   kommandoen succes for en snap-bruger, mens Firefox aldrig så manifestet.
+   Flatpak-varianten får desuden en launcher gennem `flatpak-spawn --host`,
+   fordi processen starter inde i sandkassen. Placering, indhold og oprydning
+   er verificeret; om en *indespærret* Firefox faktisk får lov at starte
+   hosten er det ikke — se
+   [`browser-host-linux-test-plan.md`](browser-host-linux-test-plan.md).
+9. **Opsætningsknap i popup'en** — de to blindgyder (ingen host, ingen
+   database) peger nu på `docs/install-browser.md` frem for at vise en rå
+   kommando. Teksten bor bevidst uden for udvidelsen: en signeret udvidelse kan
+   ikke rettes uden en ny AMO-gennemgang, og netop disse stier flytter sig.
+
 Alt undtagen fase 6 er bygget. Live-test mod en rigtig database i Firefox
 mangler stadig.
 
