@@ -37,6 +37,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `uninstall-browser-host` cleans up every variant, including ones since
   removed. `--all` installs for variants that are not present yet.
 
+- **A *Firefox search* section in the menu** (`keepass-deltasync tui`) —
+  `add-local` and `install-browser-host` were command-line only, which put the
+  whole search-only path behind flags the user who wants it least is least
+  likely to type. The section carries both, plus `--probe` to check the index
+  and the uninstall, and it is the one section shown **without enrollment**:
+  searching needs no account, so a menu whose only offer is to get one was
+  answering a question nobody asked. The masterpassword checkbox prompts in the
+  suspended terminal, the same way sync's prompt already does.
+
 - **A setup button in the extension's popup** (0.2.0) — the two dead ends
   ("cannot start the native host" and "no databases are registered") now say
   what is wrong in a sentence and offer a button to the setup guide, instead of

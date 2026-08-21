@@ -99,11 +99,25 @@ type msgs struct {
 	saDoneFmt       string // %s = binding-navn
 
 	// Sektioner på forsiden (GUI-fanerne som menupunkter)
+	secBrowser, secBrowserDesc     string
 	secDatabases, secDatabasesDesc string
 	secDevices, secDevicesDesc     string
 	secLog, secLogDesc             string
 	secAdmin, secAdminDesc         string
 	secSettings, secSettingsDesc   string
+
+	// Firefox-undermenu. Den er den ENESTE sektion der også vises uden
+	// enrollment: søgning kræver ingen server, og en bruger der kun vil det,
+	// skal ikke mødes af et krav om en konto.
+	browserMenuTitle              string
+	miAddLocal, miAddLocalDesc    string
+	fldAddLocalName               string
+	fldAddLocalPath               string
+	fldAddLocalSave               string
+	miInstallHost, miInstallDesc  string
+	miUninstallHost, miUninstDesc string
+	miProbe, miProbeDesc          string
+	pkProbe                       string
 
 	// Undermenu-titler
 	dbMenuTitle       string
@@ -254,11 +268,26 @@ var enMsgs = msgs{
 		"or Cancel to go back and sync later.\n\n" +
 		"Remember: the old binding can be removed via Advanced → Forget database.",
 
+	secBrowser: "Firefox search", secBrowserDesc: "Search your entries from Firefox — no server needed",
 	secDatabases: "Databases", secDatabasesDesc: "Sync, share, versions, add/remove",
 	secDevices: "Devices", secDevicesDesc: "List devices, issue enrollment tokens",
 	secLog: "Log", secLogDesc: "Server audit log (by period)",
 	secAdmin: "Admin", secAdminDesc: "User administration (needs admin token)",
 	secSettings: "Settings", secSettingsDesc: "Status, switch account, daemon, language",
+
+	browserMenuTitle: " Firefox search ",
+	miAddLocal:       "Add a database to search",
+	miAddLocalDesc:   "Register a .kdbx for search only — nothing is uploaded",
+	fldAddLocalName:  "Name (short id, e.g. 'private')",
+	fldAddLocalPath:  "Path to local .kdbx",
+	fldAddLocalSave:  "Store the masterpassword in the OS keyring",
+	miInstallHost:    "Register with Firefox",
+	miInstallDesc:    "Let Firefox start the search host (restart Firefox afterwards)",
+	miUninstallHost:  "Remove the registration",
+	miUninstDesc:     "Undo the above for every Firefox variant",
+	miProbe:          "Test the index",
+	miProbeDesc:      "Print what the extension would see, without involving Firefox",
+	pkProbe:          "Test the index",
 
 	dbMenuTitle:       " Databases ",
 	devMenuTitle:      " Devices ",
@@ -385,11 +414,26 @@ var daMsgs = msgs{
 		"eller Annullér for at vende tilbage og synke senere.\n\n" +
 		"Husk: den gamle binding kan fjernes med Avanceret → Glem database.",
 
+	secBrowser: "Firefox-søgning", secBrowserDesc: "Søg i dine entries fra Firefox — kræver ingen server",
 	secDatabases: "Databaser", secDatabasesDesc: "Synk, deling, versioner, tilføj/fjern",
 	secDevices: "Enheder", secDevicesDesc: "Vis enheder, udsted enrollment-tokens",
 	secLog: "Log", secLogDesc: "Server-audit-log (efter periode)",
 	secAdmin: "Admin", secAdminDesc: "Brugeradministration (kræver admin-token)",
 	secSettings: "Indstillinger", secSettingsDesc: "Status, skift konto, daemon, sprog",
+
+	browserMenuTitle: " Firefox-søgning ",
+	miAddLocal:       "Tilføj database til søgning",
+	miAddLocalDesc:   "Registrér en .kdbx til søgning alene — intet sendes nogen steder hen",
+	fldAddLocalName:  "Navn (kort id, fx 'privat')",
+	fldAddLocalPath:  "Sti til lokal .kdbx",
+	fldAddLocalSave:  "Gem masterpasswordet i OS-nøgleringen",
+	miInstallHost:    "Registrér hos Firefox",
+	miInstallDesc:    "Lad Firefox starte søge-hosten (genstart Firefox bagefter)",
+	miUninstallHost:  "Fjern registreringen",
+	miUninstDesc:     "Fortryd ovenstående for hver Firefox-variant",
+	miProbe:          "Test indekset",
+	miProbeDesc:      "Print hvad udvidelsen ville få at se, uden at involvere Firefox",
+	pkProbe:          "Test indekset",
 
 	dbMenuTitle:       " Databaser ",
 	devMenuTitle:      " Enheder ",

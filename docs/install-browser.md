@@ -63,6 +63,18 @@ Only `linux/amd64`, `darwin/amd64`, `darwin/arm64` and `windows/amd64` are
 built. On anything else — ARM Linux, for instance — build from source; it is a
 plain `go build`.
 
+## Prefer a menu?
+
+Steps 2 and 3 both exist in the built-in menu, so you do not have to remember
+any of it:
+
+```
+keepass-deltasync tui
+```
+
+Pick **Firefox search**. It is there whether or not you have an account. The
+rest of this page spells the same steps out as commands.
+
 ## 2. Point the program at your database
 
 ```

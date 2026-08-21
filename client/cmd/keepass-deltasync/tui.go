@@ -59,6 +59,11 @@ type tui struct {
 type inputField struct {
 	label    string
 	password bool
+	// checkbox gør feltet til et afkrydsningsfelt i stedet for et
+	// tekstfelt. Værdien kommer tilbage som "true" eller "" — tom er falsk,
+	// så en caller der ikke kender feltet ikke kommer til at læse "false"
+	// som en værdi.
+	checkbox bool
 }
 
 // ============================================================
@@ -119,6 +124,10 @@ func (t *tui) showMain() {
 			})
 		})
 		list.AddItem(t.m.miAdvEnroll, t.m.miAdvEnrollDesc, 'a', t.advancedEnrollFlow)
+		// Firefox-søgning kræver hverken konto eller server, så den hører
+		// hjemme her hos den uenrollede bruger — ellers ville menuen påstå at
+		// det eneste man kan uden en konto er at skaffe sig en.
+		list.AddItem(t.m.secBrowser, t.m.secBrowserDesc, 'f', t.showBrowserMenu)
 	} else {
 		// GUI'ens faner som menupunkter på forsiden. Hvert punkt åbner en
 		// undermenu med fanens handlinger.
@@ -127,6 +136,7 @@ func (t *tui) showMain() {
 		list.AddItem(t.m.secLog, t.m.secLogDesc, 'g', t.showLogMenu)
 		list.AddItem(t.m.secAdmin, t.m.secAdminDesc, 'a', t.showAdminMenu)
 		list.AddItem(t.m.secSettings, t.m.secSettingsDesc, 's', t.showSettingsMenu)
+		list.AddItem(t.m.secBrowser, t.m.secBrowserDesc, 'f', t.showBrowserMenu)
 	}
 
 	list.AddItem(t.m.miLanguage, fmt.Sprintf(t.m.miLanguageDescFmt, t.m.langDisplayName(t.lang)), 'o', t.toggleLanguage)
@@ -142,6 +152,56 @@ func (t *tui) menuList(title string) *tview.List {
 	list.SetTitle(title)
 	list.SetTitleAlign(tview.AlignLeft)
 	return list
+}
+
+// showBrowserMenu er "Firefox-søgning"-sektionen: de to kommandoer der skal
+// til for at udvidelsen virker, plus en vej til at afprøve resultatet.
+//
+// Den vises både med og uden enrollment. `add-local` er hele pointen: uden den
+// var `init` eneste vej ind i config'en, og den kræver en konto — så en bruger
+// der bare vil finde den rigtige fane skulle skrive TOML i hånden.
+func (t *tui) showBrowserMenu() {
+	list := t.menuList(t.m.browserMenuTitle)
+	back := t.showBrowserMenu
+
+	list.AddItem(t.m.miAddLocal, t.m.miAddLocalDesc, 'a', func() {
+		t.collectInputsThen(t.m.miAddLocal, []inputField{
+			{label: t.m.fldAddLocalName},
+			{label: t.m.fldAddLocalPath},
+			{label: t.m.fldAddLocalSave, checkbox: true},
+		}, back, func(v []string) {
+			name, path := strings.TrimSpace(v[0]), strings.TrimSpace(v[1])
+			if name == "" || path == "" {
+				back()
+				return
+			}
+			args := []string{"add-local", name, path}
+			if v[2] != "" {
+				// Prompten kommer i den suspenderede terminal, præcis som
+				// masterpassword-prompten i sync gør.
+				args = append(args, "--save-password")
+			}
+			t.runSelf(args...)
+			back()
+		})
+	})
+	list.AddItem(t.m.miInstallHost, t.m.miInstallDesc, 'i', func() {
+		t.runSelf("install-browser-host")
+		back()
+	})
+	list.AddItem(t.m.miProbe, t.m.miProbeDesc, 't', func() {
+		t.pickAnyDatabaseThen(t.m.pkProbe, back, func(name string) {
+			t.runSelf("browser-host", "--probe", name)
+			back()
+		})
+	})
+	list.AddItem(t.m.miUninstallHost, t.m.miUninstDesc, 'u', func() {
+		t.runSelf("uninstall-browser-host")
+		back()
+	})
+	list.AddItem(t.m.btnBack, "", 'q', t.showMain)
+	list.SetDoneFunc(t.showMain) // Esc
+	t.setRoot(list)
 }
 
 // showDatabasesMenu er "Databaser"-sektionen: alt der hører til de lokale
@@ -515,22 +575,31 @@ func (t *tui) pickDatabase(title string, onPick func(name string)) {
 }
 
 // pickDatabaseThen er som pickDatabase men lader caller bestemme hvor
-// "Tilbage"/Esc fører hen (fx tilbage til Avanceret-menuen).
+// "Tilbage"/Esc fører hen (fx tilbage til Avanceret-menuen). Den viser kun
+// databaser der kan synkroniseres — dens kaldere ender alle hos serveren.
 func (t *tui) pickDatabaseThen(title string, back func(), onPick func(name string)) {
+	t.pickDatabaseFiltered(title, back, true, onPick)
+}
+
+// pickAnyDatabaseThen tager lokal-kun databaser med. Firefox-menuen er det ene
+// sted hvor de hører hjemme: de kan ikke synkroniseres, men de kan søges i.
+func (t *tui) pickAnyDatabaseThen(title string, back func(), onPick func(name string)) {
+	t.pickDatabaseFiltered(title, back, false, onPick)
+}
+
+func (t *tui) pickDatabaseFiltered(title string, back func(), syncableOnly bool, onPick func(name string)) {
 	cfg, err := config.Load()
 	if err != nil || len(cfg.Databases) == 0 {
 		back()
 		return
 	}
 
-	// Menuen her fører udelukkende til handlinger der involverer serveren.
-	// Lokal-kun databaser (`add-local`) hører ikke hjemme på listen — de kan
-	// kun søges i, ikke synkroniseres.
 	syncable := make([]config.Database, 0, len(cfg.Databases))
 	for _, d := range cfg.Databases {
-		if !d.LocalOnly() {
-			syncable = append(syncable, d)
+		if syncableOnly && d.LocalOnly() {
+			continue
 		}
+		syncable = append(syncable, d)
 	}
 	if len(syncable) == 0 {
 		back()
@@ -569,19 +638,30 @@ func (t *tui) collectInputsThen(title string, fields []inputField, back func(), 
 	form.SetTitle(fmt.Sprintf(" %s ", title))
 	form.SetTitleAlign(tview.AlignLeft)
 
-	inputs := make([]*tview.InputField, len(fields))
+	values := make([]func() string, len(fields))
 	for i, f := range fields {
+		if f.checkbox {
+			box := tview.NewCheckbox().SetLabel(f.label + ": ")
+			form.AddFormItem(box)
+			values[i] = func() string {
+				if box.IsChecked() {
+					return "true"
+				}
+				return ""
+			}
+			continue
+		}
 		in := tview.NewInputField().SetLabel(f.label + ": ")
 		if f.password {
 			in.SetMaskCharacter('*')
 		}
 		form.AddFormItem(in)
-		inputs[i] = in
+		values[i] = in.GetText
 	}
 	form.AddButton(t.m.btnOK, func() {
-		vals := make([]string, len(inputs))
-		for i, in := range inputs {
-			vals[i] = in.GetText()
+		vals := make([]string, len(values))
+		for i, get := range values {
+			vals[i] = get()
 		}
 		onSubmit(vals)
 	})
