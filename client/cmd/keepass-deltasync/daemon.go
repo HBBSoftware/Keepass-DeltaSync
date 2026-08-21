@@ -130,9 +130,18 @@ func runDaemon(args []string) error {
 // (ingen --db) returnerer alle.
 func selectDatabases(cfg *config.Config, names []string) ([]*config.Database, error) {
 	if len(names) == 0 {
-		out := make([]*config.Database, len(cfg.Databases))
+		out := make([]*config.Database, 0, len(cfg.Databases))
 		for i := range cfg.Databases {
-			out[i] = &cfg.Databases[i]
+			// Lokal-kun bindinger (`add-local`) har ingen server at synke
+			// med. De skal ikke vælte daemonen for de databaser der har.
+			if cfg.Databases[i].LocalOnly() {
+				fmt.Fprintf(os.Stderr, "Skipping %q — registered for local search only.\n", cfg.Databases[i].Name)
+				continue
+			}
+			out = append(out, &cfg.Databases[i])
+		}
+		if len(out) == 0 {
+			return nil, errors.New("no syncable databases in local config — run `keepass-deltasync init` first")
 		}
 		return out, nil
 	}
@@ -141,6 +150,9 @@ func selectDatabases(cfg *config.Config, names []string) ([]*config.Database, er
 		db := cfg.FindDatabase(name)
 		if db == nil {
 			return nil, fmt.Errorf("database %q not found in local config", name)
+		}
+		if db.LocalOnly() {
+			return nil, errLocalOnly(name)
 		}
 		out = append(out, db)
 	}

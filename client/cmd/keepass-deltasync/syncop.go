@@ -180,6 +180,9 @@ func loadDBAndCLI(name, cliPath string) (*config.Config, *config.Database, *kdbx
 	if db == nil {
 		return nil, nil, nil, fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", name)
 	}
+	if db.LocalOnly() {
+		return nil, nil, nil, errLocalOnly(name)
+	}
 	if _, err := os.Stat(db.LocalPath); err != nil {
 		return nil, nil, nil, fmt.Errorf("local kdbx %s: %w", db.LocalPath, err)
 	}

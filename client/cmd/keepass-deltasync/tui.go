@@ -523,12 +523,26 @@ func (t *tui) pickDatabaseThen(title string, back func(), onPick func(name strin
 		return
 	}
 
+	// Menuen her fører udelukkende til handlinger der involverer serveren.
+	// Lokal-kun databaser (`add-local`) hører ikke hjemme på listen — de kan
+	// kun søges i, ikke synkroniseres.
+	syncable := make([]config.Database, 0, len(cfg.Databases))
+	for _, d := range cfg.Databases {
+		if !d.LocalOnly() {
+			syncable = append(syncable, d)
+		}
+	}
+	if len(syncable) == 0 {
+		back()
+		return
+	}
+
 	list := tview.NewList()
 	list.SetBorder(true)
 	list.SetTitle(fmt.Sprintf(" %s — %s ", title, t.m.selectDbSuffix))
 	list.SetTitleAlign(tview.AlignLeft)
 
-	for i, d := range cfg.Databases {
+	for i, d := range syncable {
 		name := d.Name
 		shortcut := rune(0)
 		if i < 9 {

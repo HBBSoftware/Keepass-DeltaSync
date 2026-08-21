@@ -33,6 +33,9 @@ import (
 // så ikke-bundne databaser også kan slettes. Alt andet er en fejl.
 func resolveDeleteTarget(cfg *config.Config, target string) (string, error) {
 	if db := cfg.FindDatabase(target); db != nil {
+		if db.LocalOnly() {
+			return "", errLocalOnly(target)
+		}
 		return db.RemoteID, nil
 	}
 	if uuidRe.MatchString(target) {

@@ -55,6 +55,9 @@ func runShare(args []string) error {
 	if db == nil {
 		return fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", dbName)
 	}
+	if db.LocalOnly() {
+		return errLocalOnly(dbName)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

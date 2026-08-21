@@ -60,6 +60,9 @@ func runRestore(args []string) error {
 	if db == nil {
 		return fmt.Errorf("database %q not found in local config — run `keepass-deltasync init` first", name)
 	}
+	if db.LocalOnly() {
+		return errLocalOnly(name)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

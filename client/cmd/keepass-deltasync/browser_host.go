@@ -328,7 +328,7 @@ func (h *browserHost) acquirePassword(db *config.Database, provided string) (pw 
 	if cached := h.cachedPassword(db.Name); cached != nil {
 		return cached, false, nil
 	}
-	stored, err := keyring.Get(db.RemoteID)
+	stored, err := keyring.Get(db.SecretID())
 	if err != nil {
 		return nil, false, err
 	}
@@ -469,7 +469,7 @@ func (h *browserHost) runProbe(name string, pwStdin bool) error {
 		return fmt.Errorf("database %q is not registered locally", name)
 	}
 
-	pw, err := keyring.Get(db.RemoteID)
+	pw, err := keyring.Get(db.SecretID())
 	if errors.Is(err, keyring.ErrNotFound) {
 		fmt.Fprintf(os.Stderr, "No keyring entry for %s — the extension would prompt here.\n", db.Name)
 		pw, err = passwd.Read(fmt.Sprintf("Masterpassword for %s: ", db.Name), pwStdin)

@@ -47,6 +47,9 @@ func runShares(args []string) error {
 	if db == nil {
 		return fmt.Errorf("database %q not found in local config", dbName)
 	}
+	if db.LocalOnly() {
+		return errLocalOnly(dbName)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

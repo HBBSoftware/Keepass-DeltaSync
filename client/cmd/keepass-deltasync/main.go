@@ -22,6 +22,7 @@ Usage:
 Commands:
   enroll <enrollment-token>   Register this device with the server
   init <name> <local.kdbx>    Register a local .kdbx for syncing
+  add-local <name> <path>     Register a .kdbx for local search only (no server)
   init-shared <remote> <path> Bootstrap a local .kdbx for a database shared with you
   forget <name>               Remove a local database binding (server + file untouched)
   delete-database <name|uuid> Permanently delete a database on the server (owner only)
@@ -57,6 +58,8 @@ func main() {
 		exitOnError(runEnroll(os.Args[2:]))
 	case "init":
 		exitOnError(runInit(os.Args[2:]))
+	case "add-local":
+		exitOnError(runAddLocal(os.Args[2:]))
 	case "init-shared":
 		exitOnError(runInitShared(os.Args[2:]))
 	case "forget":

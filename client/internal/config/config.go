@@ -109,6 +109,31 @@ type Database struct {
 	// flyttet til papirkurv) tombstones på serveren. Uden dette ville slettede
 	// grupper efterlade tomme gruppe-shells på andre enheder.
 	KnownGroups []string `toml:"known_groups,omitempty"`
+
+	// LocalID sættes KUN af `add-local`, som registrerer en .kdbx der aldrig
+	// skal synkroniseres — den findes så browser-hosten (og dermed
+	// Firefox-udvidelsen) kan søge i den uden at der er en server involveret.
+	// Den er lokalt genereret og forlader aldrig maskinen.
+	//
+	// Grunden til at den findes overhovedet: keyringen er nøglet på RemoteID
+	// (se keyring.Set/Get), og en database uden server har ikke sådan én. Uden
+	// et lokalt id ville alle lokal-kun databaser dele samme keyring-slot.
+	LocalID string `toml:"local_id,omitempty"`
+}
+
+// LocalOnly rapporterer om databasen kun er registreret lokalt — altså at der
+// ikke er nogen server-side database at synkronisere med. Alt der taler med
+// serveren skal afvise sådan en frem for at sende en tom UUID afsted.
+func (d *Database) LocalOnly() bool { return d.RemoteID == "" }
+
+// SecretID er den nøgle databasens masterpassword ligger under i OS-keyringen.
+// For en synkroniseret database er det server-UUID'en; for en lokal-kun
+// database det lokalt genererede id.
+func (d *Database) SecretID() string {
+	if d.RemoteID != "" {
+		return d.RemoteID
+	}
+	return d.LocalID
 }
 
 // RecordEntryState gemmer den seneste sete mtime for en entry (eller deletion).

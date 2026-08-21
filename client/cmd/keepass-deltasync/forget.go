@@ -6,8 +6,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
+	"gitlab.com/Star95/keepass-deltasync/client/internal/keyring"
 )
 
 // runForget fjerner en lokal database-binding fra config. Det sletter INTET på
@@ -39,15 +41,28 @@ func runForget(args []string) error {
 
 	kept := make([]config.Database, 0, len(cfg.Databases))
 	found := false
+	var localSecret string
 	for _, d := range cfg.Databases {
 		if d.Name == name {
 			found = true
+			// En lokal-kun binding har et id vi selv genererede, og et nyt
+			// `add-local` genererer et nyt. Keyring-entry'en kan altså aldrig
+			// genbruges, og at lade masterpasswordet blive ville være at
+			// efterlade en hemmelighed uden noget der peger på den.
+			if d.LocalOnly() {
+				localSecret = d.LocalID
+			}
 			continue
 		}
 		kept = append(kept, d)
 	}
 	if !found {
 		return fmt.Errorf("no local database named %q (use `databases` to list)", name)
+	}
+	if localSecret != "" {
+		if err := keyring.Delete(localSecret); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not remove the masterpassword from the keyring: %v\n", err)
+		}
 	}
 
 	cfg.Databases = kept
