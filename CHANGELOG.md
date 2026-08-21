@@ -140,6 +140,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Arrow keys in the extension popup while the pointer rests over it** — the
+  result list selected on `mouseover`, and moving the selection rebuilds that
+  list. The browser then fires `mouseover` on whatever element ends up under a
+  completely stationary pointer, which put the selection straight back on the
+  hovered row. Up/down looked dead whenever the mouse happened to sit over the
+  popup — which it usually does, having just clicked the toolbar button. The
+  list now selects on `mousemove`, guarded against a repeat of the same
+  coordinates, so only real movement moves the selection.
+
 - **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
