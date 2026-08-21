@@ -296,6 +296,17 @@ li.suburl[aria-selected="true"] {
   color: var(--danger);
 }
 
+/* Opsætningsafsnittet er den eneste vej videre når hosten mangler, så det må
+   ikke ligne endnu en fejltekst. Knappen fylder bredden — der er intet andet
+   at lave i popup'en i den tilstand. */
+#setup .hint {
+  padding: 0 0 0.6rem;
+}
+
+#setup button {
+  width: 100%;
+}
+
 section {
   padding: 0.6rem;
   border-top: 1px solid var(--border);

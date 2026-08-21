@@ -29,20 +29,39 @@ holds it in memory until the idle lock expires.
 
 ## Install
 
-1. **Register the host** (once per machine, and again after moving the binary):
+The full walkthrough — including the Linux and macOS pitfalls — is
+[`docs/install-browser.md`](../docs/install-browser.md), mirrored at
+[deltasync.bjoerck-braun.dk/firefox.html](https://deltasync.bjoerck-braun.dk/firefox.html),
+which is where the popup's setup buttons point. The short version:
+
+1. **Register a database.** A server is not required: `add-local` registers a
+   `.kdbx` for search only, and nothing about it is uploaded anywhere.
+
+   ```
+   keepass-deltasync add-local mydb ~/Documents/passwords.kdbx
+   ```
+
+   Add `--save-password` to keep the masterpassword in the OS keyring, so the
+   popup does not ask for it. If you sync the database with a server, you will
+   have run `init` instead — that works the same for search.
+
+2. **Register the host** (once per machine, and again after moving the binary):
 
    ```
    keepass-deltasync install-browser-host
    ```
 
-   Add `--dry-run` first if you want to see exactly what it writes.
+   Add `--dry-run` first if you want to see exactly what it writes. On Linux
+   this covers a packaged, a snap and a flatpak Firefox, and the command prints
+   which ones it found. A flatpak Firefox additionally needs
+   `flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox`.
 
-2. **Load the extension.** Until it is signed, use a temporary install:
+3. **Load the extension.** Until it is signed, use a temporary install:
    open `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* →
    pick `extension/manifest.json`. Temporary add-ons disappear when Firefox
    restarts.
 
-3. **Restart Firefox** so it picks up the native messaging manifest.
+4. **Restart Firefox** so it picks up the native messaging manifest.
 
 ## Use
 
@@ -86,7 +105,9 @@ main URL. Protected custom fields are skipped even when they look like a URL.
 
 **"cannot start the native host"** — the manifest is missing or points at a
 binary that has moved. Re-run `keepass-deltasync install-browser-host` and
-restart Firefox.
+restart Firefox. Note what it prints: the list of Firefox variants it
+registered with is the answer to whether it found *your* Firefox. A snap or
+flatpak installed after the fact needs the command run again.
 
 **Nothing happens after a sync** — the host watches the `.kdbx` and re-indexes
 automatically. If the database has no keyring entry and the idle lock has

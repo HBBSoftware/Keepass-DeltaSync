@@ -16,7 +16,18 @@ const els = {
   password: document.getElementById("password"),
   footerStatus: document.getElementById("footer-status"),
   lock: document.getElementById("lock"),
+  setup: document.getElementById("setup"),
+  setupText: document.getElementById("setup-text"),
+  setupButton: document.getElementById("setup-button"),
 };
+
+// Vejledningen bor på nettet, ikke herinde. Den skal kunne rettes når en
+// Firefox-indpakning flytter sine stier — og en signeret udvidelse kan ikke
+// rettes uden en ny gennemgang hos AMO. Derfor er URL'erne det eneste faste.
+// Ankrene svarer til de to blindgyder popup'en kan havne i.
+const SETUP_URL = "https://deltasync.bjoerck-braun.dk/firefox.html";
+const SETUP_HOST_URL = SETUP_URL + "#host";
+const SETUP_DATABASE_URL = SETUP_URL + "#standalone";
 
 let hits = [];
 // Markeringen er en identitet, ikke et indeks i den viste liste: `hit` peger
@@ -55,25 +66,56 @@ function showHint(text, isError = false) {
   els.empty.classList.toggle("error", isError);
 }
 
+// showSetup er den ene tilstand hvor popup'en ikke kan hjælpe med noget som
+// helst: enten mangler hosten, eller også er der ingen database at søge i.
+// Begge dele løses uden for browseren, så det eneste nyttige vi kan gøre er
+// at pege på vejledningen.
+function showSetup(text, label, url) {
+  els.setupText.textContent = text;
+  els.setupButton.textContent = label;
+  els.setupButton.dataset.url = url;
+  els.setup.hidden = false;
+  els.query.disabled = true;
+  els.lock.hidden = true;
+  els.unlock.hidden = true;
+}
+
+els.setupButton.addEventListener("click", () => {
+  browser.tabs.create({ url: els.setupButton.dataset.url || SETUP_URL });
+  window.close();
+});
+
 async function refresh() {
   let status;
   try {
     status = await send({ type: "status" });
   } catch (err) {
-    // Den typiske årsag er at hosten ikke er installeret endnu — så er en
-    // konkret kommando mere brugbar end fejlteksten alene.
-    showHint(
-      `${err.message || err}. Run "keepass-deltasync install-browser-host" and restart Firefox.`,
-      true
+    // Den typiske årsag er at hosten ikke er installeret endnu. Fejlteksten
+    // alene efterlader brugeren uden noget at gøre ved det, så den får
+    // vejledningen med.
+    showHint(`${err.message || err}.`, true);
+    showSetup(
+      "Firefox cannot reach the keepass-deltasync host. It has to be installed and registered once, outside the browser.",
+      "How to set it up",
+      SETUP_HOST_URL
     );
     return;
   }
+
+  els.setup.hidden = true;
 
   const unlocked = status.databases.filter((db) => db.unlocked);
   const locked = status.databases.filter((db) => !db.unlocked);
 
   if (status.databases.length === 0) {
-    showHint("No databases are registered. Run \"keepass-deltasync init\" first.", true);
+    // Hosten svarer, så installationen er i orden — der er bare ikke peget
+    // på en .kdbx endnu. Det er en anden opgave og en anden knap.
+    showHint("");
+    showSetup(
+      "The host is running, but no database is registered yet. Point it at your .kdbx with \"keepass-deltasync add-local\".",
+      "How to add a database",
+      SETUP_DATABASE_URL
+    );
     return;
   }
 
