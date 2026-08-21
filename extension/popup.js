@@ -374,7 +374,22 @@ els.results.addEventListener("auxclick", (event) => {
 // markeringen — så peger man på en række, bliver den markeret.
 // Underrækkerne dukker op UNDER den række markøren står på, så den
 // flytter sig ikke væk under fingeren.
-els.results.addEventListener("mouseover", (event) => {
+//
+// Det SKAL være mousemove og ikke mouseover. move() bygger listen om, og
+// browseren sender mouseover på det element der derefter ligger under en helt
+// stillestående markør — også når markøren ikke har flyttet sig en pixel.
+// Med mouseover satte den markeringen tilbage til den række musen tilfældigvis
+// pegede på, umiddelbart efter at pilen havde flyttet den, og pil op/ned så
+// derfor død ud så længe markøren stod over popup'en. scrollIntoView() i
+// render() udløser det samme. mousemove sendes kun ved faktisk bevægelse.
+let lastPointer = { x: null, y: null };
+
+els.results.addEventListener("mousemove", (event) => {
+  // Belt and braces: samme koordinat er ikke en bevægelse, uanset hvad der
+  // måtte have udløst eventet.
+  if (event.clientX === lastPointer.x && event.clientY === lastPointer.y) return;
+  lastPointer = { x: event.clientX, y: event.clientY };
+
   const li = event.target.closest("li[data-hit]");
   if (!li) return;
   const next = selectionOf(li);
