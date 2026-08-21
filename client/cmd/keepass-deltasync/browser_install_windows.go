@@ -30,14 +30,6 @@ func hostDataDir() (string, error) {
 	return filepath.Join(base, "keepass-deltasync"), nil
 }
 
-func nativeManifestPath() (string, error) {
-	dir, err := hostDataDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, hostName+".json"), nil
-}
-
 // launcherScript er en .bat, fordi Firefox' manifest ikke kan sende
 // argumenter med til programmet — og vores host er en subkommando.
 // %* videresender manifest-stien Firefox selv tilføjer.
@@ -54,7 +46,23 @@ func launcherScript(exe string) string {
 		"\"" + exe + "\" browser-host %*\r\n"
 }
 
-func registerManifest(manifestPath string) error {
+// hostTargets — Windows har kun ét mål. Manifestets placering er ligegyldig
+// (registry-nøglen peger på den), så den ligger sammen med launcheren.
+func hostTargets(exe string) ([]hostTarget, error) {
+	dir, err := hostDataDir()
+	if err != nil {
+		return nil, err
+	}
+	return []hostTarget{{
+		Label:    "Firefox",
+		Manifest: filepath.Join(dir, hostName+".json"),
+		Launcher: filepath.Join(dir, launcherFileName),
+		Script:   launcherScript(exe),
+		Detected: true,
+	}}, nil
+}
+
+func registerManifest(t hostTarget) error {
 	key, _, err := registry.CreateKey(registry.CURRENT_USER, registryKeyPath, registry.SET_VALUE)
 	if err != nil {
 		return fmt.Errorf("create registry key HKCU\\%s: %w", registryKeyPath, err)
@@ -62,7 +70,7 @@ func registerManifest(manifestPath string) error {
 	defer key.Close()
 
 	// Firefox læser manifest-stien fra nøglens default-værdi (tomt navn).
-	if err := key.SetStringValue("", manifestPath); err != nil {
+	if err := key.SetStringValue("", t.Manifest); err != nil {
 		return fmt.Errorf("set registry value: %w", err)
 	}
 	return nil
@@ -76,6 +84,6 @@ func unregisterManifest() error {
 	return nil
 }
 
-func registrationHint(manifestPath string) string {
-	return fmt.Sprintf("registry: HKCU\\%s (default) = %s", registryKeyPath, manifestPath)
+func registrationHint(t hostTarget) string {
+	return fmt.Sprintf("registry: HKCU\\%s (default) = %s", registryKeyPath, t.Manifest)
 }
