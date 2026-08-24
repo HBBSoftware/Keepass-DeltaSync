@@ -45,9 +45,24 @@ path you install from, so a binary that later moves out of `~/Downloads` stops
 working.
 
 - **Windows** — the
-  [installer](https://gitlab.com/Star95/keepass-deltasync/-/releases) puts both
-  the GUI and the command-line program in `Program Files`. If you only want the
-  command-line program, take the `.zip` instead and unpack it somewhere stable.
+  [installer](https://gitlab.com/Star95/keepass-deltasync/-/releases) puts the
+  GUI and the command-line program in the same folder, and **where that is
+  depends on the install you picked**:
+
+  | You installed | The folder is |
+  |---|---|
+  | *Just for me* — the default, no administrator prompt | `%LOCALAPPDATA%\Programs\KeePass Delta-Sync\` |
+  | *For all users* | `C:\Program Files\KeePass Delta-Sync\` |
+
+  `keepass-deltasync.exe` in there is the program every command on this page
+  means; `keepass-deltasync-gui.exe` beside it is the window with the buttons,
+  and it does not cover the Firefox setup. **Neither is on your `PATH`** — the
+  next section is how to run one anyway. Not sure which install you have? Paste
+  `%LOCALAPPDATA%\Programs\KeePass Delta-Sync` into Explorer's address bar; if
+  that folder does not exist, it is the `Program Files` one.
+
+  If you only want the command-line program, take the `.zip` instead and unpack
+  it somewhere stable.
 - **Linux** — unpack the `.tar.gz` and move the binary to `~/bin` or
   `/usr/local/bin`. Avoid `~/.local/bin` if your Firefox is a snap: a confined
   Firefox cannot reach dot-directories in your home.
@@ -63,6 +78,34 @@ Only `linux/amd64`, `darwin/amd64`, `darwin/arm64` and `windows/amd64` are
 built. On anything else — ARM Linux, for instance — build from source; it is a
 plain `go build`.
 
+## Where to type the commands
+
+Steps 2 and 3 are the same commands everywhere. What differs is getting a
+terminal that can see the program.
+
+**Windows.** Open the folder from the table above in Explorer, then click the
+address bar, type `powershell` and press Enter. A terminal opens *in that
+folder*, and the commands work with a `.\` in front:
+
+```
+.\keepass-deltasync.exe add-local mydb C:\Users\you\Documents\passwords.kdbx
+```
+
+To run them from anywhere instead, put the path in a variable once — this is
+the same folder, written so PowerShell fills it in for you:
+
+```powershell
+$kp = "$env:LOCALAPPDATA\Programs\KeePass Delta-Sync\keepass-deltasync.exe"
+& $kp add-local mydb C:\Users\you\Documents\passwords.kdbx
+```
+
+For an all-users install, that path is
+`"$env:ProgramFiles\KeePass Delta-Sync\keepass-deltasync.exe"`.
+
+**Linux and macOS.** Any terminal will do, as long as the binary is somewhere
+on your `PATH` — that is what moving it to `~/bin` or `/usr/local/bin` in step
+1 was for. Otherwise call it by its full path.
+
 ## Prefer a menu?
 
 Steps 2 and 3 both exist in the built-in menu, so you do not have to remember
@@ -72,6 +115,7 @@ any of it:
 keepass-deltasync tui
 ```
 
+— or `.\keepass-deltasync.exe tui` in the terminal you just opened on Windows.
 Pick **Firefox search**. It is there whether or not you have an account. The
 rest of this page spells the same steps out as commands.
 
@@ -105,12 +149,17 @@ The command prints every Firefox it registered with. Add `--dry-run` first if
 you want to see exactly what it would write, without writing it.
 
 On Windows this touches only `HKCU` and `%LOCALAPPDATA%` — no administrator
-rights. If you installed via the installer, `keepass-deltasync` is not on your
-`PATH`; run it from its own directory, or use the full path in quotes:
+rights. Run it the same way as step 2, from the folder itself:
 
 ```
-"C:\Program Files\KeePass Delta-Sync\keepass-deltasync.exe" install-browser-host
+.\keepass-deltasync.exe install-browser-host
 ```
+
+**Run the copy you mean to keep.** The registration writes down the path of the
+executable it was started from. Register from a downloaded `.zip` and later
+install the installer's copy — or the other way round — and Firefox still
+points at the first one. Running `install-browser-host` from the copy you keep
+overwrites the registration.
 
 ### Linux: there is more than one Firefox
 
