@@ -8,21 +8,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **A Firefox section in the GUI** (`gui/`) — the extension stands or falls on
-  two commands, `add-local` and `install-browser-host`, and both existed only
-  on the command line. That is the wrong way round: the user who would rather
-  not open a terminal is exactly the user who installs a program with windows
-  and buttons, and on Windows the installer does not put the client on `PATH`
-  either. The new tab carries both steps, a *Test* button per database that
-  prints the index the browser would actually receive (`browser-host --probe`),
-  a dry run of the registration, the uninstall, and a link to the setup guide.
-  It also states, at the bottom, **where the command-line program is** — the
-  concrete dead end behind this: the program was installed, the guide said to
-  run `keepass-deltasync add-local`, and nothing anywhere said where that file
-  was. The wizard gains a way in, too, because search needs no account and a
-  welcome screen whose only offer is to get one answers a question the user
-  did not ask.
-
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
@@ -102,6 +87,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
+  was hard to read against the near-black dark-theme background, affecting
+  links, switches and buttons. A `values-night` override lightens it to
+  `#A8C7FF`.
+
+## [gui/v0.3.4] — 2026-08-24
+
+The release that makes the app start. Everything below the first entry was
+already written; none of it reached anyone, because the two releases before
+this one shipped a binary that could not launch on a machine that had not
+built it.
+
+### Fixed
+
+- **The Windows app did not start: `libssp-0.dll` was not found.** The
+  cross-build linked Debian mingw-w64's stack-protector library dynamically,
+  and that file exists on no user's machine — so `gui/v0.3.2` and `gui/v0.3.3`
+  both shipped an app that failed before drawing a window. Reported from a
+  clean Windows Sandbox install. `-static` now pulls gcc's own runtime into the
+  binary; Windows' own DLLs are imported exactly as before. The command-line
+  client was never affected — it is pure Go, built with `CGO_ENABLED=0`, which
+  is why running the commands by hand worked while the app did not. CI now
+  reads the import table after packaging and fails on any `lib*.dll`, because a
+  build that succeeds while producing an unstartable program is not a failure
+  the user should be the first to find.
+
 - **A local-only database appeared in the GUI as a database named `L`.** The
   list parser knew the `*` and `?` markers and nothing else, so the `L` that
   `add-local` introduced was read as the name, the name as the ID, and the path
@@ -110,16 +121,38 @@ project adheres to [Semantic Versioning](https://semver.org/).
   only)` fills the ID column, and without one, where the columns are name and
   path alone.
 
-- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
-  was hard to read against the near-black dark-theme background, affecting
-  links, switches and buttons. A `values-night` override lightens it to
-  `#A8C7FF`.
+- **The wizard's bottom button was clipped.** Adding a third way out of the
+  welcome screen gave it a third row of buttons, and the layout pushes them
+  flush to the window's edge — so the last one was cut off. The two secondary
+  buttons now share a row, and a closing spacer keeps the block off the edge at
+  any window height.
+
+### Added
+
+- **A Firefox section in the GUI** (`gui/`) — the extension stands or falls on
+  two commands, `add-local` and `install-browser-host`, and both existed only
+  on the command line. That is the wrong way round: the user who would rather
+  not open a terminal is exactly the user who installs a program with windows
+  and buttons, and on Windows the installer does not put the client on `PATH`
+  either. The new tab carries both steps, a *Test* button per database that
+  prints the index the browser would actually receive (`browser-host --probe`),
+  a dry run of the registration, the uninstall, and a link to the setup guide.
+  It also states, at the bottom, **where the command-line program is** — the
+  concrete dead end behind this: the program was installed, the guide said to
+  run `keepass-deltasync add-local`, and nothing anywhere said where that file
+  was. The wizard gains a way in, too, because search needs no account and a
+  welcome screen whose only offer is to get one answers a question the user
+  did not ask.
 
 ## [gui/v0.3.3] — 2026-08-24
 
 The application is unchanged from 0.3.2. This release exists to re-cut the
 Windows installer, because the command-line client it bundles was older than
 the extension that depends on it.
+
+**Superseded by 0.3.4:** the Windows app in this release still cannot start —
+see the `libssp-0.dll` entry there. The command-line client inside the
+installer is fine, and was the point of the release.
 
 ### Fixed
 

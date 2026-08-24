@@ -37,14 +37,20 @@ func (u *ui) showWizard() {
 	firefox := widget.NewButton(L.WizardFirefox, func() { u.showFirefoxStandalone() })
 	firefox.Importance = widget.LowImportance
 
+	// De to sekundære veje deler én linje. Hver sin linje kostede en tredje
+	// knaprække, og den nederste blev klippet af vinduets kant — VBox'ens
+	// spacer skubber knapperne helt ned, så der er ingen margen at tage af.
+	// Den afsluttende spacer er af samme grund: med spacere i begge ender
+	// deles den ledige plads, og knapperne kan ikke ende klods op ad kanten
+	// uanset hvor højt vinduet er.
 	card := container.NewVBox(
 		title,
 		widget.NewSeparator(),
 		body,
 		layout.NewSpacer(),
 		container.NewHBox(layout.NewSpacer(), start, layout.NewSpacer()),
-		container.NewHBox(layout.NewSpacer(), advanced, layout.NewSpacer()),
-		container.NewHBox(layout.NewSpacer(), firefox, layout.NewSpacer()),
+		container.NewHBox(layout.NewSpacer(), advanced, firefox, layout.NewSpacer()),
+		layout.NewSpacer(),
 	)
 	u.win.SetContent(container.NewPadded(card))
 }
