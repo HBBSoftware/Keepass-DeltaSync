@@ -8,17 +8,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **A setup button in the extension's popup** (0.2.0, corrected in 0.2.1) —
-  the two dead ends
-  ("cannot start the native host" and "no databases are registered") now say
-  what is wrong in a sentence and offer a button to the setup guide, instead of
-  printing a raw CLI command. The guide deliberately lives outside the
-  extension: a signed add-on cannot be corrected without another AMO review,
-  and sandbox paths are exactly the kind of instruction that goes stale.
-  0.2.0 was packaged from a stale `dist/` build whose buttons still opened the
-  repository's markdown file rather than the guide's `#host` / `#standalone`
-  anchors; 0.2.1 ships the intended constants and nothing else.
-
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
@@ -98,6 +87,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
+  was hard to read against the near-black dark-theme background, affecting
+  links, switches and buttons. A `values-night` override lightens it to
+  `#A8C7FF`.
+
+## [extension/v0.2.1] — 2026-08-24
+
+Two corrections to what 0.2.0 put in front of users, and the first extension
+release whose package was checked against the tree it claims to come from.
+
+### Added
+
+- **A setup button in the extension's popup** (0.2.0, corrected in 0.2.1) —
+  the two dead ends
+  ("cannot start the native host" and "no databases are registered") now say
+  what is wrong in a sentence and offer a button to the setup guide, instead of
+  printing a raw CLI command. The guide deliberately lives outside the
+  extension: a signed add-on cannot be corrected without another AMO review,
+  and sandbox paths are exactly the kind of instruction that goes stale.
+  0.2.0 was packaged from a stale `dist/` build whose buttons still opened the
+  repository's markdown file rather than the guide's `#host` / `#standalone`
+  anchors; 0.2.1 ships the intended constants and nothing else.
+
+### Fixed
+
 - **Arrow keys in the extension popup while the pointer rests over it** — the
   result list selected on `mouseover`, and moving the selection rebuilds that
   list. The browser then fires `mouseover` on whatever element ends up under a
@@ -107,10 +121,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
   list now selects on `mousemove`, guarded against a repeat of the same
   coordinates, so only real movement moves the selection.
 
-- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
-  was hard to read against the near-black dark-theme background, affecting
-  links, switches and buttons. A `values-night` override lightens it to
-  `#A8C7FF`.
+- **0.2.0 shipped the wrong package.** The `.xpi` uploaded to AMO was built
+  from an older working tree, so both setup buttons opened the repository's
+  copy of the guide — a long markdown file, with no anchor for the dead end
+  the reader had actually hit. Downloading the signed file and diffing it
+  against the tree showed `popup.js` as the only real difference, `manifest.json`
+  aside, which AMO re-serialises when it signs. `dist/` is git-ignored scratch
+  and nothing stopped a stale build from being the newest file in it;
+  [`extension/amo-submission.md`](extension/amo-submission.md) now carries the
+  check that catches it in ten seconds.
 
 ## [client/v1.8.0] — 2026-08-24
 
@@ -178,6 +197,23 @@ Nothing about syncing changed, and no existing command behaves differently.
   searching needs no account, so a menu whose only offer is to get one was
   answering a question nobody asked. The masterpassword checkbox prompts in the
   suspended terminal, the same way sync's prompt already does.
+
+### Fixed
+
+- **`install-browser-host` no longer registers with a Firefox that is not
+  there.** Detection asked the very directory the command writes into —
+  `~/.var/app/org.mozilla.firefox` for flatpak, `~/snap/firefox` for snap —
+  and both are user data that outlives the package: `flatpak uninstall` keeps
+  them without `--delete-data`, `snap remove` leaves `~/snap/<name>` behind,
+  and on KDE plasma-browser-integration creates the flatpak one unprompted.
+  The Linux test run on 2026-08-22 hit it: `flatpak list --app` was empty,
+  while the command reported two variants and told the user to run a
+  `flatpak override` for an app they did not have. Detection now asks flatpak
+  and snapd through their own deploy directories, which disappear with the
+  package; the manifest still goes where Firefox reads it. All three targets
+  stay in the list with a `Detected` flag, so `uninstall-browser-host` can
+  still clean up after a variant removed since registration, and `--all`
+  covers an unusual layout.
 
 ### Changed
 

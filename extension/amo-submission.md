@@ -36,7 +36,10 @@ They now open the setup guide itself, at the section for the dead end you hit:
 one for a host Firefox cannot reach, one for a database that has not been
 registered yet.
 
-Nothing else differs from 0.2.0.
+The arrow keys also work again while the mouse is resting over the popup. The
+list used to select on mouseover, and moving the selection rebuilds the list —
+so the browser fired mouseover on whatever landed under a stationary pointer
+and put the selection straight back. It now selects on real movement only.
 ```
 
 ## Notes to Reviewer — 0.2.1
@@ -52,8 +55,12 @@ specific dead end. They now open
 https://deltasync.bjoerck-braun.dk/firefox.html at "#host" or "#standalone".
 
 Both URLs are hard-coded constants; nothing decides them at runtime, and no
-remote page is loaded into the extension. popup.js is the only file that
-differs from 0.2.0.
+remote page is loaded into the extension.
+
+The same file also carries one bug fix: the result list selected on mouseover,
+which reverted the selection whenever the arrow keys moved it under a
+stationary pointer, so it now selects on mousemove instead. popup.js is the
+only file that differs from 0.2.0.
 
 TESTING IT WITHOUT INSTALLING ANYTHING
 
