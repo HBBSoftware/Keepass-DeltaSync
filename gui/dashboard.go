@@ -25,6 +25,8 @@ func (u *ui) showDashboard() {
 	debugf("showDashboard: databasesTab built")
 	devTab := u.devicesTab()
 	debugf("showDashboard: devicesTab built")
+	ffTab := u.firefoxTab()
+	debugf("showDashboard: firefoxTab built")
 	actTab := u.activityTab()
 	debugf("showDashboard: activityTab built")
 	lgTab := u.logTab()
@@ -37,6 +39,7 @@ func (u *ui) showDashboard() {
 	tabs := container.NewAppTabs(
 		container.NewTabItem(L.TabDatabases, topPad(dbTab)),
 		container.NewTabItem(L.TabDevices, topPad(devTab)),
+		container.NewTabItem(L.TabFirefox, topPad(ffTab)),
 		container.NewTabItem(L.TabActivity, topPad(actTab)),
 		container.NewTabItem(L.TabLog, topPad(lgTab)),
 		container.NewTabItem(L.TabAdmin, topPad(adTab)),
@@ -58,6 +61,7 @@ func (u *ui) showDashboard() {
 	u.refreshStatus()
 	u.refreshDatabases()
 	u.refreshDevices()
+	u.refreshFirefox()
 	debugf("showDashboard: refresh kicked off")
 }
 

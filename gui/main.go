@@ -41,6 +41,11 @@ type ui struct {
 	devInfo *widget.Label
 	devHint *widget.Label // hover-hint-linje nederst
 
+	// Firefox-fanen: opsætningen af søgeudvidelsen — hvilke databaser den
+	// ville kunne søge i, og de to kommandoer der skal køres én gang.
+	ffBox  *fyne.Container
+	ffInfo *widget.Label
+
 	// Log-fanen: serverens audit-log (`keepass-deltasync log`) som en liste,
 	// med en periode-vælger der styrer --since.
 	logBox   *fyne.Container

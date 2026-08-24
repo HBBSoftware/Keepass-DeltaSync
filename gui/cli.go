@@ -165,6 +165,7 @@ type database struct {
 	Created   string
 	LocalPath string
 	Bound     bool // markør '*' = bundet lokalt, klar til sync
+	LocalOnly bool // markør 'L' = `add-local`, søgbar men uden server
 }
 
 var multiSpace = regexp.MustCompile(` {2,}`)
@@ -175,6 +176,11 @@ var multiSpace = regexp.MustCompile(` {2,}`)
 //	   NAME       ID        CREATED               LOCAL PATH
 //	*  personal   2f3a…     2026-06-01T09:00:00Z  C:\Users\…\my.kdbx
 //	?  shared     9c1b…     2026-06-02T10:00:00Z  (not bound locally)
+//	L  private    (local only)                    C:\Users\…\private.kdbx
+//
+// 'L' er `add-local`: registreret til søgning fra Firefox-udvidelsen, uden
+// server. Uden enrollment printer CLI'en kun de rækker, og så har tabellen
+// hverken ID- eller CREATED-kolonne — begge former håndteres her.
 func (c *cli) databases(ctx context.Context) ([]database, result) {
 	r := c.run(ctx, "", "databases")
 	if r.Err != nil {
@@ -201,12 +207,24 @@ func (c *cli) databases(ctx context.Context) ([]database, result) {
 		case strings.HasPrefix(strings.TrimSpace(t), "?"):
 			marker = "?"
 			rest = strings.TrimPrefix(strings.TrimSpace(t), "?")
+		case strings.HasPrefix(strings.TrimSpace(t), "L "):
+			marker = "L"
+			rest = strings.TrimPrefix(strings.TrimSpace(t), "L")
 		}
 		fields := multiSpace.Split(strings.TrimSpace(rest), 4)
 		if len(fields) < 2 {
 			continue
 		}
-		db := database{Name: fields[0], Bound: marker == "*"}
+		db := database{Name: fields[0], Bound: marker == "*", LocalOnly: marker == "L"}
+		if db.LocalOnly {
+			// Lokal-kun har hverken ID eller oprettelsesdato. Med enrollment
+			// står "(local only)" i ID-kolonnen for at holde tabellen ret;
+			// uden enrollment er stien allerede kolonne 2. Sidste felt er
+			// stien i begge tilfælde.
+			db.LocalPath = fields[len(fields)-1]
+			out = append(out, db)
+			continue
+		}
 		if len(fields) >= 2 {
 			db.ID = fields[1]
 		}
@@ -446,6 +464,49 @@ func (c *cli) push(ctx context.Context, name, masterPassword string) result {
 // download/merge fra serveren. Flaget SKAL stå før <name>.
 func (c *cli) pull(ctx context.Context, name, masterPassword string) result {
 	return c.run(ctx, masterPassword+"\n", "pull", "--password-stdin", name)
+}
+
+// addLocal spejler `add-local <navn> <fil.kdbx>` — registrerer en .kdbx til
+// søgning ALENE: ingen server, ingen konto, intet uploadet. Det er den vej
+// Firefox-udvidelsen har brug for.
+//
+// Er masterPassword ikke tomt, sendes det på stdin med --password-stdin, som
+// implicerer --save-password. GUI'en kan IKKE bruge --save-password alene:
+// dens prompt ville lande i den konsol vi netop har skjult, og programmet
+// ville se ud til at hænge. Flaget står før de positionelle argumenter efter
+// husreglen.
+func (c *cli) addLocal(ctx context.Context, name, kdbxPath, masterPassword string) result {
+	if masterPassword != "" {
+		return c.run(ctx, masterPassword+"\n", "add-local", "--password-stdin", name, kdbxPath)
+	}
+	return c.run(ctx, "", "add-local", name, kdbxPath)
+}
+
+// installBrowserHost spejler `install-browser-host`. dryRun printer hvad der
+// ville blive skrevet uden at røre noget — og er samtidig den eneste måde at
+// få listen over hvilke Firefox-varianter maskinen har.
+func (c *cli) installBrowserHost(ctx context.Context, dryRun bool) result {
+	if dryRun {
+		return c.run(ctx, "", "install-browser-host", "--dry-run")
+	}
+	return c.run(ctx, "", "install-browser-host")
+}
+
+// uninstallBrowserHost spejler `uninstall-browser-host` — fjerner registreringen
+// for hver Firefox-variant, også dem der er afinstalleret siden.
+func (c *cli) uninstallBrowserHost(ctx context.Context) result {
+	return c.run(ctx, "", "uninstall-browser-host")
+}
+
+// browserProbe spejler `browser-host --probe <navn>`: bygger indekset og
+// printer det som JSON uden browser i spillet. Det er præcis de felter
+// udvidelsen ville få — uuid, titel, URL'er og gruppesti — og dermed svaret på
+// både "virker opsætningen" og "hvad ser browseren egentlig".
+func (c *cli) browserProbe(ctx context.Context, name, masterPassword string) result {
+	if masterPassword != "" {
+		return c.run(ctx, masterPassword+"\n", "browser-host", "--probe", name, "--password-stdin")
+	}
+	return c.run(ctx, "", "browser-host", "--probe", name)
 }
 
 // deleteDatabase spejler `keepass-deltasync delete-database <id-eller-navn>` —

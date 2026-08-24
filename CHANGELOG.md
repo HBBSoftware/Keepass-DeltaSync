@@ -8,6 +8,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A Firefox section in the GUI** (`gui/`) — the extension stands or falls on
+  two commands, `add-local` and `install-browser-host`, and both existed only
+  on the command line. That is the wrong way round: the user who would rather
+  not open a terminal is exactly the user who installs a program with windows
+  and buttons, and on Windows the installer does not put the client on `PATH`
+  either. The new tab carries both steps, a *Test* button per database that
+  prints the index the browser would actually receive (`browser-host --probe`),
+  a dry run of the registration, the uninstall, and a link to the setup guide.
+  It also states, at the bottom, **where the command-line program is** — the
+  concrete dead end behind this: the program was installed, the guide said to
+  run `keepass-deltasync add-local`, and nothing anywhere said where that file
+  was. The wizard gains a way in, too, because search needs no account and a
+  welcome screen whose only offer is to get one answers a question the user
+  did not ask.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
@@ -86,6 +101,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
   [`VERSIONING.md`](VERSIONING.md).
 
 ### Fixed
+
+- **A local-only database appeared in the GUI as a database named `L`.** The
+  list parser knew the `*` and `?` markers and nothing else, so the `L` that
+  `add-local` introduced was read as the name, the name as the ID, and the path
+  as the timestamp. It now recognises the marker, carries `LocalOnly` on the
+  row, and handles both shapes of the table — with a server, where `(local
+  only)` fills the ID column, and without one, where the columns are name and
+  path alone.
 
 - **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
   was hard to read against the near-black dark-theme background, affecting

@@ -30,6 +30,13 @@ func (u *ui) showWizard() {
 	advanced := widget.NewButton(L.WizardAdvanced, func() { u.showAdvancedEnroll() })
 	advanced.Importance = widget.LowImportance
 
+	// Søgning i Firefox kræver hverken konto eller server, så guiden må ikke
+	// være en blindgyde for den der kun vil dét. Uden denne knap er en konto
+	// det eneste vinduet tilbyder — og det er svar på et spørgsmål brugeren
+	// ikke har stillet.
+	firefox := widget.NewButton(L.WizardFirefox, func() { u.showFirefoxStandalone() })
+	firefox.Importance = widget.LowImportance
+
 	card := container.NewVBox(
 		title,
 		widget.NewSeparator(),
@@ -37,6 +44,7 @@ func (u *ui) showWizard() {
 		layout.NewSpacer(),
 		container.NewHBox(layout.NewSpacer(), start, layout.NewSpacer()),
 		container.NewHBox(layout.NewSpacer(), advanced, layout.NewSpacer()),
+		container.NewHBox(layout.NewSpacer(), firefox, layout.NewSpacer()),
 	)
 	u.win.SetContent(container.NewPadded(card))
 }

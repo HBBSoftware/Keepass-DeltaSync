@@ -23,6 +23,7 @@ func helpTexts() []string {
 	return []string{
 		L.HelpDatabases,
 		L.HelpDevices,
+		L.HelpFirefox,
 		L.HelpActivity,
 		L.HelpLog,
 		L.HelpAdmin,
@@ -33,7 +34,7 @@ func helpTexts() []string {
 // helpTitles er fanetitlen der vises (farvet) i panel-headeren — samme tekster
 // som selve fanerne, i samme rækkefølge.
 func helpTitles() []string {
-	return []string{L.TabDatabases, L.TabDevices, L.TabActivity, L.TabLog, L.TabAdmin, L.TabSettings}
+	return []string{L.TabDatabases, L.TabDevices, L.TabFirefox, L.TabActivity, L.TabLog, L.TabAdmin, L.TabSettings}
 }
 
 // helpIcons er et repræsentativt ikon pr. fane, i samme rækkefølge.
@@ -41,6 +42,7 @@ func helpIcons() []fyne.Resource {
 	return []fyne.Resource{
 		theme.StorageIcon(),  // Databaser
 		theme.ComputerIcon(), // Enheder
+		theme.SearchIcon(),   // Firefox
 		theme.ListIcon(),     // Aktivitet
 		theme.HistoryIcon(),  // Log
 		theme.AccountIcon(),  // Administration
