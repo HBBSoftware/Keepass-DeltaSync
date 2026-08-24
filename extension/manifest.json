@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DeltaSync — KeePass search & go",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Search your KeePass entries and open their website. Filling in credentials stays with KeePassXC-Browser.",
 
   "browser_specific_settings": {

@@ -129,10 +129,12 @@ En ny `install-browser-host` overskriver filen og fjerner linjen igen.
 
 ## Trin 4 — indlæs udvidelsen
 
-Den er ikke signeret endnu, så: `about:debugging#/runtime/this-firefox` →
-*Load Temporary Add-on…* → `extension/manifest.json`. ID'et ligger fast
-(`keepass-deltasync@hb-b.dk`), så en allerede indlæst udgave skal fjernes
-først. Gentag i hver Firefox-variant du tester.
+Planen tester bygget i `extension/`, ikke det signerede fra AMO, så:
+`about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* →
+`extension/manifest.json`. ID'et ligger fast (`keepass-deltasync@hb-b.dk`), så
+en allerede indlæst udgave — også en installeret fra
+[addons.mozilla.org](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/)
+— skal fjernes først. Gentag i hver Firefox-variant du tester.
 
 ## Trin 5 — det afgørende
 

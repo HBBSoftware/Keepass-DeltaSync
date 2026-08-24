@@ -56,10 +56,12 @@ which is where the popup's setup buttons point. The short version:
    which ones it found. A flatpak Firefox additionally needs
    `flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox`.
 
-3. **Load the extension.** Until it is signed, use a temporary install:
-   open `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* →
-   pick `extension/manifest.json`. Temporary add-ons disappear when Firefox
-   restarts.
+3. **Install the extension** from
+   [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/).
+   To run *this* copy instead, load it temporarily: open
+   `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* → pick
+   `extension/manifest.json`. The ID is fixed, so remove an installed copy
+   first; temporary add-ons disappear when Firefox restarts.
 
 4. **Restart Firefox** so it picks up the native messaging manifest.
 
@@ -124,7 +126,16 @@ This prints exactly what the extension would receive, as plain JSON.
 
 ## Distribution status
 
-The extension is not signed yet. The extension ID `keepass-deltasync@hb-b.dk`
-is baked into both `manifest.json` and the native messaging manifest's
-`allowed_extensions`, so it has to stay stable — see the open questions in the
-design document.
+Signed and listed on addons.mozilla.org as
+[DeltaSync — KeePass search & go](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/).
+0.2.1 is packaged and waiting to be uploaded: it corrects a 0.2.0 package that
+was built before the setup buttons got their final address. 0.2.0 went public
+on 2026-08-24, 79 seconds after upload: a listed update is
+signed and published as soon as automated validation passes, and the human
+review happens afterwards. The first listing is the slow one — 0.1.1's review
+took three days. Check `manifest.json` against the listed version anyway before
+assuming a user has a given fix.
+
+The extension ID `keepass-deltasync@hb-b.dk` is baked into both
+`manifest.json` and the native messaging manifest's `allowed_extensions`, so it
+has to stay stable — and now that AMO holds it, it cannot be changed at all.

@@ -135,9 +135,19 @@ firefox` answer it. Installing a different Firefox later means running
 
 ## 4. Install the extension
 
-The extension is not signed yet, so for now it has to be loaded temporarily:
-open `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* → pick
-`extension/manifest.json`. Temporary add-ons disappear when Firefox restarts.
+Install **DeltaSync — KeePass search & go** from addons.mozilla.org:
+
+[addons.mozilla.org/firefox/addon/deltasync-keepass-search-go](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/)
+
+It asks for two permissions — native messaging, to reach the host from step 3,
+and storage. It requests no host permissions and runs no content scripts, so it
+cannot see any page you visit.
+
+To run a build from this repository instead, load it temporarily: open
+`about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* → pick
+`extension/manifest.json`. The ID is fixed, so a copy installed from
+addons.mozilla.org has to be removed first, and temporary add-ons disappear
+when Firefox restarts.
 
 ---
 

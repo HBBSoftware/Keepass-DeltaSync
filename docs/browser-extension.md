@@ -247,7 +247,10 @@ adaptive-icon gør.
    Windows (registry-nøgle under HKCU på sidstnævnte).
 4. ✅ omnibox-keyword `kp` + Alt+Shift+K.
 5. ✅ `changed`-push via fsnotify, debounced.
-6. Udestår: signering og distribution, Chromium-manifest, Firefox for Android.
+6. ✅ Signering og distribution: udvidelsen er listet på AMO som
+   [DeltaSync — KeePass search & go](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/).
+   0.1.1 blev godkendt 2026-08-23, 0.2.0 den 2026-08-24. Udestår:
+   Chromium-manifest og Firefox for Android.
 
 Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
 
@@ -272,15 +275,26 @@ Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
    kommando. Teksten bor bevidst uden for udvidelsen: en signeret udvidelse kan
    ikke rettes uden en ny AMO-gennemgang, og netop disse stier flytter sig.
 
-Alt undtagen fase 6 er bygget. Live-test mod en rigtig database i Firefox
-mangler stadig.
+Alt er bygget, og 0.2.0 ligger signeret på AMO. Live-testen er kørt
+2026-08-24 i en ren Windows Sandbox: installer → `add-local` →
+`install-browser-host` → søgning i popup'en, hele kæden.
+
+**Følgen af at 0.2.0 er ude:** popup'ens blindgydetekst beder brugeren køre
+`keepass-deltasync add-local`, og den kommando findes i intet udgivet
+klient-build — hverken `client/v1.7.0` eller installerens `gui/v0.3.2`. En
+klient-udgivelse skal derfor følge lige efter.
 
 ## Åbne spørgsmål
 
-1. **Distribution** — AMO-signering, eller selvhostet signeret XPI som på
-   Obtainium-sporet for Android? AMO giver auto-opdatering gratis, men
-   review-kø; extension-ID'et skal ligge fast før fase 3, fordi det står i
-   native-manifestet.
+1. ~~**Distribution**~~ — **afgjort: AMO.** Indsendt 2026-08-19, 0.1.1
+   godkendt 2026-08-23 og 0.2.0 den 2026-08-24 under sluggen
+   `deltasync-keepass-search-go`. Brugerne
+   får auto-opdatering, og prisen er review-køen: en rettelse i udvidelsen er
+   ikke ude før en reviewer har set den. Derfor bor de tekster der flytter sig
+   — opsætningsstierne — på hjemmesiden og ikke i udvidelsen. CI's usignerede
+   .xpi bliver ved med at være der til permanent-install-sporet på Developer
+   Edition, Nightly og ESR. ID'et `keepass-deltasync@hb-b.dk` er nu bundet hos
+   AMO og kan ikke laves om.
 2. **Flere databaser** — ét fælles søgeresultat med db-badge, eller vælg én ad
    gangen? Forslag: ét fælles.
 3. **Idle-lock i fallback-tilstand** — 15 min, eller følge en eksisterende
