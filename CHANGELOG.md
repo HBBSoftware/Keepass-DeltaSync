@@ -92,6 +92,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [gui/v0.3.3] — 2026-08-24
+
+The application is unchanged from 0.3.2. This release exists to re-cut the
+Windows installer, because the command-line client it bundles was older than
+the extension that depends on it.
+
+### Fixed
+
+- **The installer shipped a client without `add-local`.** `gui/v0.3.2` was
+  built on 2026-08-20 and pairs the CLI from the newest `client/*` tag at the
+  time, which predates the command by a day. The Firefox extension is public
+  on addons.mozilla.org, its popup tells the user to run
+  `keepass-deltasync add-local`, and a fresh Windows install answered `unknown
+  command` — reproduced in Windows Sandbox on 2026-08-24, which is exactly
+  what a new user, or an AMO reviewer following the submission notes, would
+  have hit. The installer now carries client v1.8.0.
+
 ## [extension/v0.2.1] — 2026-08-24
 
 Two corrections to what 0.2.0 put in front of users, and the first extension
