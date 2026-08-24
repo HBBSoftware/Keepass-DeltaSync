@@ -8,50 +8,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **The Firefox extension works without a server** — `add-local <name>
-  <path.kdbx>` registers a database for local search only. Until now the sole
-  way into the client's config was `init`, which requires enrollment, so
-  someone who just wanted to find the right tab had to hand-edit
-  `config.toml`. The binding gets no `remote_id`, and every command that talks
-  to the server refuses it by name rather than sending an empty UUID; `daemon`
-  skips such databases instead of failing on them. The keyring is keyed on the
-  server UUID, which a local-only database does not have, so `add-local` mints
-  a local id for that slot — without it every local-only database would share
-  one keyring entry. `--save-password` verifies the masterpassword by opening
-  the database before storing it. `databases` no longer requires enrollment
-  when there is something local to show. See
-  [`docs/install-browser.md`](docs/install-browser.md).
-
-- **`install-browser-host` registers with every Firefox it finds.** On Linux
-  `~/.mozilla/native-messaging-hosts` is only correct for a packaged Firefox: a
-  snap reads `~/snap/firefox/common/…` and a flatpak reads
-  `~/.var/app/org.mozilla.firefox/…`. The command used to write one path and
-  print "Installed browser host for Firefox" regardless, leaving snap and
-  flatpak users with a success message, a file on disk, and an extension that
-  still could not start the host. It now writes one manifest and launcher per
-  detected variant, prints which ones, and carries the variant-specific catch:
-  the flatpak launcher goes through `flatpak-spawn --host` and prints the
-  `flatpak override` that the sandbox requires, the snap note explains why the
-  binary must stay out of dot-directories, and macOS prints the `xattr` command
-  that clears Gatekeeper's quarantine on a downloaded binary.
-  `uninstall-browser-host` cleans up every variant, including ones since
-  removed. `--all` installs for variants that are not present yet.
-
-- **A *Firefox search* section in the menu** (`keepass-deltasync tui`) —
-  `add-local` and `install-browser-host` were command-line only, which put the
-  whole search-only path behind flags the user who wants it least is least
-  likely to type. The section carries both, plus `--probe` to check the index
-  and the uninstall, and it is the one section shown **without enrollment**:
-  searching needs no account, so a menu whose only offer is to get one was
-  answering a question nobody asked. The masterpassword checkbox prompts in the
-  suspended terminal, the same way sync's prompt already does.
-
-- **A setup button in the extension's popup** (0.2.0) — the two dead ends
+- **A setup button in the extension's popup** (0.2.0, corrected in 0.2.1) —
+  the two dead ends
   ("cannot start the native host" and "no databases are registered") now say
   what is wrong in a sentence and offer a button to the setup guide, instead of
   printing a raw CLI command. The guide deliberately lives outside the
   extension: a signed add-on cannot be corrected without another AMO review,
   and sandbox paths are exactly the kind of instruction that goes stale.
+  0.2.0 was packaged from a stale `dist/` build whose buttons still opened the
+  repository's markdown file rather than the guide's `#host` / `#standalone`
+  anchors; 0.2.1 ships the intended constants and nothing else.
 
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
@@ -115,14 +81,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **Go toolchain requirement relaxed to `go 1.26.0`** — `client/go.mod`
-  declared `go 1.26.3`, an exact patch release that was simply whatever
-  toolchain happened to be installed when `go mod tidy` last ran. Nothing
-  needs that patch level, and it forced the F-Droid recipe to download a
-  prebuilt Go tarball from go.dev — which F-Droid rejects. Debian
-  trixie-backports ships `golang-go` 1.26, so the distribution's own package
-  now suffices. Verified with `GOTOOLCHAIN=go1.26.0`: build, vet and the full
-  test suite pass.
 - **F-Droid recipe reworked** per review feedback on
   [fdroiddata!41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661):
   Go is now built from source via fdroiddata's `go` srclib and `make.bash`,
@@ -144,6 +102,84 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [client/v1.8.0] — 2026-08-24
+
+The release that makes the Firefox extension usable. Everything the browser
+half needs lives in the client — the native messaging host, the registration,
+and a way to point at a `.kdbx` without an account — and until now the last of
+those did not exist as a command. A user who only wanted to *find* the right
+tab had to hand-edit `config.toml`, which is not an onboarding path.
+
+Nothing about syncing changed, and no existing command behaves differently.
+
+### Added
+
+- **`browser-host` — the native messaging host for the Firefox extension.**
+  The client half of the search-and-go feature: it opens the local `.kdbx`
+  through `keepassxc-cli`, builds a title-and-URL index, and answers the
+  extension over stdio. What it returns is an explicit allow-list — uuid,
+  title, URLs and group path — so no future bug in the extension can surface a
+  field the host never sent, and the masterpassword is read from the OS keyring
+  by the host rather than passing through Firefox. A database without a keyring
+  entry falls back to a prompt in the popup, held in memory under a 15-minute
+  idle lock. Entries in the recycle bin and in groups with searching disabled
+  are excluded, as are values that cannot be navigated to (`{REF:…}`
+  placeholders, `cmd://`, non-http schemes). The index is paged, because
+  Firefox caps a message from the host at 1 MB, and a `changed` push follows
+  the file through fsnotify so an edited database re-indexes by itself.
+  `--probe <name>` prints the whole index as JSON with no browser involved,
+  which is both the debugging harness and the way to verify the boundary
+  without taking anyone's word for it.
+
+- **The Firefox extension works without a server** — `add-local <name>
+  <path.kdbx>` registers a database for local search only. Until now the sole
+  way into the client's config was `init`, which requires enrollment, so
+  someone who just wanted to find the right tab had to hand-edit
+  `config.toml`. The binding gets no `remote_id`, and every command that talks
+  to the server refuses it by name rather than sending an empty UUID; `daemon`
+  skips such databases instead of failing on them. The keyring is keyed on the
+  server UUID, which a local-only database does not have, so `add-local` mints
+  a local id for that slot — without it every local-only database would share
+  one keyring entry. `--save-password` verifies the masterpassword by opening
+  the database before storing it. `databases` no longer requires enrollment
+  when there is something local to show. See
+  [`docs/install-browser.md`](docs/install-browser.md).
+
+- **`install-browser-host` registers with every Firefox it finds.** On Linux
+  `~/.mozilla/native-messaging-hosts` is only correct for a packaged Firefox: a
+  snap reads `~/snap/firefox/common/…` and a flatpak reads
+  `~/.var/app/org.mozilla.firefox/…`. The command used to write one path and
+  print "Installed browser host for Firefox" regardless, leaving snap and
+  flatpak users with a success message, a file on disk, and an extension that
+  still could not start the host. It now writes one manifest and launcher per
+  detected variant, prints which ones, and carries the variant-specific catch:
+  the flatpak launcher goes through `flatpak-spawn --host` and prints the
+  `flatpak override` that the sandbox requires, the snap note explains why the
+  binary must stay out of dot-directories, and macOS prints the `xattr` command
+  that clears Gatekeeper's quarantine on a downloaded binary.
+  `uninstall-browser-host` cleans up every variant, including ones since
+  removed. `--all` installs for variants that are not present yet.
+
+- **A *Firefox search* section in the menu** (`keepass-deltasync tui`) —
+  `add-local` and `install-browser-host` were command-line only, which put the
+  whole search-only path behind flags the user who wants it least is least
+  likely to type. The section carries both, plus `--probe` to check the index
+  and the uninstall, and it is the one section shown **without enrollment**:
+  searching needs no account, so a menu whose only offer is to get one was
+  answering a question nobody asked. The masterpassword checkbox prompts in the
+  suspended terminal, the same way sync's prompt already does.
+
+### Changed
+
+- **Go toolchain requirement relaxed to `go 1.26.0`** — `client/go.mod`
+  declared `go 1.26.3`, an exact patch release that was simply whatever
+  toolchain happened to be installed when `go mod tidy` last ran. Nothing
+  needs that patch level, and it forced the F-Droid recipe to download a
+  prebuilt Go tarball from go.dev — which F-Droid rejects. Debian
+  trixie-backports ships `golang-go` 1.26, so the distribution's own package
+  now suffices. Verified with `GOTOOLCHAIN=go1.26.0`: build, vet and the full
+  test suite pass.
 
 ## [gui/v0.3.2] — 2026-08-20
 
