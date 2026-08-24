@@ -450,12 +450,37 @@ build:gui:
       # Løsning: giv LINKEREN -fstack-protector, så gcc linker libssp.
       # -U_FORTIFY_SOURCE i CFLAGS undgår runtime/cgo's -Werror-fejl
       # "_FORTIFY_SOURCE redefined".
+      #
+      # -static er lige så nødvendigt som -fstack-protector: uden det linkes
+      # libssp DYNAMISK, og så starter programmet ikke på en maskine uden
+      # mingw — "libssp-0.dll blev ikke fundet", før det første vindue
+      # overhovedet tegnes. Det er dét 0.3.2 og 0.3.3 blev udgivet med.
+      # -static tager gcc's egne runtime-biblioteker med ind i binæren;
+      # Windows' egne DLL'er importeres uændret.
       echo "==> Packaging Windows"
       ( cd gui && CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc \
           CGO_CFLAGS="-U_FORTIFY_SOURCE" \
-          CGO_LDFLAGS="-fstack-protector" \
+          CGO_LDFLAGS="-fstack-protector -static" \
           fyne package -os windows )
       mv gui/*.exe "dist/keepass-deltasync-gui-${VERSION}-windows-amd64.exe"
+
+      # Vagt mod netop den fejl igen: en Windows-binær må kun importere DLL'er
+      # der FINDES på en ren Windows. Alt andet — libssp-0, libgcc_s_seh-1,
+      # libwinpthread-1 — er byggemaskinens eget mingw, og en bruger har det
+      # ikke. Fejlen viser sig først når programmet startes, hos brugeren, og
+      # aldrig i noget job her, så den skal fanges på importlisten.
+      echo "==> Checking Windows DLL imports"
+      IMPORTS="$(x86_64-w64-mingw32-objdump -p \
+          "dist/keepass-deltasync-gui-${VERSION}-windows-amd64.exe" \
+          | sed -n 's/^\tDLL Name: //p' | sort -u)"
+      echo "$IMPORTS"
+      FOREIGN="$(echo "$IMPORTS" | grep -i '^lib' || true)"
+      if [ -n "$FOREIGN" ]; then
+        echo "GUI'en importerer DLL'er fra byggemaskinens mingw:" >&2
+        echo "$FOREIGN" >&2
+        echo "Den ville fejle med 'blev ikke fundet' paa en ren Windows." >&2
+        exit 1
+      fi
     - cd dist && sha256sum keepass-deltasync-gui-* > SHA256SUMS-gui && cat SHA256SUMS-gui
   artifacts:
     name: "keepass-deltasync-gui-${CI_COMMIT_REF_SLUG}"
