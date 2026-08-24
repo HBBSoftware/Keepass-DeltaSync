@@ -22,6 +22,12 @@ Reminders that are not fields:
   before the setup buttons were pointed at `firefox.html`, so the published
   add-on opens the repository's markdown page instead — see 0.2.1 below.
   Verify before uploading: `grep SETUP_URL` on the popup.js inside the .xpi.
+- **Check the hash against the tag's release.** `package.sh` prints a sha256
+  and writes `dist/SHA256SUMS-extension`; the GitLab release for the tag
+  carries CI's. They must match — a local build and CI's are byte-identical
+  since `extension/*` is pinned to LF and `create_system` is pinned in
+  `package.sh`. If they differ, something in the tree is not what the tag
+  says, which is the same failure that shipped 0.2.0.
 
 ---
 

@@ -2,3 +2,11 @@
 # shebang line breaks execution).
 *.sh text eol=lf
 docker-entrypoint.sh text eol=lf
+
+# The extension's sources are shipped verbatim inside the .xpi, and package.sh
+# stamps fixed timestamps so two builds of the same tag are byte-identical.
+# That only holds if the bytes are the same to begin with: a Windows checkout
+# with core.autocrlf=true turns every LF into CRLF, and the .xpi built from it
+# differs from CI's by one byte per line — which is exactly the check anyone
+# verifying the package against the tag would run.
+extension/* text eol=lf

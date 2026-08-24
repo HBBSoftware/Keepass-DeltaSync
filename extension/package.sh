@@ -69,6 +69,11 @@ with zipfile.ZipFile(xpi_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as xp
         info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
         info.compress_type = zipfile.ZIP_DEFLATED
         info.external_attr = 0o644 << 16
+        # create_system defaults to the host: 0 on Windows, 3 elsewhere. It is
+        # one byte per entry in the central directory, and it was enough to
+        # make a Windows build differ from CI's while every file inside was
+        # identical. Pin it, or "byte-reproducible" only holds per platform.
+        info.create_system = 3
         with open(os.path.join(script_dir, name), "rb") as fh:
             xpi.writestr(info, fh.read())
 
