@@ -299,8 +299,8 @@ var dicts = map[lang]*dict{
 		WizardDone:       "Alt klar!",
 		WizardDoneBody:   "Du er klar til at synkronisere. Brug knappen 'Synkronisér' på en database for at sende og hente ændringer.",
 
-		WizardAdvanced:     "Avanceret (administrator)…",
-		WizardFirefox:      "Søg i Firefox — uden konto…",
+		WizardAdvanced:     "Avanceret (administrator)",
+		WizardFirefox:      "Søg i Firefox — uden konto",
 		FFIntro:            "Søg i dine KeePass-poster fra Firefox og hop til den rigtige side. Det kræver hverken konto eller server — kun to ting, én gang: peg programmet på din .kdbx, og registrér den hos Firefox. Selve udfyldningen af login lader vi KeePassXC-Browser om; udvidelsen ser aldrig et password.",
 		FFAddLocal:         "Registrér database…",
 		FFAddLocalTitle:    "Registrér database til søgning",
@@ -586,8 +586,8 @@ var dicts = map[lang]*dict{
 		WizardDone:       "All set!",
 		WizardDoneBody:   "You're ready to sync. Use the 'Sync' button on a database to send and fetch changes.",
 
-		WizardAdvanced:     "Advanced (administrator)…",
-		WizardFirefox:      "Search from Firefox — no account…",
+		WizardAdvanced:     "Advanced (administrator)",
+		WizardFirefox:      "Search from Firefox — no account",
 		FFIntro:            "Search your KeePass entries from Firefox and jump straight to the right site. It needs no account and no server — just two things, once: point the program at your .kdbx, and register it with Firefox. Filling in the login stays with KeePassXC-Browser; the extension never sees a password.",
 		FFAddLocal:         "Register database…",
 		FFAddLocalTitle:    "Register a database for search",

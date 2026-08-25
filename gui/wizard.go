@@ -27,15 +27,16 @@ func (u *ui) showWizard() {
 	start.Importance = widget.HighImportance
 
 	// Sekundær vej for administratorer: udsted token + tilmeld PC'en i ét hug.
+	// De to sekundære knapper står i standard-udgaven (grå knapflade) frem for
+	// LowImportance, som tegner ren tekst uden baggrund — uden flade lignede de
+	// ikke knapper, og så var det ikke til at se at der var noget at trykke på.
 	advanced := widget.NewButton(L.WizardAdvanced, func() { u.showAdvancedEnroll() })
-	advanced.Importance = widget.LowImportance
 
 	// Søgning i Firefox kræver hverken konto eller server, så guiden må ikke
 	// være en blindgyde for den der kun vil dét. Uden denne knap er en konto
 	// det eneste vinduet tilbyder — og det er svar på et spørgsmål brugeren
 	// ikke har stillet.
 	firefox := widget.NewButton(L.WizardFirefox, func() { u.showFirefoxStandalone() })
-	firefox.Importance = widget.LowImportance
 
 	// De to sekundære veje deler én linje. Hver sin linje kostede en tredje
 	// knaprække, og den nederste blev klippet af vinduets kant — VBox'ens
