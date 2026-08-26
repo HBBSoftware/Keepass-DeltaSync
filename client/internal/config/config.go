@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -141,6 +142,29 @@ func (d *Database) SecretID() string {
 func (d *Database) RecordEntryState(uuid, mtimeISO string) {
 	if d.EntryStates == nil {
 		d.EntryStates = make(map[string]string)
+	}
+	d.EntryStates[uuid] = mtimeISO
+}
+
+// RecordEntryStateIfNewer gemmer mtimeISO, men kun hvis den er SENERE end den
+// allerede registrerede værdi. Bruges på pull-siden.
+//
+// Staten betyder "den seneste version vi har set af dette objekt", og den må
+// aldrig rulle baglæns. Push registrerer laterTime(ModifiedAt, LocationChanged)
+// for at fange flytninger, mens serveren kun kender ModifiedAt. Uden denne
+// vagt ville et pull af vores eget push sætte staten tilbage til ModifiedAt,
+// hvorefter push-tjekket ville sige ja igen — og entry'en re-pushes for evigt.
+func (d *Database) RecordEntryStateIfNewer(uuid, mtimeISO string) {
+	if d.EntryStates == nil {
+		d.EntryStates = make(map[string]string)
+	}
+	if prev, ok := d.EntryStates[uuid]; ok {
+		prevT, perr := time.Parse(time.RFC3339, prev)
+		newT, nerr := time.Parse(time.RFC3339, mtimeISO)
+		// Korrupt gemt værdi: lad den nye overskrive, så vi recovers.
+		if perr == nil && nerr == nil && !newT.After(prevT) {
+			return
+		}
 	}
 	d.EntryStates[uuid] = mtimeISO
 }

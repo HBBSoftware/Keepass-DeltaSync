@@ -39,6 +39,12 @@ type StagingGroup struct {
 	CreatedAt       time.Time
 	ModifiedAt      time.Time
 	LocationChanged time.Time
+
+	// EnableSearching er KDBX' per-gruppe søgeflag; nil = arv fra forælder.
+	// Bæres med så et pull ikke nulstiller en gruppe brugeren har taget ud
+	// af søgeresultater. Wire-formatet (canonical.Group) kender ikke feltet,
+	// så det udfyldes kun fra det lokale gruppetræ.
+	EnableSearching *bool
 }
 
 // StagingDeletion er én tombstone der skal med i staging-databasens
@@ -176,7 +182,7 @@ func BuildStagingXMLWithGroups(entries []StagingEntry, groups []StagingGroup, de
 	// Root-gruppen matcher target's Root-UUID, så børn merges ind i Root.
 	buf.WriteString("    <Group>\n")
 	buf.WriteString("      <UUID>" + rootUUID + "</UUID>\n")
-	writeGroupHeader(&buf, "      ", "Root", "", 49, time.Time{}, time.Time{}, time.Time{}, now)
+	writeGroupHeader(&buf, "      ", "Root", "", 49, time.Time{}, time.Time{}, time.Time{}, now, nil)
 	visited := make(map[string]bool)
 	if err := writeGroupChildren(&buf, "", "      ", childGroups, entriesByParent, visited, now); err != nil {
 		return nil, err
@@ -221,7 +227,7 @@ func writeGroupChildren(buf *bytes.Buffer, parentRef, indent string, childGroups
 		}
 		buf.WriteString(indent + "<Group>\n")
 		buf.WriteString(indent + "  <UUID>" + b64 + "</UUID>\n")
-		writeGroupHeader(buf, indent+"  ", g.Name, g.Notes, g.IconID, g.CreatedAt, g.ModifiedAt, g.LocationChanged, now)
+		writeGroupHeader(buf, indent+"  ", g.Name, g.Notes, g.IconID, g.CreatedAt, g.ModifiedAt, g.LocationChanged, now, g.EnableSearching)
 		if err := writeGroupChildren(buf, g.UUID, indent+"  ", childGroups, entriesByParent, visited, now); err != nil {
 			return err
 		}
@@ -232,7 +238,7 @@ func writeGroupChildren(buf *bytes.Buffer, parentRef, indent string, childGroups
 
 // writeGroupHeader skriver en gruppes felter fra <Name> til <LastTopVisibleEntry>
 // (UUID skrives af caller). Tidsstempler defaulter til now ved zero-time.
-func writeGroupHeader(buf *bytes.Buffer, indent, name, notes string, iconID int, created, modified, locationChanged time.Time, now string) {
+func writeGroupHeader(buf *bytes.Buffer, indent, name, notes string, iconID int, created, modified, locationChanged time.Time, now string, enableSearching *bool) {
 	buf.WriteString(indent + "<Name>" + xmlEscape(name) + "</Name>\n")
 	if notes != "" {
 		buf.WriteString(indent + "<Notes>" + xmlEscape(notes) + "</Notes>\n")
@@ -250,8 +256,20 @@ func writeGroupHeader(buf *bytes.Buffer, indent, name, notes string, iconID int,
 	buf.WriteString(indent + "<IsExpanded>True</IsExpanded>\n")
 	buf.WriteString(indent + "<DefaultAutoTypeSequence/>\n")
 	buf.WriteString(indent + "<EnableAutoType>null</EnableAutoType>\n")
-	buf.WriteString(indent + "<EnableSearching>null</EnableSearching>\n")
+	buf.WriteString(indent + "<EnableSearching>" + tristate(enableSearching) + "</EnableSearching>\n")
 	buf.WriteString(indent + "<LastTopVisibleEntry>AAAAAAAAAAAAAAAAAAAAAA==</LastTopVisibleEntry>\n")
+}
+
+// tristate serialiserer KDBX' per-gruppe tri-state-boolean: nil betyder
+// "arv fra forælder" og skrives som null, jf. parseTristateBool i xml.go.
+func tristate(b *bool) string {
+	if b == nil {
+		return "null"
+	}
+	if *b {
+		return "True"
+	}
+	return "False"
 }
 
 func isoOrNow(t time.Time, now string) string {

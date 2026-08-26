@@ -273,7 +273,13 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		}
 		// Optag server's modified_at som "vi har set denne version" så
 		// push-delta næste sync ikke re-pusher det pullede objekt.
-		e.db.RecordEntryState(c.UUID, modAt.UTC().Format("2006-01-02T15:04:05Z"))
+		//
+		// KUN fremad: push registrerer laterTime(ModifiedAt, LocationChanged)
+		// for at fange flytninger, mens serveren kun kender ModifiedAt. Et
+		// ubetinget skriv her ville rulle en flyttet entry's state tilbage til
+		// ModifiedAt, hvorefter push-tjekket sagde ja igen — og entry'en
+		// re-pushede for evigt.
+		e.db.RecordEntryStateIfNewer(c.UUID, modAt.UTC().Format("2006-01-02T15:04:05Z"))
 
 		// Tombstones (entry ELLER gruppe) → DeletedObjects; keepassxc-cli's
 		// merge sletter det matchende objekt by-UUID i target.
@@ -319,6 +325,18 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		rootUUID = ""
 	}
 
+	// Delta-pullet indeholder KUN de grupper der er ÆNDRET siden last_seq.
+	// BuildStagingXMLWithGroups omskriver referencer til grupper den ikke
+	// kender til Root, så en entry hvis forældregruppe var uændret ville blive
+	// flyttet op i roden af merge. Suppler derfor med hele det lokale
+	// gruppetræ; localXML er allerede eksporteret ovenfor, så det koster ingen
+	// ekstra kdbx-runde.
+	_, localGroups, _, lerr := kdbx.ParseExport(localXML)
+	if lerr != nil {
+		return 0, 0, 0, fmt.Errorf("parse local export for group tree: %w", lerr)
+	}
+	groups = mergeGroupTree(localGroups, groups, deletions)
+
 	stagingXML, err := kdbx.BuildStagingXMLWithGroups(entries, groups, deletions, rootUUID)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("build staging xml: %w", err)
@@ -361,6 +379,72 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 	return changes.CurrentSeq, len(entries), len(deletions), nil
 }
 
+// mergeGroupTree kombinerer det lokale gruppetræ med de grupper der kom med i
+// delta-pullet, så staging-builderen kan genskabe hele stien ned til hver
+// pullet entry. Delta vinder pr. UUID — dér ligger navne- og flytte-ændringer
+// fra andre enheder — men søgeflaget bæres videre fra den lokale gruppe, fordi
+// wire-formatet (canonical.Group) ikke kender det.
+//
+// Grupper der tombstones i samme pull udelades, så de ikke genopstår i træet.
+func mergeGroupTree(local []kdbx.Group, delta []kdbx.StagingGroup, deletions []kdbx.StagingDeletion) []kdbx.StagingGroup {
+	tombstoned := make(map[string]bool, len(deletions))
+	for _, d := range deletions {
+		tombstoned[d.UUID] = true
+	}
+	localByUUID := make(map[string]kdbx.Group, len(local))
+	for _, g := range local {
+		localByUUID[g.UUID] = g
+	}
+
+	out := make([]kdbx.StagingGroup, 0, len(local)+len(delta))
+	seen := make(map[string]bool, len(delta))
+	for _, g := range delta {
+		if tombstoned[g.UUID] {
+			continue
+		}
+		if lg, ok := localByUUID[g.UUID]; ok && g.EnableSearching == nil {
+			g.EnableSearching = lg.EnableSearching
+		}
+		seen[g.UUID] = true
+		out = append(out, g)
+	}
+	for _, g := range local {
+		if seen[g.UUID] || tombstoned[g.UUID] {
+			continue
+		}
+		out = append(out, kdbx.StagingGroup{
+			UUID:            g.UUID,
+			ParentUUID:      g.ParentUUID,
+			Name:            g.Name,
+			Notes:           g.Notes,
+			IconID:          g.IconID,
+			CreatedAt:       g.CreatedAt,
+			ModifiedAt:      g.ModifiedAt,
+			LocationChanged: g.LocationChanged,
+			EnableSearching: g.EnableSearching,
+		})
+	}
+	return out
+}
+
+// refuseGroupDeletion afgør om et gruppe-slette-sæt er så stort at det bør
+// afvises frem for udført. Under gulvet er det normalt oprydningsarbejde; over
+// gulvet OG over procentdelen af det kendte sæt ligner det et symptom.
+func refuseGroupDeletion(doomed, known int) bool {
+	if doomed <= groupDeleteFloor {
+		return false
+	}
+	return doomed*100 > known*groupDeletePercent
+}
+
+// Tærskler for sikkerhedsspærren mod massesletning af grupper (se pushChanges).
+// Under gulvet sletter vi altid — at fjerne en håndfuld grupper er normalt
+// arbejde. Over gulvet OG over procentdelen nægter vi.
+const (
+	groupDeleteFloor   = 5
+	groupDeletePercent = 25
+)
+
 // pushChanges eksporterer den lokale .kdbx via keepassxc-cli, parser entries
 // og deletions, og uploader dem til serveren. Filteret er pr.-entry: en entry
 // pushes hvis dens mtime er nyere end den seneste i db.EntryStates (eller
@@ -392,7 +476,10 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 	// Grupper først, så parent-grupper findes på serveren før entries der
 	// peger på dem (selv om desktop-pull rebuilder hele træet på én gang).
 	for _, g := range groups {
-		if !force && !shouldPush(e.db.EntryStates, g.UUID, g.ModifiedAt) {
+		// Som for entries: en flytning af gruppen bumper LocationChanged,
+		// ikke ModifiedAt — brug den seneste som push-trigger.
+		gTrigger := laterTime(g.ModifiedAt, g.LocationChanged)
+		if !force && !shouldPush(e.db.EntryStates, g.UUID, gTrigger) {
 			continue
 		}
 		blob, gerr := encodeGroupToBlob(e.entryKey, g)
@@ -406,7 +493,7 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		if resp.Seq > maxSeq {
 			maxSeq = resp.Seq
 		}
-		e.db.RecordEntryState(g.UUID, g.ModifiedAt.UTC().Format("2006-01-02T15:04:05Z"))
+		e.db.RecordEntryState(g.UUID, gTrigger.UTC().Format("2006-01-02T15:04:05Z"))
 		pushed++
 	}
 
@@ -418,22 +505,43 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 	for _, g := range groups {
 		currentGroups[g.UUID] = true
 	}
-	delTime := time.Now().UTC()
+	var doomed []string
 	for _, known := range e.db.KnownGroups {
-		if currentGroups[known] {
-			continue
+		if !currentGroups[known] {
+			doomed = append(doomed, known)
 		}
-		resp, derr := e.client.DeleteGroup(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, known, nil, delTime)
-		if derr != nil {
-			return pushed, deleted, maxSeq, fmt.Errorf("DELETE group %s: %w", known, derr)
-		}
-		if resp.Seq > maxSeq {
-			maxSeq = resp.Seq
-		}
-		deleted++
 	}
-	// Opdater det kendte gruppe-sæt til de aktuelle (sorteret for stabil config).
-	e.db.KnownGroups = sortedStrings(currentGroups)
+
+	// Sikkerhedsspærre. En eksport der pludselig mangler størstedelen af de
+	// kendte grupper er næsten altid et symptom — en mislykket merge der har
+	// rullet en gammel backup ind, en halvskrevet fil, eller en config der
+	// peger på den forkerte database — ikke at brugeren har slettet dem alle
+	// på én gang. Tombstones propagerer til hver eneste enhed og er dyre at
+	// fortryde, så her nægter vi og lader mennesket afgøre det.
+	if refuseGroupDeletion(len(doomed), len(e.db.KnownGroups)) {
+		fmt.Fprintf(os.Stderr,
+			"warning: %d of %d known groups are missing from %s — refusing to delete them on the server.\n"+
+				"  This usually means the local database is not what it should be (failed merge, restored\n"+
+				"  backup, wrong file). No groups were deleted; nothing else in this sync is affected.\n",
+			len(doomed), len(e.db.KnownGroups), e.db.LocalPath)
+		// KnownGroups bevares med vilje: overskrev vi den med det (formentlig
+		// afkortede) aktuelle sæt, ville beviset være væk næste gang.
+		doomed = nil
+	} else {
+		delTime := time.Now().UTC()
+		for _, known := range doomed {
+			resp, derr := e.client.DeleteGroup(e.ctx, e.cfg.Server.DeviceToken, e.db.RemoteID, known, nil, delTime)
+			if derr != nil {
+				return pushed, deleted, maxSeq, fmt.Errorf("DELETE group %s: %w", known, derr)
+			}
+			if resp.Seq > maxSeq {
+				maxSeq = resp.Seq
+			}
+			deleted++
+		}
+		// Opdater det kendte gruppe-sæt til de aktuelle (sorteret for stabil config).
+		e.db.KnownGroups = sortedStrings(currentGroups)
+	}
 
 	for _, en := range entries {
 		// Flyt-detektion: en flytning mellem grupper bumper LocationChanged,
