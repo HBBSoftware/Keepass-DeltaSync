@@ -92,6 +92,90 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [client/v1.8.1] — 2026-08-26
+
+A group reorganisation on a live database was rolled back by the client's own
+sync: nineteen entries jumped out of their groups and into the root. Nothing
+was lost — every title and every group survived — but the placement did not,
+and the same pull would have done it again on the next device to sync.
+
+Four separate faults were behind it. Three are in the sync path and one is in
+the safety of deletion. All four are covered by tests, and the fixed client has
+been verified against a live server: a delta pull of 451 entries carrying only
+36 groups landed without moving a single entry to the root, which is precisely
+the shape of the pull that caused the damage.
+
+### Fixed
+
+- **A pull could move entries into the root.** The staging builder rewrites a
+  reference to a group it does not know into Root, and the pull only handed it
+  the groups that had changed since `last_seq`. Any entry whose parent group
+  happened not to change in the same window was therefore reparented, and the
+  merge carried that into the local database. The pull now supplies the whole
+  local group tree, so a path exists for every entry it places. This costs no
+  extra `keepassxc-cli` round: the export it needs was already being taken a
+  few lines earlier to find the root UUID.
+
+- **A moved entry re-pushed for ever.** Moving an entry between groups bumps
+  `LocationChanged`, not `LastModificationTime`, so the push filter correctly
+  compares the later of the two — but it sends the plain modification time to
+  the server, and the pull recorded whatever came back. The entry's tracked
+  state therefore rolled backwards on every pull, the filter said yes again,
+  and the cycle never closed. Recorded state can now only move forward. The
+  wire format is unchanged, so other devices still see honest timestamps.
+
+- **Moving a group was never detected.** The group loop compared modification
+  time alone, even though the type has carried `LocationChanged` since group
+  sync was built. Rearranging your group tree simply did not propagate.
+
+- **A failed merge could delete your groups on the server.** The push
+  tombstoned every known group missing from the export, unconditionally. When a
+  merge failed and restored an old backup, the export was a fraction of the
+  real database — and 27 groups and 22 entries were deleted server-side, which
+  then propagated to every other device. A mass deletion is now declined: more
+  than five groups *and* more than a quarter of the known set means the local
+  database is not what it should be, not that the user removed them all at
+  once. The known set is kept intact so the next run can still tell.
+
+- **Groups taken out of search results kept that setting through a pull.** The
+  first fix puts every local group into the staging tree, and the staging
+  header hardcoded `EnableSearching` to inherit — which would have silently
+  reset every group the user had hidden from search. The flag now travels with
+  the group, including for groups the server changed, since the wire format has
+  no field for it.
+
+### Added
+
+- **Read-only diagnostics** (`servercheck_test.go`) — four reports that answer
+  what the server actually believes: where it thinks each entry lives, which
+  groups the next sync would delete, which local objects never reached it, and
+  what a push would send right now. They decrypt locally and write nothing.
+  Skipped unless `DELTASYNC_CHECK=1`, so they stay out of CI and out of the
+  shipped binary.
+
+## [gui/v0.3.5] — 2026-08-26
+
+### Added
+
+- **Update check.** The GUI had no way to tell you it was out of date. On
+  startup it now asks GitLab whether a newer `gui/*` release exists and, if so,
+  shows a line at the top of the window with a button to the release page.
+  Every failure path is silent — offline, DNS, rate limit, a changed API — so a
+  password tool never nags about the network. The check is on by default and
+  can be switched off in Settings; that switch exists because this is an
+  outbound call to gitlab.com on every start, which anyone self-hosting has a
+  fair reason to decline. Nothing about the user or their databases is sent.
+
+### Fixed
+
+- **A server-only database could only be deleted from behind the ⋮ menu.** A
+  database that exists on the server but is not bound locally has neither sync
+  nor forget, so clearing it away was hidden in the overflow menu on the one
+  row that needs it most. The row now carries a visible button. It uses the
+  trash icon rather than the ✕ that sits on bound rows: there ✕ means forget
+  the local binding, which touches neither the file nor the server, and one
+  glyph must not stand for both a harmless unbind and a permanent delete.
+
 ## [gui/v0.3.4] — 2026-08-24
 
 The release that makes the app start. Everything below the first entry was
