@@ -17,6 +17,16 @@ type settings struct {
 	Language      string `json:"language"`
 	Theme         string `json:"theme"`           // "system" (følg OS), "light" eller "dark"
 	ShowHelpPanel bool   `json:"show_help_panel"` // vis wiki-agtigt hjælpe-panel i bunden
+
+	// CheckUpdates styrer om GUI'en spørger GitLab efter en nyere udgivelse
+	// ved opstart. nil betyder "ikke sat" og regnes som slået til, så
+	// eksisterende installationer får funktionen uden at røre gui.json.
+	CheckUpdates *bool `json:"check_updates,omitempty"`
+}
+
+// updateCheckEnabled er standard-til: kun et udtrykkeligt false slår det fra.
+func (s settings) updateCheckEnabled() bool {
+	return s.CheckUpdates == nil || *s.CheckUpdates
 }
 
 // settingsPath er <os-config-dir>/keepass-deltasync-gui/gui.json.

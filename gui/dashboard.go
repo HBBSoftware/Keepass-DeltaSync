@@ -46,15 +46,20 @@ func (u *ui) showDashboard() {
 		container.NewTabItem(L.TabSettings, topPad(setTab)),
 	)
 
+	// Opdateringsbanner øverst — bygges tomt og skjult, og fyldes først hvis
+	// tjekket finder en nyere udgivelse.
+	u.updateBar = container.NewVBox()
+	u.updateBar.Hide()
+
 	if helpEnabled {
 		// Wiki-agtigt hjælpe-panel i bunden, der følger den valgte fane.
 		panel := u.buildHelpPanel()
 		u.updateHelp(tabs.SelectedIndex())
 		tabs.OnSelected = func(*container.TabItem) { u.updateHelp(tabs.SelectedIndex()) }
-		u.win.SetContent(container.NewBorder(nil, panel, nil, nil, tabs))
+		u.win.SetContent(container.NewBorder(u.updateBar, panel, nil, nil, tabs))
 	} else {
 		u.helpText = nil
-		u.win.SetContent(tabs)
+		u.win.SetContent(container.NewBorder(u.updateBar, nil, nil, nil, tabs))
 	}
 	debugf("showDashboard: content set")
 
@@ -62,6 +67,7 @@ func (u *ui) showDashboard() {
 	u.refreshDatabases()
 	u.refreshDevices()
 	u.refreshFirefox()
+	u.checkForUpdate()
 	debugf("showDashboard: refresh kicked off")
 }
 
@@ -130,7 +136,12 @@ func (u *ui) dbCard(db database, members []member, memErr string) fyne.CanvasObj
 		bind := newHintIconButton(L.BindExisting, theme.FolderOpenIcon(), func() { u.bindDatabase(db) }, u.setHint)
 		bind.Importance = widget.HighImportance
 		setup := newHintIconButton(L.SetupShared, theme.DownloadIcon(), func() { u.setupSharedDB(db) }, u.setHint)
-		actions = container.NewHBox(bind, setup, more, info)
+		// En server-kun database kan hverken synkroniseres eller glemmes, så
+		// oprydning var kun mulig bag ⋮. Papirkurv-ikonet — IKKE ✕, som på en
+		// bundet række betyder det harmløse "glem den lokale binding". To vidt
+		// forskellige konsekvenser må ikke dele ikon.
+		del := newHintIconButton(L.DeleteOnServer, theme.DeleteIcon(), func() { u.deleteDatabaseServer(db) }, u.setHint)
+		actions = container.NewHBox(bind, setup, del, more, info)
 	}
 
 	header := container.NewBorder(nil, nil, left, actions, path)
@@ -870,6 +881,23 @@ func (u *ui) settingsTab() fyne.CanvasObject {
 	helpDesc := widget.NewLabel(L.HelpPanelDesc)
 	helpDesc.Wrapping = fyne.TextWrapWord
 
+	// Opdateringstjek: standard til, men kan slås fra — det er et netværkskald
+	// til gitlab.com ved hver opstart, og det skal en selvhoster kunne fravælge.
+	updCheck := widget.NewCheck(L.UpdateCheckLabel, nil)
+	updCheck.Checked = u.set.updateCheckEnabled()
+	updCheck.OnChanged = func(on bool) {
+		v := on
+		u.set.CheckUpdates = &v
+		_ = saveSettings(u.set)
+		if on {
+			u.checkForUpdate()
+		} else if u.updateBar != nil {
+			u.updateBar.Hide()
+		}
+	}
+	updDesc := widget.NewLabel(L.UpdateCheckDesc)
+	updDesc.Wrapping = fyne.TextWrapWord
+
 	return container.NewVScroll(container.NewVBox(
 		statusCard,
 		widget.NewSeparator(),
@@ -877,6 +905,9 @@ func (u *ui) settingsTab() fyne.CanvasObject {
 		widget.NewSeparator(),
 		helpCheck,
 		helpDesc,
+		widget.NewSeparator(),
+		updCheck,
+		updDesc,
 		widget.NewSeparator(),
 		u.autostartSection(),
 	))

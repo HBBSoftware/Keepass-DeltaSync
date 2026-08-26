@@ -209,15 +209,22 @@ type dict struct {
 	ThemeDark         string
 	HelpPanelLabel    string
 	HelpPanelDesc     string
-	HelpTitle         string
-	HelpDatabases     string
-	HelpDevices       string
-	HelpFirefox       string
-	HelpActivity      string
-	HelpLog           string
-	HelpAdmin         string
-	HelpSettings      string
-	ResetEnroll       string
+
+	// Opdateringstjek
+	UpdateAvailable  string // format: nyeste version, nuværende version
+	UpdateDownload   string
+	UpdateCheckLabel string
+	UpdateCheckDesc  string
+
+	HelpTitle     string
+	HelpDatabases string
+	HelpDevices   string
+	HelpFirefox   string
+	HelpActivity  string
+	HelpLog       string
+	HelpAdmin     string
+	HelpSettings  string
+	ResetEnroll   string
 
 	// Autostart (Indstillinger): OS-opsætning der kører `daemon` ved login.
 	AutostartTitle       string
@@ -447,7 +454,13 @@ var dicts = map[lang]*dict{
 		ThemeDark:         "Mørkt",
 		HelpPanelLabel:    "Vis hjælpe-panel",
 		HelpPanelDesc:     "Når slået til, vises et felt i bunden af vinduet med en beskrivelse af den fane du er på — hvad siden gør, og hvad knapperne svarer til i keepass-deltasync-programmet.",
-		HelpTitle:         "Om denne side",
+
+		UpdateAvailable:  "Version %s er tilgængelig — du kører %s.",
+		UpdateDownload:   "Hent",
+		UpdateCheckLabel: "Søg efter opdateringer",
+		UpdateCheckDesc:  "Når slået til, spørger programmet ved opstart GitLab om der findes en nyere udgave, og viser en linje øverst hvis der gør. Der sendes intet om dig eller dine databaser — kun et almindeligt opslag på projektets udgivelsesside.",
+
+		HelpTitle: "Om denne side",
 		HelpDatabases: "## Databaser\n\n" +
 			"Dine databaser og deres delinger. **● (fuld cirkel)** = bundet til en lokal `.kdbx`-fil og klar til synkronisering. **○ (åben cirkel)** = findes kun på serveren.\n\n" +
 			"**Handlinger pr. database:**\n\n" +
@@ -734,7 +747,13 @@ var dicts = map[lang]*dict{
 		ThemeDark:         "Dark",
 		HelpPanelLabel:    "Show help panel",
 		HelpPanelDesc:     "When enabled, a panel at the bottom of the window describes the tab you are on — what the page does, and what the buttons map to in the keepass-deltasync program.",
-		HelpTitle:         "About this page",
+
+		UpdateAvailable:  "Version %s is available — you are running %s.",
+		UpdateDownload:   "Download",
+		UpdateCheckLabel: "Check for updates",
+		UpdateCheckDesc:  "When enabled, the program asks GitLab at startup whether a newer release exists, and shows a line at the top if so. Nothing about you or your databases is sent — just an ordinary lookup on the project's releases page.",
+
+		HelpTitle: "About this page",
 		HelpDatabases: "## Databases\n\n" +
 			"Your databases and their shares. **● (filled circle)** = bound to a local `.kdbx` file and ready to sync. **○ (open circle)** = exists on the server only.\n\n" +
 			"**Per-database actions:**\n\n" +
