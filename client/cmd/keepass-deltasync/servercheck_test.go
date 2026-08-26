@@ -422,3 +422,124 @@ func TestMissingOnServer(t *testing.T) {
 	}
 	fmt.Printf("\n%d UUID'er skrevet til %s\n", len(missGroups)+len(missEntries), out)
 }
+
+// TestPendingPushes viser præcis hvilke objekter en push VILLE sende nu, med
+// både den gemte state og den beregnede trigger. Det er svaret på "hvorfor
+// bliver den ved med at pushe de samme N". Rører hverken fil eller server.
+func TestPendingPushes(t *testing.T) {
+	if os.Getenv("DELTASYNC_CHECK") == "" {
+		t.Skip("sæt DELTASYNC_CHECK=1 for at køre denne diagnose")
+	}
+	dbName := os.Getenv("DELTASYNC_DB")
+	if dbName == "" {
+		dbName = "mypasswords"
+	}
+	_, db, cli, err := loadDBAndCLI(dbName, "")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	password, perr := passwd.Read("Masterpassword: ", false)
+	if perr != nil {
+		t.Fatalf("læs password: %v", perr)
+	}
+	defer passwd.Zero(password)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	xmlBytes, err := cli.Export(ctx, db.LocalPath, password)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	entries, groups, deletions, err := kdbx.ParseExport(xmlBytes)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	st := db.EntryStates
+	iso := func(tm time.Time) string { return tm.UTC().Format("2006-01-02T15:04:05Z") }
+	n := 0
+	fmt.Printf("\n=== OBJEKTER DER VILLE BLIVE PUSHET NU ===\n\n")
+
+	for _, g := range groups {
+		trig := laterTime(g.ModifiedAt, g.LocationChanged)
+		if shouldPush(st, g.UUID, trig) {
+			n++
+			fmt.Printf("  gruppe  %-26s state=%-21s trigger=%s (mod=%s loc=%s)\n",
+				g.Name, st[g.UUID], iso(trig), iso(g.ModifiedAt), iso(g.LocationChanged))
+		}
+	}
+	for _, e := range entries {
+		trig := laterTime(e.ModifiedAt, e.LocationChanged)
+		if shouldPush(st, e.UUID, trig) {
+			n++
+			fmt.Printf("  entry   %-26s state=%-21s trigger=%s (mod=%s loc=%s)\n",
+				e.UUID, st[e.UUID], iso(trig), iso(e.ModifiedAt), iso(e.LocationChanged))
+		}
+	}
+	for _, d := range deletions {
+		if shouldPush(st, d.UUID, d.DeletedAt) {
+			n++
+			fmt.Printf("  tombst  %-26s state=%-21s trigger=%s\n", d.UUID, st[d.UUID], iso(d.DeletedAt))
+		}
+	}
+	if n == 0 {
+		fmt.Println("  (ingen — en sync ville give pushed 0)")
+	}
+	fmt.Printf("\ni alt: %d\n", n)
+}
+
+// TestInspectDatabase tæller hvad der ligger på serveren i en vilkårlig
+// database, uden at dekryptere noget — GetChanges kræver kun device-token.
+// Bruges før en delete-database, så beslutningen tages på tal og ikke på
+// hukommelse. Sæt DELTASYNC_DBID til databasens uuid.
+func TestInspectDatabase(t *testing.T) {
+	if os.Getenv("DELTASYNC_CHECK") == "" {
+		t.Skip("sæt DELTASYNC_CHECK=1 for at køre denne diagnose")
+	}
+	id := os.Getenv("DELTASYNC_DBID")
+	if id == "" {
+		t.Skip("sæt DELTASYNC_DBID til databasens uuid")
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	client := api.New(cfg.Server.URL)
+
+	dbs, err := client.ListDatabases(ctx, cfg.Server.DeviceToken)
+	if err != nil {
+		t.Fatalf("list databases: %v", err)
+	}
+	for i := range dbs {
+		if dbs[i].ID == id {
+			fmt.Printf("\nnavn: %s\nrolle: %s\noprettet: %s\n", dbs[i].Name, dbs[i].Role, dbs[i].CreatedAt)
+		}
+	}
+
+	changes, err := client.GetChanges(ctx, cfg.Server.DeviceToken, id, 0, true)
+	if err != nil {
+		t.Fatalf("GET /changes: %v", err)
+	}
+	live, groups, tombs, bytes := 0, 0, 0, 0
+	var newest string
+	for _, c := range changes.Entries {
+		bytes += len(c.Blob)
+		if c.ModifiedAt > newest {
+			newest = c.ModifiedAt
+		}
+		switch {
+		case c.Deleted:
+			tombs++
+		case c.Kind == 2:
+			groups++
+		default:
+			live++
+		}
+	}
+	fmt.Printf("current_seq: %d\n", changes.CurrentSeq)
+	fmt.Printf("entries: %d   grupper: %d   tombstones: %d\n", live, groups, tombs)
+	fmt.Printf("krypteret indhold: %d KB\n", bytes/1024)
+	fmt.Printf("seneste ændring: %s\n", newest)
+}

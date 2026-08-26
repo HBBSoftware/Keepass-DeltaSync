@@ -136,7 +136,12 @@ func (u *ui) dbCard(db database, members []member, memErr string) fyne.CanvasObj
 		bind := newHintIconButton(L.BindExisting, theme.FolderOpenIcon(), func() { u.bindDatabase(db) }, u.setHint)
 		bind.Importance = widget.HighImportance
 		setup := newHintIconButton(L.SetupShared, theme.DownloadIcon(), func() { u.setupSharedDB(db) }, u.setHint)
-		actions = container.NewHBox(bind, setup, more, info)
+		// En server-kun database kan hverken synkroniseres eller glemmes, så
+		// oprydning var kun mulig bag ⋮. Papirkurv-ikonet — IKKE ✕, som på en
+		// bundet række betyder det harmløse "glem den lokale binding". To vidt
+		// forskellige konsekvenser må ikke dele ikon.
+		del := newHintIconButton(L.DeleteOnServer, theme.DeleteIcon(), func() { u.deleteDatabaseServer(db) }, u.setHint)
+		actions = container.NewHBox(bind, setup, del, more, info)
 	}
 
 	header := container.NewBorder(nil, nil, left, actions, path)
