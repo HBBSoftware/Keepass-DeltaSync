@@ -29,6 +29,10 @@ type ui struct {
 	activity *readOnlyEntry // aktivitets-/log-panel (read-only, fuld kontrast)
 	statusLb *widget.Label  // status-tekst på dashboardet
 
+	// updateBar er linjen øverst i vinduet der dukker op hvis der findes en
+	// nyere udgivelse. Tom og skjult indtil opdateringstjekket siger andet.
+	updateBar *fyne.Container
+
 	// Database-fanen: en hierarkisk liste hvor hver database står på sin egen
 	// linje med inline-handlinger, og dens medlemmer vises lige under den.
 	dbBox  *fyne.Container // beholder for database-kortene (genopbygges ved refresh)
