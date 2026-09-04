@@ -70,6 +70,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The Firefox extension connects by itself** (`extension/`) — on a machine
+  where everything is set up, opening the popup (toolbar button or
+  Alt+Shift+K) used to land on an *Unlock* button whose only job was to ask
+  the host for a masterpassword it fetches from the OS keyring itself. The
+  popup now does that on its own and shows the search field as soon as the
+  index is built, and the address bar's `kp` keyword warms the same index when
+  it is asked to search with nothing unlocked. The button stays for the cases
+  where a click actually decides something: after you pressed **Lock** —
+  auto-connect then stays off for the rest of the browser session, since
+  otherwise the button would be pointless — and after an attempt failed. A
+  database with no keyring entry opens the password field straight away rather
+  than costing a wasted click first, and a failed attempt is not repeated on
+  every popup open: each one costs an Argon2 run and would answer the same.
+  Nothing in the security model moves; the extension still never sees the
+  masterpassword.
 - **F-Droid recipe reworked** per review feedback on
   [fdroiddata!41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661):
   Go is now built from source via fdroiddata's `go` srclib and `make.bash`,
@@ -86,6 +101,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
   [`VERSIONING.md`](VERSIONING.md).
 
 ### Fixed
+
+- **Lock in the Firefox popup did not survive the next sync.** The host keeps
+  watching the `.kdbx` after a `lock`, and the extension re-indexed on every
+  change event it got — including for a database it no longer held an index
+  for. A sync landing after you pressed Lock therefore unlocked the database
+  again, silently, and rebuilt the index from the OS keyring. A change event
+  now only refreshes an index that already exists.
 
 - **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
   was hard to read against the near-black dark-theme background, affecting

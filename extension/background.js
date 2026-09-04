@@ -14,6 +14,7 @@
 const HOST_NAME = "dk.hbb.keepass_deltasync";
 const REQUEST_TIMEOUT_MS = 3 * 60 * 1000; // Argon2 + keepassxc-cli må gerne tage tid.
 const INDEX_KEY = "index";
+const AUTO_KEY = "autoconnect";
 
 let port = null;
 let nextRequestId = 1;
@@ -89,10 +90,17 @@ function onHostMessage(msg) {
 
 async function handleHostEvent(msg) {
   if (msg.event !== "changed") return;
+
   // Databasen er skrevet på disken — typisk fordi en sync lige er landet.
-  // Genindekser lydløst. Har databasen kun et fallback-password, og har
-  // idle-låsen taget det, fejler det her; så bliver det gamle indeks stående,
-  // hvilket er bedre end at prompte brugeren uopfordret.
+  // Genindekser lydløst, men kun hvis vi allerede HAVDE et indeks: efter et
+  // "Lock" bliver hostens fil-watch stående, og uden dette ville den første
+  // sync bagefter låse databasen op igen bag ryggen på brugeren.
+  const cache = await readCache();
+  if (!cache[msg.db]) return;
+
+  // Har databasen kun et fallback-password, og har idle-låsen taget det,
+  // fejler det her; så bliver det gamle indeks stående, hvilket er bedre end
+  // at prompte brugeren uopfordret.
   try {
     await unlockDatabase(msg.db);
   } catch (err) {
@@ -155,7 +163,93 @@ async function lockAll() {
     await send({ cmd: "lock" });
   } finally {
     await browser.storage.session.remove(INDEX_KEY);
+    // Et bevidst "Lock" slår auto-connect fra resten af sessionen. Uden det
+    // ville næste popup-åbning låse op igen, og knappen var ren pynt.
+    await writeAuto({ suppressed: true, failed: {} });
   }
+}
+
+// ------------------------------------------------------------ auto-connect
+
+// Normalvejen kræver ikke brugeren: hosten henter selv masterpasswordet i
+// OS-keyringen, så `unlock` beder ikke om noget. Derfor låser popup'en op af
+// sig selv, i stedet for at parkere brugeren bag en knap der ikke gør andet.
+//
+// To ting må det ikke gøre:
+//
+//   * ophæve et bevidst "Lock" — så havde knappen ingen virkning,
+//   * prøve igen ved hver eneste popup-åbning på en database der ikke KAN
+//     låses op uden hjælp. Hvert forsøg koster en Argon2-kørsel, og svaret
+//     bliver det samme.
+//
+// Begge dele bor i session storage sammen med indekset, ikke i en variabel
+// her i filen: baggrundssiden er en event page, som browseren må lukke ned
+// mellem to popup-åbninger. Og som indekset nulstilles tilstanden når
+// Firefox lukkes — et "Lock" holder altså kun sessionen ud.
+
+async function readAuto() {
+  const stored = await browser.storage.session.get(AUTO_KEY);
+  return stored[AUTO_KEY] || { suppressed: false, failed: {} };
+}
+
+async function writeAuto(state) {
+  await browser.storage.session.set({ [AUTO_KEY]: state });
+}
+
+// pendingConnect deler ét forsøg mellem samtidige kaldere: popup'en kan lukkes
+// og åbnes igen mens den første unlock stadig kører, og adresselinjen kan
+// varme op oven i den. To Argon2-kørsler på samme database ville hverken være
+// hurtigere eller pænere.
+let pendingConnect = null;
+
+function autoConnect() {
+  if (!pendingConnect) {
+    pendingConnect = runAutoConnect().finally(() => {
+      pendingConnect = null;
+    });
+  }
+  return pendingConnect;
+}
+
+async function runAutoConnect() {
+  const state = await readAuto();
+  if (state.suppressed) return { attempted: [] };
+
+  const hostStatus = await send({ cmd: "status" });
+  const cache = await readCache();
+  const attempted = [];
+
+  for (const db of hostStatus.databases || []) {
+    if (cache[db.name] || state.failed[db.name]) continue;
+    attempted.push(db.name);
+    try {
+      await unlockDatabase(db.name);
+      delete state.failed[db.name];
+    } catch (err) {
+      // Fejlen gemmes, ikke bare logges. Popup'en tegner beskeden — og for en
+      // database uden keyring-entry er password-feltet det rigtige svar, ikke
+      // en knap der ville fejle på nøjagtig samme måde igen.
+      state.failed[db.name] = {
+        message: err.message || String(err),
+        needPassword: Boolean(err.needPassword),
+      };
+    }
+  }
+
+  await writeAuto(state);
+  return { attempted };
+}
+
+// manualUnlock er unlock med brugeren bag sig. Det ophæver både et tidligere
+// "Lock" og et auto-forsøg der slog fejl — ellers ville en database man lige
+// har låst op i hånden stadig være undtaget fra auto-connect bagefter.
+async function manualUnlock(msg) {
+  const result = await unlockDatabase(msg.db, msg.password);
+  const state = await readAuto();
+  state.suppressed = false;
+  delete state.failed[result.db];
+  await writeAuto(state);
+  return result;
 }
 
 // --------------------------------------------------------------- navigation
@@ -200,7 +294,16 @@ function suggestionFor(entry, url) {
 
 browser.omnibox.onInputChanged.addListener(async (text, addSuggestions) => {
   if (!text.trim()) return;
-  const hits = searchIndex(await allEntries(), text, 6).filter((h) => h.url);
+
+  const entries = await allEntries();
+  // Adresselinjen har ingen knap at trykke på: er intet låst op, er listen
+  // tom, og brugeren kan ikke gøre noget ved det herfra. Så varmer vi
+  // indekset op — uden at vente på det, for et forslag der først kommer efter
+  // en Argon2-kørsel er alligevel for sent til dette tastetryk. Næste tegn
+  // har det.
+  if (entries.length === 0) autoConnect().catch(() => {});
+
+  const hits = searchIndex(entries, text, 6).filter((h) => h.url);
 
   // Adresselinjen er en flad liste og kan ikke folde ud som popup'en. Skal en
   // entry's øvrige adresser kunne nås herfra, må de have hvert sit forslag.
@@ -258,7 +361,9 @@ async function handlePopupMessage(msg) {
     case "status":
       return status();
     case "unlock":
-      return unlockDatabase(msg.db, msg.password);
+      return manualUnlock(msg);
+    case "connect":
+      return autoConnect();
     case "lock":
       await lockAll();
       return {};
@@ -304,12 +409,23 @@ async function diagnostics() {
 async function status() {
   const hostStatus = await send({ cmd: "status" });
   const cache = await readCache();
+  const auto = await readAuto();
+
+  const databases = (hostStatus.databases || []).map((db) => ({
+    name: db.name,
+    unlocked: Boolean(cache[db.name]),
+    count: cache[db.name] ? cache[db.name].entries.length : 0,
+    // Null når intet auto-forsøg er slået fejl. Ellers {message,
+    // needPassword} fra det forsøg, så popup'en kan sige hvad der gik galt i
+    // stedet for bare "is locked".
+    failure: auto.failed[db.name] || null,
+  }));
+
   return {
     version: hostStatus.version,
-    databases: (hostStatus.databases || []).map((db) => ({
-      name: db.name,
-      unlocked: Boolean(cache[db.name]),
-      count: cache[db.name] ? cache[db.name].entries.length : 0,
-    })),
+    databases,
+    // Er der noget at hente ved at spørge? Reglerne for hvornår et automatisk
+    // forsøg er i orden bor her, så popup'en ikke skal kende dem.
+    canAutoConnect: !auto.suppressed && databases.some((db) => !db.unlocked && !db.failure),
   };
 }

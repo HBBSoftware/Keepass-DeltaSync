@@ -73,7 +73,21 @@ which is where the popup's setup buttons point. The short version:
   Enter opens in the current tab, Ctrl/Cmd+Enter and middle-click open a new
   tab.
 - **Lock** in the popup drops the cached index and tells the host to wipe any
-  password it holds.
+  password it holds. It also stops the extension from unlocking on its own
+  again until you say so — a Lock that the next popup undid would be no lock
+  at all — so the next popup shows the *Unlock* button. Closing Firefox has
+  the same effect: nothing about the index survives it.
+
+The popup unlocks by itself. The masterpassword comes from the OS keyring, so
+nothing is asked of you, and the search field is ready as soon as the index is
+built — a second or two, since opening the database runs Argon2. The *Unlock*
+button only appears when a click actually decides something: after a **Lock**,
+or when the attempt failed. In that last case the popup says why, and for a
+database with no keyring entry it goes straight to the password field.
+
+The address bar warms the index the same way: search with `kp` while nothing is
+unlocked and the first search comes up empty, but the next keystroke has the
+entries.
 
 Search matches on host name, title and group. Hostname matches rank highest,
 since that is usually what you remember.
@@ -128,8 +142,8 @@ This prints exactly what the extension would receive, as plain JSON.
 
 Signed and listed on addons.mozilla.org as
 [DeltaSync — KeePass search & go](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/).
-0.2.1 is packaged and waiting to be uploaded: it corrects a 0.2.0 package that
-was built before the setup buttons got their final address. 0.2.0 went public
+0.3.0 — the popup that unlocks by itself — is packaged and waiting to be
+uploaded; 0.2.1 is the listed version. 0.2.0 went public
 on 2026-08-24, 79 seconds after upload: a listed update is
 signed and published as soon as automated validation passes, and the human
 review happens afterwards. The first listing is the slow one — 0.1.1's review

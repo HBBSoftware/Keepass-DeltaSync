@@ -62,8 +62,9 @@ release-artefakter, ét installationstrin for brugeren.
 Fordi keyringen allerede findes, kan browseren holdes helt uden for
 hemmeligheden:
 
-1. Brugeren klikker "Lås op" i popup'en → udvidelsen sender `unlock` **uden
-   password**.
+1. Popup'en sender `unlock` **uden password**, af sig selv, når den åbnes.
+   Der er ikke noget at spørge brugeren om: hemmeligheden ligger i keyringen,
+   og et klik ville kun forsinke det samme kald. Se fase 10.
 2. Hosten kalder `keyring.Get(RemoteID)`. På macOS og Linux kan OS'et vise sin
    egen godkendelsesdialog — den hører til OS'et, ikke til browseren.
 3. Hosten kører `Export` → `ParseExport` → felt-udtræk, bygger indekset, og
@@ -274,6 +275,30 @@ Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
    database) peger nu på `docs/install-browser.md` frem for at vise en rå
    kommando. Teksten bor bevidst uden for udvidelsen: en signeret udvidelse kan
    ikke rettes uden en ny AMO-gennemgang, og netop disse stier flytter sig.
+10. **Auto-connect** — popup'en låser op af sig selv i stedet for at vise en
+    knap der ikke gjorde andet end at kalde `unlock` uden argumenter.
+    "Lås op"-knappen var et levn fra en model hvor browseren holdt
+    hemmeligheden; med keyringen koster unlock ikke brugeren noget, og så er
+    klikket ren ventetid. Tre regler holder det ærligt, og alle tre bor i
+    `storage.session` sammen med indekset — baggrundssiden er en event page,
+    der kan lukkes ned mellem to popup-åbninger:
+
+    - Et bevidst **Lock** slår auto-connect fra resten af sessionen. Ellers
+      ville næste popup-åbning låse op igen, og knappen var uden virkning.
+    - Et **mislykket forsøg** noteres pr. database og gentages ikke. Hvert
+      forsøg koster en Argon2-kørsel, og svaret bliver det samme; i stedet
+      viser popup'en fejlen, og ved `need_password` password-feltet med det
+      samme.
+    - Et **manuelt unlock** ophæver begge dele igen.
+
+    Samme tur udløses fra adresselinjen når der søges uden noget låst op —
+    uden at vente på den, for et forslag der først kommer efter Argon2 er for
+    sent til det tastetryk.
+
+    Samtidig blev det rettet at hostens `changed`-event kunne låse en database
+    op igen efter et `lock`: fil-watchen bliver stående, og udvidelsen
+    genindekserede på et hvilket som helst event. Nu genindekseres kun en
+    database der allerede HAR et indeks.
 
 Alt er bygget, og 0.2.0 ligger signeret på AMO. Live-testen er kørt
 2026-08-24 i en ren Windows Sandbox: installer → `add-local` →

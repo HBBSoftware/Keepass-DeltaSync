@@ -31,6 +31,106 @@ Reminders that are not fields:
 
 ---
 
+## Release Notes — 0.3.0
+
+```
+The popup connects on its own.
+
+Opening it on a machine where everything is set up used to show an Unlock
+button whose only job was to ask the host for the masterpassword — which the
+host reads from your OS keyring itself, without asking you for anything. That
+click bought nothing, so it is gone: the popup unlocks as it opens, and the
+search field is ready as soon as the index is built. Searching from the address
+bar warms the same index.
+
+The button stays for the two cases where a click decides something. After you
+press Lock, the extension stays locked for the rest of the browser session — a
+lock that the next popup undid would be no lock at all. And when unlocking
+fails, the popup now says why instead of silently offering the same button
+again; a database with no keyring entry goes straight to the password field.
+
+Also fixed: pressing Lock no longer came undone the next time the database was
+synced. The host keeps watching the file, and the extension rebuilt its index
+on any change — including for a database you had just locked.
+
+No new permissions. The masterpassword still never passes through Firefox.
+```
+
+## Notes to Reviewer — 0.3.0
+
+```
+WHAT CHANGED SINCE 0.2.1
+
+Two files: background.js and popup.js. No new files, no new permissions, no
+change to the native messaging protocol.
+
+The popup used to require a click on "Unlock" before sending {cmd:"unlock"} to
+the native host. It now sends it when it opens. The message is byte-for-byte
+the one the button sent: no password field, because the host reads the
+masterpassword from the OS keyring itself. Nothing new is stored and nothing
+new is sent anywhere — the index still lives in browser.storage.session only.
+
+Three rules keep the automatic unlock from being surprising, and all three
+live in browser.storage.session next to the index (the background page is an
+event page and may be unloaded between two popup openings):
+
+  * Pressing Lock disables the automatic unlock for the rest of the browser
+    session, so a lock stays a lock. A manual unlock re-enables it.
+  * A failed attempt is recorded per database and not retried on every popup
+    opening. Opening a KeePass database runs Argon2; repeating a doomed
+    attempt would only spend the user's CPU to print the same error.
+  * The recorded failure is what the popup then shows, including the
+    password field when the host answered need_password.
+
+The same file also fixes a bug: the host emits a "changed" event when the .kdbx
+is written, and the extension re-indexed on any such event — including for a
+database the user had just locked, which unlocked it again behind their back.
+It now only refreshes an index that already exists.
+
+TESTING IT
+
+The change is visible only with the native host installed, since it is about
+what happens instead of the Unlock click. Without the host, the popup behaves
+exactly as in 0.2.1 and shows the setup button. The full end-to-end setup, with
+no account, no server and no network, is below and takes about five minutes.
+
+WHAT THE ADD-ON DOES
+
+It cannot read a KeePass database itself. It talks over native messaging to
+dk.hbb.keepass_deltasync, a subcommand of the separately installed
+keepass-deltasync binary (GPL-3.0, same repository), which opens the user's
+local .kdbx through keepassxc-cli and returns only uuid, title, URLs and group
+path — an explicit allow-list in the host, so nothing else can be sent. No
+passwords, usernames, notes or attachments reach the browser, and the
+masterpassword is read from the OS keyring by the host rather than passing
+through Firefox.
+
+To test it end to end, with no account and no server:
+
+  keepassxc-cli db-create -p test.kdbx
+  keepassxc-cli add -u alice --url https://example.org -g -L 16 -l -U -n       test.kdbx "Example site"
+  keepass-deltasync add-local test ./test.kdbx --save-password
+  keepass-deltasync install-browser-host     (then restart Firefox)
+
+Open the popup: it says "Unlocking test…" for a moment and then shows the
+search field. Type "exa" and Enter opens the entry's site. Press Lock and open
+the popup again — it stays locked and offers the button.
+"keepass-deltasync browser-host --probe test" prints exactly the JSON the
+extension would receive, without Firefox in the picture.
+
+PERMISSIONS
+
+nativeMessaging reaches the host. storage is used solely as
+browser.storage.session, for the index and for the two flags above — dropped
+when Firefox closes. Nothing on disk. No host permissions, no content scripts,
+no remote code. Sources, unminified and with no build step:
+https://gitlab.com/Star95/keepass-deltasync
+```
+
+---
+
+## Submitted earlier — kept as the template
+
 ## Release Notes — 0.2.1
 
 ```
@@ -108,8 +208,6 @@ https://gitlab.com/Star95/keepass-deltasync
 ```
 
 ---
-
-## Submitted earlier — kept as the template
 
 ## Release Notes — 0.2.0
 

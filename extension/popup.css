@@ -296,6 +296,63 @@ li.suburl[aria-selected="true"] {
   color: var(--danger);
 }
 
+/* Ventetegnet foran "Unlocking …": et timeglas. Det er vente-symbolet der
+   ikke skal læres, og det siger noget en snurrende ring ikke gør — at det er
+   tid der går, ikke data der hentes. Ventetiden er rigtig: hosten kører
+   Argon2, og det tager et par sekunder hvor popup'en ellers ville se død ud.
+
+   Det VENDES med mellemrum frem for at rotere jævnt. Et timeglas der spinder
+   er ingenting; et der bliver vendt er nogen der venter. Pausen mellem
+   vendingerne er derfor det halve af animationen, ikke spildtid. */
+.hint.busy::before {
+  content: "";
+  display: inline-block;
+  /* Ikke kvadratisk: viewBox'en er skåret til selve glasset, så masken kan
+     fylde sit felt ud. Med et kvadratisk felt ville `contain` skalere efter
+     højden, og glasset stod smalt og spinkelt ved siden af teksten. */
+  width: 0.72em;
+  height: 0.95em;
+  vertical-align: -0.14em;
+  margin-right: 0.45em;
+  background-color: var(--accent);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'%3E%3Cpath d='M0.5 1H11.5V2.6L6 8 11.5 13.4V15H0.5V13.4L6 8 0.5 2.6Z'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  animation: hourglass 2.4s ease-in-out infinite;
+}
+
+@keyframes hourglass {
+  0%,
+  40% {
+    transform: rotate(0);
+  }
+  50%,
+  90% {
+    transform: rotate(180deg);
+  }
+  100% {
+    /* Videre til 360 og ikke tilbage til 0: glasset vendes den samme vej
+       hver gang, i stedet for at vippe frem og tilbage. */
+    transform: rotate(360deg);
+  }
+}
+
+/* En animation der aldrig stopper er præcis den bevægelse "reduce motion"
+   findes for. Timeglasset bliver stående og toner i stedet op og ned — der
+   skal stadig være tegn på liv, ellers ligner det at noget hang. */
+@media (prefers-reduced-motion: reduce) {
+  .hint.busy::before {
+    animation: fade 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes fade {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* Opsætningsafsnittet er den eneste vej videre når hosten mangler, så det må
    ikke ligne endnu en fejltekst. Knappen fylder bredden — der er intet andet
    at lave i popup'en i den tilstand. */

@@ -36,6 +36,11 @@ let hits = [];
 // en udfoldning ændrede antallet af rækker.
 let selected = { hit: 0, url: -1 };
 let lockedDatabase = null;
+// Auto-connect prøves højst én gang pr. popup-åbning. Baggrundssiden noterer
+// selv en database der ikke kunne låses op, men fejler selve forsøget — dør
+// hosten midt i det — bliver der intet noteret, og uden dette flag kunne
+// refresh() sende sig selv rundt i ring.
+let autoConnectTried = false;
 // Er kun én database låst op, er dens navn det samme på hver eneste række —
 // ren støj, og det står allerede i bundlinjen. Så viser vi kun gruppestien.
 let showDatabaseName = false;
@@ -64,6 +69,22 @@ function showHint(text, isError = false) {
   els.empty.textContent = text;
   els.empty.hidden = !text;
   els.empty.classList.toggle("error", isError);
+  // Enhver anden besked afløser ventetilstanden — ellers kunne timeglasset
+  // blive stående og vende sig over en tekst der ikke venter på noget.
+  els.empty.classList.remove("busy");
+}
+
+// showConnecting er tilstanden mens hosten åbner databasen. Det tager et par
+// sekunder — det er Argon2 der kører — og popup'en må ikke stå tom imens.
+function showConnecting(names) {
+  els.setup.hidden = true;
+  els.unlock.hidden = true;
+  els.query.disabled = true;
+  els.lock.hidden = true;
+  els.results.textContent = "";
+  els.footerStatus.textContent = "";
+  showHint(`Unlocking ${names.join(", ")}…`);
+  els.empty.classList.add("busy");
 }
 
 // showSetup er den ene tilstand hvor popup'en ikke kan hjælpe med noget som
@@ -119,6 +140,24 @@ async function refresh() {
     return;
   }
 
+  // Er alt sat op, henter hosten selv masterpasswordet i OS-keyringen — så
+  // er der ingen grund til at bede om et klik først. Vi låser op med det
+  // samme og tegner igen bagefter.
+  //
+  // Det kan ikke løbe rundt: efter forsøget er hver database enten låst op
+  // eller noteret som mislykket, og i begge tilfælde er canAutoConnect falsk.
+  if (locked.length && status.canAutoConnect && !autoConnectTried) {
+    autoConnectTried = true;
+    showConnecting(locked.map((db) => db.name));
+    try {
+      await send({ type: "connect" });
+    } catch {
+      // Forsvinder hosten undervejs, tegner refresh() nedenfor billedet som
+      // det så er — typisk opsætningsafsnittet.
+    }
+    return refresh();
+  }
+
   els.query.disabled = unlocked.length === 0;
   els.lock.hidden = unlocked.length === 0;
   showDatabaseName = unlocked.length > 1;
@@ -129,9 +168,26 @@ async function refresh() {
   lockedDatabase = locked.length ? locked[0].name : null;
   els.unlock.hidden = locked.length === 0;
   if (lockedDatabase) {
-    els.unlockText.textContent = `${lockedDatabase} is locked.`;
-    els.password.hidden = true;
+    // Har auto-connect allerede prøvet og fejlet, er dens svar det der skal
+    // stå her — ikke "is locked", som ville få det til at ligne noget et klik
+    // kunne klare. Den ene fejl brugeren kan gøre noget ved herfra er en
+    // manglende keyring-entry, og så kommer password-feltet frem med det
+    // samme frem for at koste et forgæves klik først.
+    const failure = locked[0].failure;
+    const needPassword = Boolean(failure && failure.needPassword);
+    els.password.hidden = !needPassword;
+    els.unlockText.classList.toggle("error", Boolean(failure) && !needPassword);
+    if (needPassword) {
+      els.unlockText.textContent = `${lockedDatabase} has no entry in the OS keyring.`;
+    } else if (failure) {
+      els.unlockText.textContent = failure.message;
+    } else {
+      els.unlockText.textContent = `${lockedDatabase} is locked.`;
+    }
     els.unlockButton.textContent = `Unlock ${lockedDatabase}`;
+    // Er password-feltet det eneste sted der kan tastes, skal markøren stå i
+    // det. Er der en anden database låst op, hører fokus til i søgefeltet.
+    if (needPassword && unlocked.length === 0) els.password.focus();
   }
 
   if (unlocked.length) {
