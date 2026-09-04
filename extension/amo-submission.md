@@ -14,6 +14,10 @@ Reminders that are not fields:
 
 - Bump `manifest.json` first. AMO burns a version number permanently, even if
   the version is deleted.
+- **Both free-text fields cap at 3000 characters**, and AMO counts them after
+  you paste — 0.3.0's reviewer notes were written at 3400 and had to be cut on
+  the spot. Keep new ones under ~2900. The four sections earn their place in
+  this order: what changed, what the add-on does, how to test it, permissions.
 - "Do You Need to Submit Source Code?" → **No.** No build step, no
   minification: `package.sh` zips the seven listed files verbatim.
 - **Run `extension/package.sh` immediately before uploading, and upload the
@@ -65,65 +69,58 @@ Two files: background.js and popup.js. No new files, no new permissions, no
 change to the native messaging protocol.
 
 The popup used to require a click on "Unlock" before sending {cmd:"unlock"} to
-the native host. It now sends it when it opens. The message is byte-for-byte
-the one the button sent: no password field, because the host reads the
+the native host. It now sends it when it opens. The message is the one the
+button sent, byte for byte: no password in it, because the host reads the
 masterpassword from the OS keyring itself. Nothing new is stored and nothing
 new is sent anywhere — the index still lives in browser.storage.session only.
 
-Three rules keep the automatic unlock from being surprising, and all three
-live in browser.storage.session next to the index (the background page is an
-event page and may be unloaded between two popup openings):
+Three rules keep the automatic unlock from surprising anyone, all three held
+in browser.storage.session beside the index (the background page is an event
+page and may be unloaded between two popup openings):
 
-  * Pressing Lock disables the automatic unlock for the rest of the browser
-    session, so a lock stays a lock. A manual unlock re-enables it.
+  * Pressing Lock disables it for the rest of the browser session, so a lock
+    stays a lock. A manual unlock re-enables it.
   * A failed attempt is recorded per database and not retried on every popup
-    opening. Opening a KeePass database runs Argon2; repeating a doomed
-    attempt would only spend the user's CPU to print the same error.
-  * The recorded failure is what the popup then shows, including the
-    password field when the host answered need_password.
+    opening: opening a KeePass database runs Argon2, and a doomed retry would
+    only spend the user's CPU to print the same error.
+  * That recorded failure is what the popup then shows, including the password
+    field when the host answered need_password.
 
-The same file also fixes a bug: the host emits a "changed" event when the .kdbx
+The same change fixes a bug: the host emits a "changed" event when the .kdbx
 is written, and the extension re-indexed on any such event — including for a
 database the user had just locked, which unlocked it again behind their back.
 It now only refreshes an index that already exists.
-
-TESTING IT
-
-The change is visible only with the native host installed, since it is about
-what happens instead of the Unlock click. Without the host, the popup behaves
-exactly as in 0.2.1 and shows the setup button. The full end-to-end setup, with
-no account, no server and no network, is below and takes about five minutes.
 
 WHAT THE ADD-ON DOES
 
 It cannot read a KeePass database itself. It talks over native messaging to
 dk.hbb.keepass_deltasync, a subcommand of the separately installed
-keepass-deltasync binary (GPL-3.0, same repository), which opens the user's
-local .kdbx through keepassxc-cli and returns only uuid, title, URLs and group
-path — an explicit allow-list in the host, so nothing else can be sent. No
-passwords, usernames, notes or attachments reach the browser, and the
-masterpassword is read from the OS keyring by the host rather than passing
-through Firefox.
+keepass-deltasync binary (GPL-3.0, same repository), which opens the local
+.kdbx through keepassxc-cli and returns only uuid, title, URLs and group path
+— an explicit allow-list in the host. No passwords, usernames, notes or
+attachments reach the browser.
 
-To test it end to end, with no account and no server:
+TESTING IT
+
+The change needs the native host: without it the popup behaves exactly as in
+0.2.1. End to end, with no account and no server:
 
   keepassxc-cli db-create -p test.kdbx
   keepassxc-cli add -u alice --url https://example.org -g -L 16 -l -U -n       test.kdbx "Example site"
   keepass-deltasync add-local test ./test.kdbx --save-password
   keepass-deltasync install-browser-host     (then restart Firefox)
 
-Open the popup: it says "Unlocking test…" for a moment and then shows the
-search field. Type "exa" and Enter opens the entry's site. Press Lock and open
-the popup again — it stays locked and offers the button.
-"keepass-deltasync browser-host --probe test" prints exactly the JSON the
-extension would receive, without Firefox in the picture.
+Open the popup: it says "Unlocking test…" and then shows the search field.
+Type "exa" and Enter opens the entry's site. Press Lock, open it again — it
+stays locked and offers the button. "browser-host --probe test" prints the
+same JSON without Firefox.
 
 PERMISSIONS
 
 nativeMessaging reaches the host. storage is used solely as
-browser.storage.session, for the index and for the two flags above — dropped
-when Firefox closes. Nothing on disk. No host permissions, no content scripts,
-no remote code. Sources, unminified and with no build step:
+browser.storage.session — the index and the two flags above — dropped when
+Firefox closes. Nothing on disk. No host permissions, no content scripts, no
+remote code. Sources, no build step:
 https://gitlab.com/Star95/keepass-deltasync
 ```
 
