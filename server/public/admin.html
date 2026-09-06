@@ -81,13 +81,12 @@
 <div id="login" class="container center">
   <div class="card">
     <h2>DeltaSync Admin</h2>
-    <p class="muted">Paste your admin token to manage users and view the audit log.
-    The token is the one printed once when the server first started
-    (or from <code>bin/admin token:create-admin</code>). It is kept only in this
-    tab's session storage.</p>
-    <label for="token">Admin token</label>
-    <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
-    <div style="margin-top:14px"><button id="connect">Connect</button></div>
+    <p class="muted">Sign in to manage users and view the audit log.</p>
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <div style="margin-top:14px"><button id="connect">Sign in</button></div>
     <div id="login-err" class="err"></div>
   </div>
 </div>
@@ -301,13 +300,11 @@
     return canvas;
   }
 
-  const TOKEN_KEY = "deltasync_admin_token";
   // API base relative to this page → works at the web root AND under an
   // APP_BASE_PATH sub-path (e.g. /sync/admin.html → /sync/api/v1/).
   const API = new URL("api/v1/", window.location.href).href;
 
   const $ = (id) => document.getElementById(id);
-  const getToken = () => sessionStorage.getItem(TOKEN_KEY);
 
   // ---- DOM helpers (XSS-safe: never use innerHTML for server data) ----
   function el(tag, opts = {}, children = []) {
@@ -322,12 +319,16 @@
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
   // ---- API ----
+  // Auth rides on the session cookie, which is HttpOnly — this script cannot
+  // read it, and neither can anything injected into this page. That is the
+  // point: the credential is no longer in JavaScript's reach.
   async function api(method, path, body) {
-    const headers = { "Authorization": "Bearer " + getToken() };
+    const headers = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const res = await fetch(API + path, {
       method,
       headers,
+      credentials: "same-origin",
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (res.status === 204) return null;
@@ -343,37 +344,58 @@
   }
 
   // ---- Login ----
-  async function tryLogin(token) {
-    sessionStorage.setItem(TOKEN_KEY, token);
-    try {
-      await api("GET", "admin/users"); // 200 ⇒ valid admin token
-      showApp();
-    } catch (e) {
-      sessionStorage.removeItem(TOKEN_KEY);
-      throw e;
-    }
+  async function tryLogin(username, password) {
+    await api("POST", "admin/session", { username, password });
+    showApp();
   }
   function showApp() {
     $("login").classList.add("hidden");
     $("app").classList.remove("hidden");
+    $("password").value = "";
     loadUsers();
   }
-  function logout() {
-    sessionStorage.removeItem(TOKEN_KEY);
+  function showLogin() {
     $("app").classList.add("hidden");
     $("login").classList.remove("hidden");
-    $("token").value = "";
+    $("password").value = "";
+  }
+  async function logout() {
+    // Tell the server first, so the session row is gone and not merely
+    // unreachable from this browser.
+    try { await api("DELETE", "admin/session"); } catch (_) { /* log out anyway */ }
+    showLogin();
+  }
+
+  function loginErrorText(e) {
+    if (e.status === 401) return "Invalid username or password.";
+    if (e.status === 429) return "Too many attempts. Wait a minute and try again.";
+    if (e.status === 503) return "No admin account is configured on this server. "
+      + "Set ADMIN_USERNAME and ADMIN_PASSWORD, or run: php bin/admin admin:set-password <username>";
+    return e.message;
   }
 
   $("connect").addEventListener("click", async () => {
-    const t = $("token").value.trim();
+    const u = $("username").value.trim();
+    const pw = $("password").value;
     $("login-err").textContent = "";
-    if (!t) { $("login-err").textContent = "Enter a token."; return; }
-    try { await tryLogin(t); }
-    catch (e) { $("login-err").textContent = e.status === 401 ? "Invalid admin token." : e.message; }
+    if (!u || !pw) { $("login-err").textContent = "Enter a username and password."; return; }
+    $("connect").disabled = true;
+    try { await tryLogin(u, pw); }
+    catch (e) { $("login-err").textContent = loginErrorText(e); }
+    finally { $("connect").disabled = false; }
   });
-  $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connect").click(); });
+  for (const id of ["username", "password"]) {
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") $("connect").click(); });
+  }
   $("logout").addEventListener("click", logout);
+
+  // A session outlives a page reload, so try it before showing the form. It
+  // also means an expired session drops you back to login instead of leaving
+  // an empty panel behind.
+  (async () => {
+    try { await api("GET", "admin/users"); showApp(); }
+    catch (_) { showLogin(); }
+  })();
 
   // ---- Tabs ----
   document.querySelectorAll(".tabs button").forEach((b) => {

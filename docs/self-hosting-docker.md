@@ -50,6 +50,56 @@ for Docker or Kubernetes secrets. It wins over `ADMIN_TOKEN` when both are set.
 Setting it later works too: the token is added alongside any existing one, so
 nothing is lost if you already have a token you like.
 
+### A real login for the admin panel
+
+Pasting a token at every visit gets old, and the token has to live somewhere in
+the browser while you work. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` instead
+and the panel gets an ordinary sign-in form:
+
+```yaml
+    environment:
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "a-long-passphrase"
+```
+
+The password is hashed with Argon2id (tune it with `ARGON2_MEMORY_COST`,
+`ARGON2_TIME_COST` and `ARGON2_THREADS`), and signing in sets an `HttpOnly`
+session cookie — so unlike a pasted token, the credential is never reachable
+from JavaScript. The session lasts `ADMIN_SESSION_TTL_HOURS` (8 by default) and
+slides forward while you work, so a day in the panel needs one sign-in.
+Changing the password logs every open session out.
+
+Login attempts are rate-limited per IP to `RATE_LIMIT_AUTH_PER_MINUTE`
+(10 by default). A password is guessable in a way a 256-bit token is not, which
+is why the limit matters here and not for token auth.
+
+Both `ADMIN_PASSWORD_FILE` and the CLI work as alternatives:
+
+```sh
+docker compose exec app php bin/admin admin:set-password admin
+```
+
+**Bearer tokens keep working.** `bin/admin` and the client's `keepass-deltasync
+admin` commands still authenticate with a token — the login is a second way in
+for humans with a browser, not a replacement.
+
+### Behind a reverse proxy
+
+The session cookie only gets the `Secure` flag when the connection is actually
+HTTPS. The server itself always speaks plain HTTP, so behind a TLS-terminating
+proxy that fact can only arrive in the `X-Forwarded-Proto` header — which any
+client can send. So it is honoured only from addresses you list:
+
+```yaml
+      TRUSTED_PROXIES: "172.16.0.0/12"
+```
+
+Leave it empty on a plain-HTTP LAN install. The cookie is then set without
+`Secure`, which is what makes signing in possible at all — a `Secure` cookie
+over HTTP is discarded by the browser. The same setting makes `X-Forwarded-For`
+trusted, so the audit log and the rate limiter see real client IPs instead of
+the proxy's.
+
 ---
 
 ## Option B — TrueNAS SCALE (Custom App)

@@ -44,6 +44,10 @@ Prefer to decide the admin token yourself? Set `ADMIN_TOKEN` (at least 24
 characters) or `ADMIN_TOKEN_FILE` on the `app` service, and the log-reading
 step disappears.
 
+Or set `ADMIN_USERNAME` + `ADMIN_PASSWORD` and the panel gets an ordinary
+sign-in form backed by an `HttpOnly` session cookie. Bearer tokens keep working
+for the CLI and API either way.
+
 The server is then on `http://<host>:8080`. A built-in `HEALTHCHECK`
 (`GET /api/v1/health`) surfaces real status in `docker ps` and NAS UIs. Manage
 it from the browser at `/admin.html` (token-authenticated admin panel: create

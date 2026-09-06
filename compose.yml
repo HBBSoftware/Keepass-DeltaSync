@@ -58,6 +58,17 @@ services:
       # Leave it commented out and the server mints one and prints it on the
       # first start (see below). ADMIN_TOKEN_FILE works too, for secrets.
       # ADMIN_TOKEN: "paste-a-long-random-string-here"
+      #
+      # Or give the admin panel a real login instead of a pasted token.
+      # Password is Argon2id-hashed; at least 12 characters. Set both or
+      # neither. ADMIN_PASSWORD_FILE works too, for secrets.
+      # ADMIN_USERNAME: "admin"
+      # ADMIN_PASSWORD: "a-long-passphrase"
+      #
+      # Behind a TLS-terminating reverse proxy, list its IP here so the
+      # session cookie gets the Secure flag. Without it the proxy's
+      # X-Forwarded-Proto is ignored, because any client can send it.
+      # TRUSTED_PROXIES: "172.16.0.0/12"
       # --- DB access for the entrypoint's schema migrations ---
       PGHOST: db
       PGPORT: "5432"
