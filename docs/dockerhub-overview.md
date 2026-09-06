@@ -5,7 +5,7 @@ databases** across your devices (desktop CLI, Android). The server only ever
 stores ciphertext — it never sees your master password or keys.
 
 Canonical project & source: **https://gitlab.com/Star95/keepass-deltasync**
-(GPL-3.0). Mirror: https://github.com/HBBSoftware/Keepass-DeltaSync
+(server: AGPL-3.0-or-later). Mirror: https://github.com/HBBSoftware/Keepass-DeltaSync
 
 ## Tags
 
@@ -56,4 +56,8 @@ the exact env-var names):
 
 ## License
 
-GPL-3.0-or-later.
+AGPL-3.0-or-later.
+
+That covers this image. The project licenses per component: the desktop client,
+GUI, Android app and browser extension are GPL-3.0-or-later, and the docs are
+CC-BY-SA-4.0. The README has the full table.
