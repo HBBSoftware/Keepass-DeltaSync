@@ -657,6 +657,14 @@ build:installer:
 #     description are NOT set by the push — a PAT lacks the scope to edit them.
 #     Paste them once from docs/dockerhub-overview.md via the Docker Hub UI:
 #     Repository -> Manage repository -> Description + Overview.)
+#   • GHCR mirror — reuses GITHUB_TOKEN (the same PAT the GitHub release job
+#     uses; it needs the `write:packages` scope on top of `repo`). Optionally
+#     GHCR_USER / GHCR_IMAGE to override the account and repo name (default:
+#     ghcr.io/hbbsoftware/deltasync-server). TrueNAS's app catalog prefers
+#     ghcr.io over Docker Hub, because a NAS pulls anonymously and Docker Hub
+#     rate-limits that. NOTE: a freshly pushed GHCR package is PRIVATE — set it
+#     public once at
+#     github.com/users/<account>/packages/container/<name>/settings.
 #   • cosign signature — set COSIGN_PRIVATE_KEY (a cosign private key) and
 #     COSIGN_PASSWORD. The pushed image digest is signed in every registry it
 #     was pushed to. Verify with:  cosign verify --key cosign.pub <image>
@@ -703,6 +711,19 @@ publish:server-image:
         echo "$DOCKERHUB_TOKEN" | docker login -u "${DOCKERHUB_USER}" --password-stdin docker.io
         TAGS="$TAGS --tag docker.io/$DHIMAGE:$VERSION --tag docker.io/$DHIMAGE:latest"
         SIGN_REFS="$SIGN_REFS docker.io/$DHIMAGE"
+      fi
+
+      # Optional GHCR mirror (only if the GitHub PAT is configured). Registry
+      # paths must be lowercase, so the account name is downcased — GitHub
+      # spells it HBBSoftware, the registry wants hbbsoftware.
+      if [ -n "${GITHUB_TOKEN:-}" ]; then
+        GHUSER="${GHCR_USER:-HBBSoftware}"
+        GHOWNER="$(echo "$GHUSER" | tr '[:upper:]' '[:lower:]')"
+        GHIMAGE="${GHCR_IMAGE:-ghcr.io/$GHOWNER/deltasync-server}"
+        echo "==> GHCR mirror enabled: $GHIMAGE"
+        echo "$GITHUB_TOKEN" | docker login -u "$GHUSER" --password-stdin ghcr.io
+        TAGS="$TAGS --tag $GHIMAGE:$VERSION --tag $GHIMAGE:latest"
+        SIGN_REFS="$SIGN_REFS $GHIMAGE"
       fi
 
       echo "==> Building $IMAGE:$VERSION (+ :latest) for linux/amd64,linux/arm64"
