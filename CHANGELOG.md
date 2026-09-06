@@ -8,6 +8,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The admin token can be set up front** — `ADMIN_TOKEN` (or
+  `ADMIN_TOKEN_FILE`, for a Docker secret) on the server container registers
+  that token at startup instead of minting a random one and printing it to the
+  log. Reading a credential out of a container log is awkward on a NAS, where
+  the log view is a web page, and it is unrecoverable once the log rotates.
+  `TokenHasher::hash()` is plain SHA-256, so the entrypoint computes the same
+  hash the application would and inserts it with `ON CONFLICT DO NOTHING` —
+  restarts are a no-op, and setting the variable on an existing deployment
+  adds a token rather than replacing one. Tokens shorter than 24 characters
+  are refused at startup: this credential administers every user, and the
+  generated ones are 43 characters. Unset, the previous behaviour is
+  unchanged.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with

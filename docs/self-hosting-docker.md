@@ -30,6 +30,26 @@ docker compose logs app        # look for the "admin token" banner
 
 The server is now on `http://<host>:8080`.
 
+### Setting the admin token yourself
+
+Digging a token out of a log is awkward, and it is gone once the log rotates.
+Set `ADMIN_TOKEN` in the `app` service instead and you decide it up front:
+
+```sh
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '='   # generate one
+```
+
+The server registers that token on every start (it is stored as a SHA-256
+hash, so re-running is a no-op) and skips the generated-token banner
+entirely. It must be at least 24 characters — the server refuses to start
+otherwise, because this is the credential that administers every user.
+
+`ADMIN_TOKEN_FILE=/run/secrets/admin_token` does the same thing from a file,
+for Docker or Kubernetes secrets. It wins over `ADMIN_TOKEN` when both are set.
+
+Setting it later works too: the token is added alongside any existing one, so
+nothing is lost if you already have a token you like.
+
 ---
 
 ## Option B — TrueNAS SCALE (Custom App)
