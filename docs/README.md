@@ -25,6 +25,8 @@ Fælles dokumentation — protokol-specifikation, betjeningsguides, threat model
   multi-bruger sharing
 - `v3-canonical-entry-format.md` — platform-uafhængigt entry-format
 - `v4-group-sync.md` — gruppesynkronisering: struktur og entry-tilhørsforhold
+- `v5-multi-server-sync.md` — udveksling af blobs mellem to servere, i tre
+  niveauer: kopi, fuld synk, filtreret pr. enhed
 
 ## Testplaner
 
