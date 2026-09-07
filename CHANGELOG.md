@@ -531,6 +531,41 @@ instead of theirs.
   `Synchronizer` now also writes the `.kdbx` back when group changes
   (and not just entry/deletion changes) were pulled.
 
+## [client/v1.7.0] — 2026-06-26
+
+The terminal menu catches up with the desktop GUI, so a machine without a
+graphical session is no longer a second-class way to run this.
+
+### Added
+
+- **The `tui` front page mirrors the GUI's tabs** — *Databases*, *Devices*,
+  *Log*, *Admin* and *Settings* are now top-level entries, each opening a
+  submenu with that area's actions, instead of one flat list of commands.
+- **A full admin section** — list, create, enable, disable and delete users,
+  issue enrolment tokens and print `token-sql`, all on top of the existing
+  `admin` subcommands. The admin token is cached for the session and passed
+  to the subprocess through the environment, never on the command line, where
+  it would be visible to every other process on the machine.
+- **Advanced enrolment from the not-enrolled screen** — an admin can issue a
+  token and enrol the device in one step, the same flow the GUI wizard
+  offers. Previously the terminal route required issuing the token somewhere
+  else first.
+- **Smaller additions** — *Databases* gained *delete on server*, and *Log*
+  gained 24-hour, 7-day and 30-day filters.
+
+## [client/v1.6.0] — 2026-06-26
+
+### Fixed
+
+- **`admin user-create` and `admin user-enrollment` could not run on a machine
+  that was not enrolled yet.** Both resolved the server URL from
+  `config.toml` alone, which is precisely the file that does not exist yet on
+  a fresh machine — so the one command you need to bootstrap a device could
+  not be run on a device that needed bootstrapping. Both now take an optional
+  `--server` flag and fall back to the config, as `enroll` already did. This
+  is what unblocks the GUI's advanced enrolment, which issues a token and
+  enrols the PC before any config file is written.
+
 ## [client/v1.5.0] — 2026-06-24
 
 ### Added
@@ -541,6 +576,66 @@ instead of theirs.
   including the current one. This is the command the GUI's *Remove
   device* button invokes — previously the button failed because the
   subcommand did not exist (`devices` rejected all arguments).
+
+## [client/v1.4.0] — 2026-06-22
+
+**Folders sync.** Until now the sync was purely entry-based, keyed on UUID,
+and the group tree was flattened away: renaming a group, moving an entry
+between groups, or rearranging the tree simply did not reach your other
+devices. New entries landed in a `deltasync` group and you filed them by hand,
+on every device, every time.
+
+This release makes the group structure a first-class synchronised object on
+the desktop side. The design, including the wire format and the compatibility
+rules, is in [`docs/v4-group-sync.md`](docs/v4-group-sync.md).
+
+### Added
+
+- **Groups on the wire** — `canonical.Group` is a self-contained object kind
+  with its own envelope byte (`0x02`) and schema version, alongside entries.
+  Entries gain `parent_group`, added without bumping the entry schema
+  version: an older client ignores the unknown field, and an empty value is
+  left out entirely, so blobs it does understand stay byte-identical.
+- **Root as a sentinel** — every database has its own root UUID, so "lives in
+  the root" travels as an empty string and each device maps it to its own
+  root on arrival. Without that, objects would point at a group UUID that
+  does not exist on the receiving device.
+- **Push sends the tree** — the export now yields the group tree along with
+  each entry's parent, and groups are uploaded before the entries that point
+  at them. Moving an entry is detected too: a move bumps `LocationChanged`
+  and not necessarily the modification time, so the push trigger is the later
+  of the two.
+- **Pull rebuilds the tree** — the pull asks for groups explicitly, and the
+  staging database it hands to `keepassxc-cli merge` now carries the real
+  group tree with each entry nested under its parent, rather than one flat
+  group. Orphaned parents fall back to the root, group names are escaped, and
+  cycles are broken rather than followed.
+- **Deleting a group propagates** — group UUIDs seen in a previous sync are
+  tracked per database, and one that is gone from the local export is
+  tombstoned on the server. Verified against a live server: deleting a group
+  on one device sends exactly one group tombstone.
+
+### Known limitation
+
+- On the desktop **receiving** side, `keepassxc-cli merge` honours
+  `DeletedObjects` for entries but not for empty groups, so a deleted group's
+  empty shell can linger on other desktops. Android applies it correctly.
+  Entries inside a deleted group are removed everywhere, so this is cosmetic
+  rather than data loss.
+
+## [client/v1.3.0] — 2026-06-10
+
+### Added
+
+- **`delete-database <name|uuid>`** — delete a database on the server from
+  the client. `forget` only ever dropped the local binding, so the database
+  itself, its entries, versions, shares and history could only be removed
+  with a hand-written HTTP call. The command takes a local name or a raw
+  UUID — the latter so an unbound duplicate with no local name can still be
+  removed — cross-checks the server's listing to show you the real name
+  before you confirm, and refuses a database that is shared with you rather
+  than owned by you. Any matching local binding is removed afterwards; the
+  `.kdbx` file itself is left alone.
 
 ## [client/v1.2.0] — 2026-06-04
 
