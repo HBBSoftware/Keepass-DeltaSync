@@ -104,7 +104,7 @@ func TestCLIRoundTrip(t *testing.T) {
 		t.Fatalf("cli.Export: %v", err)
 	}
 
-	entries, _, err := kdbx.ParseExport(exported)
+	entries, _, _, err := kdbx.ParseExport(exported)
 	if err != nil {
 		t.Fatalf("ParseExport: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestCLIRoundTrip_MergeIntoExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cli.Export merged: %v", err)
 	}
-	entries, _, err := kdbx.ParseExport(merged)
+	entries, _, _, err := kdbx.ParseExport(merged)
 	if err != nil {
 		t.Fatalf("ParseExport merged: %v", err)
 	}
