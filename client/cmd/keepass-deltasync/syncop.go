@@ -376,7 +376,34 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		fmt.Fprintf(os.Stderr, "warning: could not delete backup %s: %v\n", backupPath, err)
 	}
 
+	// En tombstone vi lige har merget ind er autoritativ viden om at objektet
+	// er væk. Uden dette ville gruppen blive stående i KnownGroups, forsvinde
+	// fra næste eksport, og dermed ligne en gruppe der er forsvundet uden spor
+	// — hvilket både genudsender sletningen og fodrer sikkerhedsspærren med
+	// falske mistanker, indtil den til sidst nægtede at slette noget som helst.
+	e.db.KnownGroups = pruneKnownGroups(e.db.KnownGroups, deletions)
+
 	return changes.CurrentSeq, len(entries), len(deletions), nil
+}
+
+// pruneKnownGroups fjerner de UUID'er der lige er blevet tombstonet fra det
+// kendte gruppesæt. deletions dækker både entries og grupper (fælles
+// UUID-rum); at fjerne en entry-UUID der aldrig var i sættet er et no-op.
+func pruneKnownGroups(known []string, deletions []kdbx.StagingDeletion) []string {
+	if len(known) == 0 || len(deletions) == 0 {
+		return known
+	}
+	gone := make(map[string]bool, len(deletions))
+	for _, d := range deletions {
+		gone[d.UUID] = true
+	}
+	out := make([]string, 0, len(known))
+	for _, uuid := range known {
+		if !gone[uuid] {
+			out = append(out, uuid)
+		}
+	}
+	return out
 }
 
 // mergeGroupTree kombinerer det lokale gruppetræ med de grupper der kom med i
@@ -427,9 +454,39 @@ func mergeGroupTree(local []kdbx.Group, delta []kdbx.StagingGroup, deletions []k
 	return out
 }
 
+// doomedGroups sammenholder de grupper vi kendte fra sidste sync med det
+// eksporten viser nu. Returnerer dem der skal tombstones, og hvor mange af dem
+// der forsvandt UDEN spor — dvs. hverken findes i træet eller i papirkurven.
+//
+// Skelnen er hele grundlaget for sikkerhedsspærren: en gruppe der ligger i
+// papirkurven er positivt bevis for en brugerhandling, mens en gruppe der bare
+// er væk lige så godt kan skyldes at vi kigger på den forkerte fil.
+func doomedGroups(known []string, current map[string]bool, trashedList []string) (doomed []string, unexplained int) {
+	trashed := make(map[string]bool, len(trashedList))
+	for _, t := range trashedList {
+		trashed[t] = true
+	}
+	for _, uuid := range known {
+		if current[uuid] {
+			continue
+		}
+		doomed = append(doomed, uuid)
+		if !trashed[uuid] {
+			unexplained++
+		}
+	}
+	return doomed, unexplained
+}
+
 // refuseGroupDeletion afgør om et gruppe-slette-sæt er så stort at det bør
 // afvises frem for udført. Under gulvet er det normalt oprydningsarbejde; over
 // gulvet OG over procentdelen af det kendte sæt ligner det et symptom.
+//
+// doomed er kun de UFORKLAREDE sletninger — grupper der er forsvundet fra
+// eksporten uden at kunne findes i papirkurven. Ligger gruppen i papirkurven,
+// har vi positivt bevis for at brugeren slettede den, og så er selv en meget
+// stor oprydning legitim. Det er den samme skelnen som for entries: en entry
+// tombstones kun fordi vi kan SE den i papirkurven, aldrig fordi den mangler.
 func refuseGroupDeletion(doomed, known int) bool {
 	if doomed <= groupDeleteFloor {
 		return false
@@ -462,10 +519,11 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 		return 0, 0, 0, err
 	}
 
-	entries, groups, deletions, err := kdbx.ParseExport(xmlBytes)
+	exp, err := kdbx.ParseExportFull(xmlBytes)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("parse export: %w", err)
 	}
+	entries, groups, deletions := exp.Entries, exp.Groups, exp.Deletions
 
 	if force {
 		e.progressf("Pushing all %d groups + %d entries + %d tombstones (force).\n", len(groups), len(entries), len(deletions))
@@ -505,25 +563,20 @@ func (e *runEnv) pushChanges(force bool) (pushed, deleted int, maxSeq int64, err
 	for _, g := range groups {
 		currentGroups[g.UUID] = true
 	}
-	var doomed []string
-	for _, known := range e.db.KnownGroups {
-		if !currentGroups[known] {
-			doomed = append(doomed, known)
-		}
-	}
+	doomed, unexplained := doomedGroups(e.db.KnownGroups, currentGroups, exp.TrashedGroups)
 
 	// Sikkerhedsspærre. En eksport der pludselig mangler størstedelen af de
-	// kendte grupper er næsten altid et symptom — en mislykket merge der har
-	// rullet en gammel backup ind, en halvskrevet fil, eller en config der
-	// peger på den forkerte database — ikke at brugeren har slettet dem alle
-	// på én gang. Tombstones propagerer til hver eneste enhed og er dyre at
+	// kendte grupper UDEN at de ligger i papirkurven er næsten altid et
+	// symptom — en mislykket merge der har rullet en gammel backup ind, en
+	// halvskrevet fil, eller en config der peger på den forkerte database —
+	// ikke at brugeren har slettet dem alle på én gang. Tombstones propagerer til hver eneste enhed og er dyre at
 	// fortryde, så her nægter vi og lader mennesket afgøre det.
-	if refuseGroupDeletion(len(doomed), len(e.db.KnownGroups)) {
+	if refuseGroupDeletion(unexplained, len(e.db.KnownGroups)) {
 		fmt.Fprintf(os.Stderr,
-			"warning: %d of %d known groups are missing from %s — refusing to delete them on the server.\n"+
+			"warning: %d of %d known groups vanished without a trace from %s — refusing to delete them on the server.\n"+
 				"  This usually means the local database is not what it should be (failed merge, restored\n"+
 				"  backup, wrong file). No groups were deleted; nothing else in this sync is affected.\n",
-			len(doomed), len(e.db.KnownGroups), e.db.LocalPath)
+			unexplained, len(e.db.KnownGroups), e.db.LocalPath)
 		// KnownGroups bevares med vilje: overskrev vi den med det (formentlig
 		// afkortede) aktuelle sæt, ville beviset være væk næste gang.
 		doomed = nil

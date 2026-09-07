@@ -60,19 +60,26 @@ object KotpassLocalStateAdapter {
      * desktop-klientens `ParseExport` (`client/internal/kdbx/xml.go`):
      *
      *  1. **Recycle-bin-synthesis:** hvis recycle bin er aktiveret og en
-     *     gruppe er udpeget, behandles entries der ligger DIREKTE i den
-     *     gruppe som sletninger med `DeletedAt = LocationChanged` (det
-     *     tidspunkt entry'en blev flyttet i papirkurven). Det er den
-     *     almindelige sti — KeePass' standard er at "slet" flytter til
-     *     papirkurven frem for at fjerne entry'en helt.
+     *     gruppe er udpeget, behandles entries i HELE dens undertræ som
+     *     sletninger med `DeletedAt = LocationChanged` (det tidspunkt
+     *     entry'en blev flyttet i papirkurven). Det er den almindelige sti —
+     *     KeePass' standard er at "slet" flytter til papirkurven frem for at
+     *     fjerne entry'en helt. Undertræet tæller med fordi sletning af en
+     *     MAPPE flytter mappen med indhold derned: entries i en slettet mappe
+     *     ligger i en undergruppe af papirkurven, ikke direkte i den.
      *  2. **DeletedObjects:** permanente sletninger (papirkurv tømt, eller
      *     papirkurv deaktiveret) lever i KDBX' `<DeletedObjects>`-liste med
      *     UUID + deletion-time.
      *
      * Trade-off (samme som desktop): undelete — at flytte en entry UD af
      * papirkurven igen — propagerer ikke, da entry'en allerede er slettet på
-     * serveren. Entries i UNDERgrupper af papirkurven behandles som aktive
-     * (kun direkte børn synthesizes), igen for paritet med desktop.
+     * serveren. Det gælder efter denne ændring også hele mapper.
+     *
+     * Kendt asymmetri: selve den slettede GRUPPE tombstones ikke herfra.
+     * Desktop finder den ved at sammenholde med sidste syncs gruppesæt
+     * (`KnownGroups`); Android har ikke det spor endnu, så mappen bliver
+     * hængende som tom skal på de andre enheder indtil en desktop-sync rydder
+     * op. Indholdet slettes korrekt. Se docs/v4-group-sync.md.
      */
     fun read(db: KeePassDatabase): LocalState {
         val state = LocalState()
@@ -99,11 +106,17 @@ object KotpassLocalStateAdapter {
     }
 
     /**
-     * Walk'er [group]-træet rekursivt. Entries i den gruppe hvis UUID matcher
-     * [recycleBinUuid] synthesizes som tombstones (`DeletedAt =
-     * LocationChanged`); alle øvrige bliver aktive entries. Bemærk at
-     * `inRecycleBin` genberegnes pr. gruppe, så entries i UNDERgrupper af
-     * papirkurven IKKE synthesizes — kun direkte børn — identisk med desktop.
+     * Walk'er [group]-træet rekursivt. Entries i papirkurvens UNDERTRÆ
+     * synthesizes som tombstones (`DeletedAt = LocationChanged`); alle øvrige
+     * bliver aktive entries.
+     *
+     * [parentTrashed] bærer "vi er inde i papirkurven" nedad i rekursionen. Det
+     * er nødvendigt fordi det at slette en MAPPE i KeePass flytter mappen med
+     * hele sit indhold ned i papirkurven — entries i en slettet mappe ligger
+     * altså i en undergruppe af papirkurven, ikke direkte i den. Uden
+     * nedarvning blev de læst som levende entries og pushet videre, så en
+     * mappe-sletning aldrig nåede de andre enheder. Identisk med desktop's
+     * `collectTree` i `client/internal/kdbx/xml.go`.
      */
     private fun collectTree(
         group: Group,
@@ -111,8 +124,9 @@ object KotpassLocalStateAdapter {
         recycleBinUuid: UUID?,
         binaryPool: Map<ByteString, BinaryData>,
         state: LocalState,
+        parentTrashed: Boolean = false,
     ) {
-        val inRecycleBin = recycleBinUuid != null && group.uuid == recycleBinUuid
+        val inRecycleBin = parentTrashed || (recycleBinUuid != null && group.uuid == recycleBinUuid)
 
         // Reference som entries i denne gruppe + dens børn peger på: "" for
         // Root (sentinel), ellers gruppens UUID. Matcher desktop's collectTree.
@@ -143,7 +157,7 @@ object KotpassLocalStateAdapter {
                 val cg = Mapper.groupToCanonical(child, thisRef)
                 state.groups[cg.uuid] = cg
             }
-            collectTree(child, isRoot = false, recycleBinUuid, binaryPool, state)
+            collectTree(child, isRoot = false, recycleBinUuid, binaryPool, state, parentTrashed = inRecycleBin)
         }
     }
 

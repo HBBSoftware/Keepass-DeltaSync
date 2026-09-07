@@ -99,42 +99,68 @@ func RootGroupUUID(xmlBytes []byte) (string, error) {
 // deletions. Entries i <History>-undertræer ignoreres — det er entry'ens egen
 // version-historik som serveren håndterer separat.
 //
-// Entries der ligger i recycle-bin-gruppen (matches via <Meta><RecycleBinUUID>)
-// behandles som synthetic deletions med DeletedAt = entry'ens
-// <LocationChanged>. Det betyder at "delete i KeePassXC GUI" propagerer som
-// faktisk sletning til andre enheder, selv om brugeren ikke har "Empty Recycle
-// Bin" først. Trade-off: undelete (flyt entry tilbage ud af Papirkurv) virker
-// ikke på tværs af enheder — entry'en er allerede slettet på server. Hvis
+// Entries i papirkurvens undertræ (papirkurven matches via
+// <Meta><RecycleBinUUID>) behandles som synthetic deletions med DeletedAt =
+// entry'ens <LocationChanged>. Hele undertræet tæller med, fordi sletning af
+// en GRUPPE flytter gruppen med indhold derned — entries i en slettet gruppe
+// ligger altså i en undergruppe af papirkurven, ikke direkte i den. Det
+// betyder at "delete i KeePassXC GUI" propagerer som faktisk sletning til
+// andre enheder, selv om brugeren ikke har "Empty Recycle Bin" først.
+// Trade-off: undelete (flyt entry eller gruppe tilbage ud af Papirkurv)
+// virker ikke på tværs af enheder — objektet er allerede slettet på server. Hvis
 // recycle-bin er deaktiveret eller endnu ikke materialiseret
 // (RecycleBinUUID = null), gør synthesis intet.
 func ParseExport(xmlBytes []byte) ([]Entry, []Group, []Deletion, error) {
+	exp, err := ParseExportFull(xmlBytes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return exp.Entries, exp.Groups, exp.Deletions, nil
+}
+
+// Export er det fulde resultat af at parse en keepassxc-cli-eksport.
+// [ParseExport] er en bekvemmelighedsindpakning der kaster TrashedGroups væk.
+type Export struct {
+	Entries   []Entry
+	Groups    []Group
+	Deletions []Deletion
+
+	// TrashedGroups er UUID'erne på de grupper der ligger i papirkurvens
+	// undertræ. De emittes IKKE i Groups (de er slettet), men push-siden
+	// skal kunne se forskel på "gruppen er væk fordi brugeren smed den ud"
+	// og "gruppen er væk uden spor" — kun det sidste er mistænkeligt nok
+	// til at udløse sikkerhedsspærren mod masse-sletning. Se
+	// refuseGroupDeletion i cmd/keepass-deltasync/syncop.go.
+	TrashedGroups []string
+}
+
+// ParseExportFull er [ParseExport] med papirkurvs-konteksten bevaret.
+func ParseExportFull(xmlBytes []byte) (*Export, error) {
 	var doc kdbxFile
 	if err := xml.Unmarshal(xmlBytes, &doc); err != nil {
-		return nil, nil, nil, fmt.Errorf("parse kdbx xml: %w", err)
+		return nil, fmt.Errorf("parse kdbx xml: %w", err)
 	}
 
 	recycleBinUUID := activeRecycleBinUUID(doc.Meta)
 
-	var entries []Entry
-	var groups []Group
-	deletions := make([]Deletion, 0, len(doc.Root.DeletedObjects.Objects))
-	if err := collectTree(&doc.Root.Group, recycleBinUUID, true, &entries, &groups, &deletions); err != nil {
-		return nil, nil, nil, err
+	exp := &Export{Deletions: make([]Deletion, 0, len(doc.Root.DeletedObjects.Objects))}
+	if err := collectTree(&doc.Root.Group, recycleBinUUID, true, false, exp); err != nil {
+		return nil, err
 	}
 
 	for _, d := range doc.Root.DeletedObjects.Objects {
 		uuid, err := decodeUUID(d.UUID)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("deleted-object uuid: %w", err)
+			return nil, fmt.Errorf("deleted-object uuid: %w", err)
 		}
 		t, err := parseKdbxTime(d.DeletionTime)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("deletion-time for %s: %w", uuid, err)
+			return nil, fmt.Errorf("deletion-time for %s: %w", uuid, err)
 		}
-		deletions = append(deletions, Deletion{UUID: uuid, DeletedAt: t})
+		exp.Deletions = append(exp.Deletions, Deletion{UUID: uuid, DeletedAt: t})
 	}
 
-	return entries, groups, deletions, nil
+	return exp, nil
 }
 
 // activeRecycleBinUUID returnerer recycle-bin-gruppens UUID i base64-form
@@ -151,16 +177,23 @@ func activeRecycleBinUUID(m meta) string {
 }
 
 // collectTree walks groups recursively og indsamler entries (med deres
-// parent-gruppe), grupper og deletions. Entries i gruppen med UUID
-// recycleBinUUID synthesizes som Deletion i stedet for at lande i entries-
-// listen. Entries inde i <History>-undertræer besøges ikke — de lever som
-// raw InnerXML på hver parent-entry.
+// parent-gruppe), grupper og deletions. Entries i papirkurvens undertræ
+// synthesizes som Deletion i stedet for at lande i entries-listen. Entries
+// inde i <History>-undertræer besøges ikke — de lever som raw InnerXML på
+// hver parent-entry.
 //
 // isRoot markerer det øverste kald: Root-gruppen emittes aldrig som en synket
-// Group, og dens entries får ParentGroupUUID = "" (sentinel). Recycle-bin-
-// gruppen og dens undertræ emittes heller ikke som grupper.
-func collectTree(g *group, recycleBinUUID string, isRoot bool, entries *[]Entry, groups *[]Group, deletions *[]Deletion) error {
-	inRecycleBin := recycleBinUUID != "" && g.UUID == recycleBinUUID
+// Group, og dens entries får ParentGroupUUID = "" (sentinel).
+//
+// parentTrashed bærer "vi er inde i papirkurven" NEDAD i rekursionen. Det er
+// hele pointen: at slette en gruppe i KeePass flytter gruppen MED indhold ned
+// i papirkurven, så entries i en slettet gruppe ligger i en UNDERgruppe af
+// papirkurven, ikke direkte i den. Uden nedarvning blev de opsamlet som
+// levende entries med en forældregruppe der samtidig blev tombstonet — og
+// dukkede så op i roden på alle andre enheder. Grupper i undertræet emittes
+// ikke som synkede Groups; de opsamles i Export.TrashedGroups.
+func collectTree(g *group, recycleBinUUID string, isRoot, parentTrashed bool, exp *Export) error {
+	inRecycleBin := parentTrashed || (recycleBinUUID != "" && g.UUID == recycleBinUUID)
 
 	// Reference som entries i denne gruppe + dens børn skal pege på: "" for
 	// Root (sentinel), ellers gruppens standard-UUID.
@@ -191,14 +224,14 @@ func collectTree(g *group, recycleBinUUID string, isRoot bool, entries *[]Entry,
 			if err != nil {
 				return fmt.Errorf("recycle-bin deletion-time for entry %s: %w", uuid, err)
 			}
-			*deletions = append(*deletions, Deletion{UUID: uuid, DeletedAt: t})
+			exp.Deletions = append(exp.Deletions, Deletion{UUID: uuid, DeletedAt: t})
 			continue
 		}
 		t, err := parseKdbxTime(e.Times.LastModificationTime)
 		if err != nil {
 			return fmt.Errorf("modified-time for entry %s: %w", uuid, err)
 		}
-		*entries = append(*entries, Entry{
+		exp.Entries = append(exp.Entries, Entry{
 			UUID:            uuid,
 			ModifiedAt:      t,
 			Fragment:        []byte(e.InnerXML),
@@ -210,16 +243,27 @@ func collectTree(g *group, recycleBinUUID string, isRoot bool, entries *[]Entry,
 	for i := range g.Groups {
 		child := &g.Groups[i]
 		childIsRecycleBin := recycleBinUUID != "" && child.UUID == recycleBinUUID
-		// Emit child som synket Group — men ikke recycle-bin'en, ikke
-		// undertræet i recycle bin (lokalt/slettet).
-		if !inRecycleBin && !childIsRecycleBin {
+		// Emit child som synket Group — men ikke recycle-bin'en selv, og ikke
+		// noget i dens undertræ (slettet). Alt i undertræet noteres i stedet
+		// som trashed, så push-siden ved hvorfor gruppen forsvandt.
+		switch {
+		case childIsRecycleBin:
+			// Papirkurven selv synkroniseres aldrig — hverken som gruppe
+			// eller som trashed. Den er lokal infrastruktur.
+		case inRecycleBin:
+			uuid, err := decodeUUID(child.UUID)
+			if err != nil {
+				return fmt.Errorf("trashed group uuid: %w", err)
+			}
+			exp.TrashedGroups = append(exp.TrashedGroups, uuid)
+		default:
 			gr, err := buildGroup(child, thisRef)
 			if err != nil {
 				return err
 			}
-			*groups = append(*groups, gr)
+			exp.Groups = append(exp.Groups, gr)
 		}
-		if err := collectTree(child, recycleBinUUID, false, entries, groups, deletions); err != nil {
+		if err := collectTree(child, recycleBinUUID, false, inRecycleBin, exp); err != nil {
 			return err
 		}
 	}

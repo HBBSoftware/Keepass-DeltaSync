@@ -121,9 +121,14 @@ tilsvarende også emittere grupper.
 ## Konflikt-semantik (skal bekræftes)
 
 - **Omdøb/flyt af gruppe:** last-writer-wins på tidsstempel (som entries).
-- **Sletning af gruppe (tombstone via `deleted`-flag):** Entries/undergrupper i en
-  slettet gruppe → **flyttes til papirkurv** (KeePass-norm). *(Åbent: alternativ =
-  flyt til Root, eller blokér sletning af ikke-tom gruppe.)*
+- **Sletning af gruppe (tombstone via `deleted`-flag):** AFKLARET 2026-08-27:
+  entries og undergrupper i en slettet gruppe **slettes med** (tombstones).
+  Papirkurven er allerede sandheden lokalt — KeePass flytter den slettede
+  gruppe med hele sit indhold derned — så begge klienter behandler nu HELE
+  papirkurvens undertræ som slettet, ikke kun dens direkte børn. Alternativet
+  "flyt til Root" blev valgt fra: det ville lade en entry brugeren har slettet
+  overleve på de andre enheder, hvilket er den forkerte fejlretning for en
+  password-manager.
 - **Cyklisk parent** (A→B→A pga. samtidige flytninger): detektér og bryd ved
   apply (fald tilbage til Root for den brydende gruppe) — ellers uendelig løkke.
 - **Papirkurv:** recycle-bin er allerede speciel (`activeRecycleBinUuid`).
@@ -153,9 +158,24 @@ tilsvarende også emittere grupper.
 Indsats: fase 5 + 6 er ~70%. Fase 1 først (uafhængig). Desktop (fase 4) næsten
 gratis pga. keepassxc-cli.
 
-## Åbne spørgsmål (kræver beslutning)
+## Åbne spørgsmål
 
-1. Entries i en **slettet gruppe**: papirkurv (anbefalet) vs. Root vs. blokér?
+1. ~~Entries i en **slettet gruppe**~~ — afklaret 2026-08-27, se
+   Konflikt-semantik ovenfor: de slettes med.
 2. **Mixed-fleet-politik**: acceptér transient Root-fald (anbefalet for lille
    flåde) vs. udskyd til alle klienter er opgraderet?
 3. Root-sentinel: tom string (anbefalet) vs. null-UUID?
+
+## Kendt asymmetri: gruppe-sletning fra Android
+
+Desktop finder en slettet gruppe ved at sammenholde eksporten med sidste syncs
+gruppesæt (`known_groups` i config) og tombstoner de manglende — med en
+sikkerhedsspærre der kun tæller de grupper der forsvandt uden at kunne findes i
+papirkurven (`doomedGroups` + `refuseGroupDeletion` i `syncop.go`).
+
+Android har ikke det spor: `SyncEngine.push` sender kun grupper og
+entry-tombstones, aldrig `api.deleteGroup` (metoden findes, men er ubrugt).
+Sletter man en mappe på telefonen, slettes **indholdet** korrekt på alle
+enheder, men selve mappen bliver hængende som tom skal indtil en desktop-sync
+rydder op. Rettelsen er at spejle desktop's `known_groups` i Androids
+persisterede state — udskudt, ikke glemt.

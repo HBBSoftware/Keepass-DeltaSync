@@ -102,6 +102,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Deleting a folder left its entries alive on every other device.** Deleting
+  a group in KeePass moves the group *with its contents* into the recycle bin,
+  so the entries end up in a subgroup of the bin rather than directly in it.
+  Both clients only treated the bin's direct children as deleted, so those
+  entries were still collected as live objects — and pushed, with a parent
+  group that the same sync was tombstoning. On every other device the group
+  disappeared while its entries resurfaced in the root, and the passwords you
+  meant to delete stayed in the database. The recycle-bin marker now carries
+  down the whole subtree on both desktop (`ParseExport`) and Android
+  (`KotpassLocalStateAdapter.read`), so deleting a folder deletes what is in
+  it, subfolders included.
+
+  Unchanged, and worth knowing: undelete still does not propagate. Dragging an
+  entry — or now a folder — back out of the recycle bin does not resurrect it
+  elsewhere, because it is already tombstoned on the server.
+
+- **A large folder deletion was refused as if it were corruption.** The guard
+  against mass group deletion counted every group missing from the export,
+  including the ones plainly sitting in the recycle bin, so deleting one folder
+  with five or more subfolders could trip it and silently sync nothing. It now
+  counts only groups that vanished *without a trace*, which is the case it was
+  built for (a failed merge, a restored backup, the wrong file). A deletion the
+  export can account for is always carried out, however large. This mirrors how
+  entries have always worked: an entry is tombstoned because we can see it in
+  the recycle bin, never because it is missing.
+
 - **Lock in the Firefox popup did not survive the next sync.** The host keeps
   watching the `.kdbx` after a `lock`, and the extension re-indexed on every
   change event it got — including for a database it no longer held an index

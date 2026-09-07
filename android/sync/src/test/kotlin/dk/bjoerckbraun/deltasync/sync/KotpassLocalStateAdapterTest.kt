@@ -432,6 +432,62 @@ class KotpassLocalStateAdapterTest {
     // --- Helpers ---
 
     /** Tæl forekomster af [uuid] i HELE gruppetræet, inkl. papirkurven (modsat findEntries). */
+    @Test
+    fun `read tombstones entries in a deleted folder inside the recycle bin`() {
+        val liveUuid = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc")
+        val recycleBinId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+        val deletedGroupId = UUID.fromString("aaaa0000-0000-0000-0000-00000000000a")
+        val deletedSubGroupId = UUID.fromString("bbbb0000-0000-0000-0000-00000000000b")
+        val inFolder = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd")
+        val inSubFolder = UUID.fromString("dddddddd-dddd-dddd-dddd-eeeeeeeeeeee")
+        val movedAt = Instant.parse("2026-05-31T08:00:00Z")
+
+        fun trashed(uuid: UUID, title: String) = kotpassEntry(uuid, title).let {
+            it.copy(times = it.times!!.copy(locationChanged = movedAt.toJavaInstant()))
+        }
+
+        // Sådan ser en slettet mappe ud i KeePass: mappen med hele sit indhold
+        // ligger som UNDERgruppe af papirkurven — ikke entries direkte i den.
+        val db = freshDatabase()
+            .modifyParentGroup {
+                copy(
+                    entries = entries + kotpassEntry(liveUuid, "Live"),
+                    groups = groups + Group(
+                        uuid = recycleBinId,
+                        name = "Recycle Bin",
+                        groups = listOf(
+                            Group(
+                                uuid = deletedGroupId,
+                                name = "Slettet mappe",
+                                entries = listOf(trashed(inFolder, "IFolder")),
+                                groups = listOf(
+                                    Group(
+                                        uuid = deletedSubGroupId,
+                                        name = "Undermappe",
+                                        entries = listOf(trashed(inSubFolder, "ISubFolder")),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            .modifyMeta { copy(recycleBinEnabled = true, recycleBinUuid = recycleBinId) }
+
+        val state = KotpassLocalStateAdapter.read(db)
+
+        // Kun den levende entry overlever; begge entries i den slettede mappe
+        // bliver tombstones med flytte-tidspunktet som slettetid.
+        assertEquals(1, state.entries.size)
+        assertTrue(state.entries.containsKey(liveUuid.toString()))
+        assertEquals(movedAt, state.tombstones[inFolder.toString()])
+        assertEquals(movedAt, state.tombstones[inSubFolder.toString()])
+
+        // Og ingen af de slettede mapper må rapporteres som levende grupper —
+        // så ville de holde sig selv i live på serveren.
+        assertTrue(state.groups.isEmpty(), "slettede mapper blev emitteret som levende: ${state.groups.keys}")
+    }
+
     private fun countOccurrences(db: KeePassDatabase, uuid: UUID): Int {
         fun walk(group: Group): Int =
             group.entries.count { it.uuid == uuid } + group.groups.sumOf { walk(it) }
