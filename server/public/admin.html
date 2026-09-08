@@ -81,7 +81,8 @@
 <div id="login" class="container center">
   <div class="card">
     <h2>DeltaSync Admin</h2>
-    <p class="muted">Sign in to manage users and view the audit log.</p>
+    <div id="server-problem" class="err hidden" style="text-align:left; margin-bottom:12px"></div>
+    <p id="login-intro" class="muted">Sign in to manage users and view the audit log.</p>
     <label for="username">Username</label>
     <input id="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
     <label for="password">Password</label>
@@ -369,9 +370,27 @@
   function loginErrorText(e) {
     if (e.status === 401) return "Invalid username or password.";
     if (e.status === 429) return "Too many attempts. Wait a minute and try again.";
-    if (e.status === 503) return "No admin account is configured on this server. "
-      + "Set ADMIN_USERNAME and ADMIN_PASSWORD, or run: php bin/admin admin:set-password <username>";
+    // Every 503 carries a message written for a human — a failed startup, an
+    // unreachable database, or no admin account yet. Show it as given.
+    if (e.status === 503) return e.message;
     return e.message;
+  }
+
+  // A server that cannot serve is worth saying up front, rather than letting
+  // the sign-in form sit there looking ordinary until someone types into it.
+  function showServerProblem(e) {
+    const box = $("server-problem");
+    if (!e || (e.status !== 503 && e.status !== 500)) {
+      box.classList.add("hidden");
+      return false;
+    }
+    clear(box);
+    box.appendChild(el("strong", { text: "This server is not ready." }));
+    box.appendChild(el("div", { text: e.message || ("HTTP " + e.status) }));
+    box.classList.remove("hidden");
+    $("login-intro").classList.add("hidden");
+    $("connect").disabled = true;
+    return true;
   }
 
   $("connect").addEventListener("click", async () => {
@@ -393,8 +412,15 @@
   // also means an expired session drops you back to login instead of leaving
   // an empty panel behind.
   (async () => {
-    try { await api("GET", "admin/users"); showApp(); }
-    catch (_) { showLogin(); }
+    try {
+      await api("GET", "admin/users");
+      showApp();
+    } catch (e) {
+      showLogin();
+      // 401 just means "not signed in yet". Anything else is the server
+      // telling us it cannot work, and that belongs on screen immediately.
+      showServerProblem(e);
+    }
   })();
 
   // ---- Tabs ----

@@ -12,16 +12,42 @@ set -eu
 
 APP_DIR=/var/www/app
 
+# A misconfiguration used to end in `exit 1`, which under `restart:
+# unless-stopped` means a crash loop: the port never opens and a browser says
+# nothing more useful than "unable to connect". The reason was only ever
+# visible to whoever thought to run `docker logs`.
+#
+# Instead we record why, and start the web server anyway. Every request then
+# answers 503 with the reason, including /api/v1/health — so the container
+# still reports UNHEALTHY to Docker and the NAS, which is correct, while a
+# human who opens the address gets told what to fix.
+STARTUP_ERROR_FILE="$APP_DIR/.startup-error"
+
+fail_startup() {
+    echo "[entrypoint] STARTUP ERROR: $1" >&2
+    printf '%s\n' "$1" > "$STARTUP_ERROR_FILE" 2>/dev/null || true
+    echo "[entrypoint] serving the diagnostic page instead; the app is not usable until this is fixed." >&2
+    exec apache2-foreground
+}
+
 # Only run the DB bootstrap when we're about to start the web server. This lets
 # you run one-off admin commands without re-triggering migrations, e.g.:
 #   docker compose run --rm app php bin/admin user:create alice
 if [ "${1:-}" = "apache2-foreground" ]; then
+    # A previous boot may have left one behind; a fixed config must clear it.
+    rm -f "$STARTUP_ERROR_FILE"
+
     : "${PGHOST:=db}"
     : "${PGPORT:=5432}"
     : "${PGUSER:=deltasync}"
 
     echo "[entrypoint] waiting for PostgreSQL at ${PGHOST}:${PGPORT} ..."
+    waited=0
     until pg_isready -q -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+        waited=$((waited + 1))
+        if [ "$waited" -ge 120 ]; then
+            fail_startup "PostgreSQL at ${PGHOST}:${PGPORT} did not become ready within 120s. Check that the database container is running and that PGHOST/PGPORT point at it."
+        fi
         sleep 1
     done
     echo "[entrypoint] PostgreSQL is up."
@@ -45,10 +71,12 @@ if [ "${1:-}" = "apache2-foreground" ]; then
         # File + bookkeeping insert run as ONE transaction: if the SQL fails,
         # ON_ERROR_STOP aborts and the insert is rolled back, so it retries
         # cleanly next start.
-        {
+        if ! {
             cat "$f"
             printf "\nINSERT INTO _container_migrations (filename) VALUES ('%s');\n" "$name"
-        } | psql -v ON_ERROR_STOP=1 -q --single-transaction
+        } | psql -v ON_ERROR_STOP=1 -q --single-transaction; then
+            fail_startup "Schema migration [$name] failed. The database rejected it, so nothing was applied. Check the container log for the SQL error, and that DATABASE_USER may create tables."
+        fi
     done
     echo "[entrypoint] migrations up to date."
 
@@ -60,8 +88,7 @@ if [ "${1:-}" = "apache2-foreground" ]; then
     # Idempotent: ON CONFLICT DO NOTHING, so restarts are a no-op.
     if [ -n "${ADMIN_TOKEN_FILE:-}" ]; then
         if [ ! -r "$ADMIN_TOKEN_FILE" ]; then
-            echo "[entrypoint] ERROR: ADMIN_TOKEN_FILE is set but not readable: $ADMIN_TOKEN_FILE" >&2
-            exit 1
+            fail_startup "ADMIN_TOKEN_FILE is set but not readable: $ADMIN_TOKEN_FILE"
         fi
         ADMIN_TOKEN="$(head -n 1 "$ADMIN_TOKEN_FILE" | tr -d '\r\n')"
     fi
@@ -69,17 +96,18 @@ if [ "${1:-}" = "apache2-foreground" ]; then
     if [ -n "${ADMIN_TOKEN:-}" ]; then
         # A generated token is 43 chars (32 random bytes, base64url). Refuse
         # anything short enough to be guessed — this is the master credential.
+        # The length is logged, not the token. A value that arrives shorter
+        # than it was typed is the signature of something eating it on the way
+        # in — Docker Compose expands an unescaped $ in a YAML value, and YAML
+        # itself drops everything after an unquoted ' #'.
+        echo "[entrypoint] ADMIN_TOKEN received: ${#ADMIN_TOKEN} characters."
         if [ "${#ADMIN_TOKEN}" -lt 24 ]; then
-            echo "[entrypoint] ERROR: ADMIN_TOKEN is ${#ADMIN_TOKEN} characters; at least 24 are required." >&2
-            echo "[entrypoint] Generate one with:" >&2
-            echo "[entrypoint]   openssl rand -base64 32 | tr '+/' '-_' | tr -d '='" >&2
-            exit 1
+            fail_startup "ADMIN_TOKEN is ${#ADMIN_TOKEN} characters; at least 24 are required. If you set a longer one, something shortened it: quote the value, and write a literal dollar sign as \$\$ (Compose expands a single \$ as a variable). Generate a safe one with: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='"
         fi
 
         admin_hash="$(printf '%s' "$ADMIN_TOKEN" | sha256sum | cut -d' ' -f1)"
         if [ "${#admin_hash}" -ne 64 ] || [ -n "$(printf '%s' "$admin_hash" | tr -d '0-9a-f')" ]; then
-            echo "[entrypoint] ERROR: could not compute a SHA-256 hash of ADMIN_TOKEN." >&2
-            exit 1
+            fail_startup "Could not compute a SHA-256 hash of ADMIN_TOKEN."
         fi
 
         # The hash is hex by construction (checked above), so interpolating it
@@ -97,8 +125,7 @@ if [ "${1:-}" = "apache2-foreground" ]; then
     # command is idempotent and only writes when something actually changed.
     if [ -n "${ADMIN_PASSWORD_FILE:-}" ]; then
         if [ ! -r "$ADMIN_PASSWORD_FILE" ]; then
-            echo "[entrypoint] ERROR: ADMIN_PASSWORD_FILE is set but not readable: $ADMIN_PASSWORD_FILE" >&2
-            exit 1
+            fail_startup "ADMIN_PASSWORD_FILE is set but not readable: $ADMIN_PASSWORD_FILE"
         fi
         ADMIN_PASSWORD="$(head -n 1 "$ADMIN_PASSWORD_FILE" | tr -d '\r\n')"
         export ADMIN_PASSWORD
@@ -106,15 +133,18 @@ if [ "${1:-}" = "apache2-foreground" ]; then
 
     admin_login_configured=0
     if [ -n "${ADMIN_USERNAME:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+        # Same reasoning as ADMIN_TOKEN above: the length is the one detail
+        # that catches a value mangled in transit, and it is not a secret.
+        echo "[entrypoint] admin account: username=[${ADMIN_USERNAME}], password is ${#ADMIN_PASSWORD} characters."
         if [ "${#ADMIN_PASSWORD}" -lt 12 ]; then
-            echo "[entrypoint] ERROR: ADMIN_PASSWORD is ${#ADMIN_PASSWORD} characters; at least 12 are required." >&2
-            exit 1
+            fail_startup "ADMIN_PASSWORD is ${#ADMIN_PASSWORD} characters; at least 12 are required. If you set a longer one, something shortened it: quote the value, and write a literal dollar sign as \$\$ (Compose expands a single \$ as a variable)."
         fi
-        php "$APP_DIR/bin/admin" admin:ensure
+        if ! php "$APP_DIR/bin/admin" admin:ensure; then
+            fail_startup "Could not create or update the admin account. See the container log for the reason."
+        fi
         admin_login_configured=1
     elif [ -n "${ADMIN_USERNAME:-}" ] || [ -n "${ADMIN_PASSWORD:-}" ]; then
-        echo "[entrypoint] ERROR: set BOTH ADMIN_USERNAME and ADMIN_PASSWORD, or neither." >&2
-        exit 1
+        fail_startup "Set BOTH ADMIN_USERNAME and ADMIN_PASSWORD, or neither. Only one of them is set."
     fi
 
     # --- First-time admin token ---------------------------------------------
