@@ -65,6 +65,8 @@
     background: #04222e; border: 1px solid var(--accent); border-radius: 8px;
     padding: 14px; margin-top: 12px;
   }
+  ol.steps { margin: 8px 0 0 18px; padding: 0; }
+  ol.steps li { margin-bottom: 8px; line-height: 1.5; }
   .token-box code { display: block; word-break: break-all; font-size: 1rem; margin: 8px 0; color: var(--accent); }
   .qr-wrap { margin: 12px 0 4px; }
   .qr-wrap canvas { background: #fff; padding: 8px; border-radius: 6px; display: block; image-rendering: pixelated; width: 208px; height: 208px; }
@@ -96,16 +98,14 @@
 <div id="app" class="hidden">
   <header class="site">
     <div class="brand">DeltaSync <small>admin</small></div>
-    <div>
-      <a id="clients-link" class="secondary small" target="_blank" rel="noopener noreferrer">Get clients</a>
-      <button id="logout" class="secondary small">Log out</button>
-    </div>
+    <button id="logout" class="secondary small">Log out</button>
   </header>
   <div class="container">
     <div class="tabs">
       <button data-tab="users" class="active">Users</button>
       <button data-tab="devices">Devices</button>
       <button data-tab="log">Audit log</button>
+      <button data-tab="next">Next steps</button>
     </div>
 
     <!-- Users -->
@@ -151,6 +151,78 @@
         audit log on <code>auth.success</code>.</p>
         <div id="devices-table"></div>
         <div id="devices-err" class="err"></div>
+      </div>
+    </section>
+
+    <!-- Next steps -->
+    <section id="tab-next" class="hidden">
+      <div class="card">
+        <h2>Handing a database to someone</h2>
+        <ol class="steps">
+          <li><strong>Create the user</strong> under <em>Users</em>. You get a
+            one-time enrollment token, shown as text and as a QR code.</li>
+          <li><strong>Send the token over a secure channel.</strong> It is shown
+            once and expires; issue a new one from the same tab if it lapses.</li>
+          <li><strong>They install the app</strong> for their platform — see
+            below.</li>
+          <li><strong>They enroll</strong>: open the app, enter this server's
+            address and paste the token. On Android, scan the QR code instead.</li>
+        </ol>
+        <p class="muted">This server's address, as this page reached it:</p>
+        <div class="token-box"><code id="server-url"></code></div>
+        <p class="note" id="http-warning" hidden>⚠ This address is plain HTTP.
+          The Android app refuses cleartext connections, so a phone cannot enroll
+          against it — put an HTTPS reverse proxy in front of the server first.
+          The desktop clients are unaffected.</p>
+      </div>
+
+      <div class="card">
+        <h2>What to download</h2>
+        <p class="muted">Everything below is on the project's
+          <a id="rel-link" target="_blank" rel="noopener noreferrer">Releases page</a>.
+          Pick the newest release of each component.</p>
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>Download</th><th>From</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Windows</strong></td>
+              <td>Windows installer (GUI&nbsp;+&nbsp;CLI) — <code>.exe</code></td>
+              <td>a <code>gui/v*</code> release</td>
+            </tr>
+            <tr>
+              <td rowspan="2"><strong>Linux</strong></td>
+              <td>Linux (amd64) — <code>.tar.gz</code> &nbsp;<span class="muted">(keepass-deltasync client)</span></td>
+              <td>a <code>client/v*</code> release</td>
+            </tr>
+            <tr>
+              <td>Linux (amd64) — <code>.tar.xz</code> &nbsp;<span class="muted">(keepass-deltasync GUI)</span></td>
+              <td>a <code>gui/v*</code> release</td>
+            </tr>
+            <tr>
+              <td><strong>Android</strong></td>
+              <td><code>DeltaSync-&lt;version&gt;.apk</code></td>
+              <td><a id="android-link" target="_blank" rel="noopener noreferrer">GitHub releases</a></td>
+            </tr>
+            <tr>
+              <td><strong>macOS</strong></td>
+              <td colspan="2">See <a id="site-link-macos" target="_blank" rel="noopener noreferrer">the website</a> — there is no prebuilt macOS app.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="muted">On Windows the installer contains both parts. On Linux
+          they are two downloads: the GUI drives the client, so both are needed.
+          The Android build lives on GitHub rather than GitLab because it is
+          signed outside CI; <a href="https://github.com/ImranR98/Obtainium"
+          target="_blank" rel="noopener noreferrer">Obtainium</a> can follow that
+          release feed and keep the app updated.</p>
+      </div>
+
+      <div class="card">
+        <h2>More</h2>
+        <p>Guides, the Firefox extension and a walkthrough live on
+          <a id="site-link" target="_blank" rel="noopener noreferrer">the DeltaSync website</a>.</p>
       </div>
     </section>
 
@@ -329,6 +401,9 @@
   // stay in step.
   const RELEASES_URL = "https://gitlab.com/Star95/keepass-deltasync/-/releases";
   const SITE_URL     = "https://deltasync.bjoerck-braun.dk/";
+  // The Android APK is signed outside CI and published to the GitHub mirror's
+  // releases — not to GitLab with everything else, and not to the website.
+  const ANDROID_URL  = "https://github.com/HBBSoftware/Keepass-DeltaSync/releases";
 
   const $ = (id) => document.getElementById(id);
 
@@ -433,7 +508,18 @@
   }
   $("logout").addEventListener("click", logout);
   $("refresh-devices").addEventListener("click", loadDevices);
-  $("clients-link").setAttribute("href", SITE_URL);
+
+  $("rel-link").setAttribute("href", RELEASES_URL);
+  $("site-link").setAttribute("href", SITE_URL);
+  $("android-link").setAttribute("href", ANDROID_URL);
+  $("site-link-macos").setAttribute("href", SITE_URL);
+  // The API base minus the trailing api/v1/ — what a client should be pointed
+  // at. Derived from this page, so it stays right behind a proxy or a
+  // sub-path rather than being something the admin has to work out.
+  $("server-url").textContent = API.replace(/api\/v1\/$/, "").replace(/\/$/, "");
+  // Only warn when it actually applies. Behind an HTTPS proxy the note would
+  // be noise, and a warning that fires when it should not is soon ignored.
+  $("http-warning").hidden = window.location.protocol !== "http:";
 
   // A session outlives a page reload, so try it before showing the form. It
   // also means an expired session drops you back to login instead of leaving
@@ -459,6 +545,7 @@
       $("tab-users").classList.toggle("hidden", tab !== "users");
       $("tab-devices").classList.toggle("hidden", tab !== "devices");
       $("tab-log").classList.toggle("hidden", tab !== "log");
+      $("tab-next").classList.toggle("hidden", tab !== "next");
       if (tab === "devices") loadDevices();
     });
   });
@@ -492,20 +579,13 @@
       ]));
     } catch (_) { /* payload too large for a QR — token + copy button still work */ }
 
-    // The token is only half of what the user needs. Say where the client
-    // comes from, here, rather than leaving the admin to find the link.
-    const where = el("div", { class: "muted", style: "margin-top:10px" });
-    where.appendChild(document.createTextNode("The user needs a client: "));
-    where.appendChild(el("a", {
-      text: "desktop downloads",
-      attrs: { href: RELEASES_URL, target: "_blank", rel: "noopener noreferrer" },
+    // The token is only half of what the user needs. The other half — which
+    // download, and what to do with it — lives on the Next steps tab, so it is
+    // written once instead of repeated here.
+    box.appendChild(el("div", {
+      class: "muted", style: "margin-top:10px",
+      text: "The user also needs a client. See the Next steps tab for what to send them.",
     }));
-    where.appendChild(document.createTextNode(" · "));
-    where.appendChild(el("a", {
-      text: "Android and Firefox",
-      attrs: { href: SITE_URL, target: "_blank", rel: "noopener noreferrer" },
-    }));
-    box.appendChild(where);
 
     container.appendChild(box);
   }
