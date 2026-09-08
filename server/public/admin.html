@@ -96,11 +96,15 @@
 <div id="app" class="hidden">
   <header class="site">
     <div class="brand">DeltaSync <small>admin</small></div>
-    <button id="logout" class="secondary small">Log out</button>
+    <div>
+      <a id="clients-link" class="secondary small" target="_blank" rel="noopener noreferrer">Get clients</a>
+      <button id="logout" class="secondary small">Log out</button>
+    </div>
   </header>
   <div class="container">
     <div class="tabs">
       <button data-tab="users" class="active">Users</button>
+      <button data-tab="devices">Devices</button>
       <button data-tab="log">Audit log</button>
     </div>
 
@@ -131,6 +135,22 @@
         </div>
         <div id="users-table"></div>
         <div id="users-err" class="err"></div>
+      </div>
+    </section>
+
+    <!-- Devices -->
+    <section id="tab-devices" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <h2>Devices</h2>
+          <button id="refresh-devices" class="secondary small">Refresh</button>
+        </div>
+        <p class="muted">Every enrolled device and when it last contacted the
+        server. Least recently seen first, so a device that has gone quiet is
+        at the top. For a full connection history with IP addresses, filter the
+        audit log on <code>auth.success</code>.</p>
+        <div id="devices-table"></div>
+        <div id="devices-err" class="err"></div>
       </div>
     </section>
 
@@ -305,6 +325,11 @@
   // APP_BASE_PATH sub-path (e.g. /sync/admin.html → /sync/api/v1/).
   const API = new URL("api/v1/", window.location.href).href;
 
+  // Where a user gets a client. Kept here so both places that link to them
+  // stay in step.
+  const RELEASES_URL = "https://gitlab.com/Star95/keepass-deltasync/-/releases";
+  const SITE_URL     = "https://deltasync.bjoerck-braun.dk/";
+
   const $ = (id) => document.getElementById(id);
 
   // ---- DOM helpers (XSS-safe: never use innerHTML for server data) ----
@@ -407,6 +432,8 @@
     $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") $("connect").click(); });
   }
   $("logout").addEventListener("click", logout);
+  $("refresh-devices").addEventListener("click", loadDevices);
+  $("clients-link").setAttribute("href", SITE_URL);
 
   // A session outlives a page reload, so try it before showing the form. It
   // also means an expired session drops you back to login instead of leaving
@@ -430,7 +457,9 @@
       b.classList.add("active");
       const tab = b.getAttribute("data-tab");
       $("tab-users").classList.toggle("hidden", tab !== "users");
+      $("tab-devices").classList.toggle("hidden", tab !== "devices");
       $("tab-log").classList.toggle("hidden", tab !== "log");
+      if (tab === "devices") loadDevices();
     });
   });
 
@@ -462,6 +491,22 @@
         el("div", { class: "qr-cap", text: "Scan with the DeltaSync Android app (Enroll → Scan QR code)." }),
       ]));
     } catch (_) { /* payload too large for a QR — token + copy button still work */ }
+
+    // The token is only half of what the user needs. Say where the client
+    // comes from, here, rather than leaving the admin to find the link.
+    const where = el("div", { class: "muted", style: "margin-top:10px" });
+    where.appendChild(document.createTextNode("The user needs a client: "));
+    where.appendChild(el("a", {
+      text: "desktop downloads",
+      attrs: { href: RELEASES_URL, target: "_blank", rel: "noopener noreferrer" },
+    }));
+    where.appendChild(document.createTextNode(" · "));
+    where.appendChild(el("a", {
+      text: "Android and Firefox",
+      attrs: { href: SITE_URL, target: "_blank", rel: "noopener noreferrer" },
+    }));
+    box.appendChild(where);
+
     container.appendChild(box);
   }
 
@@ -472,6 +517,63 @@
       const data = await api("GET", "admin/users");
       renderUsers(data.users || []);
     } catch (e) { $("users-err").textContent = e.message; }
+  }
+
+  async function loadDevices() {
+    $("devices-err").textContent = "";
+    try {
+      const data = await api("GET", "admin/devices");
+      renderDevices(data.devices || []);
+    } catch (e) { $("devices-err").textContent = e.message; }
+  }
+
+  // "3 days ago" answers the question the timestamp only implies. The exact
+  // value stays in the title attribute for when it matters.
+  function since(iso) {
+    if (!iso) return "never";
+    const secs = Math.floor((Date.now() - Date.parse(iso)) / 1000);
+    if (!isFinite(secs)) return "—";
+    if (secs < 90) return "just now";
+    const units = [["minute", 60], ["hour", 3600], ["day", 86400], ["month", 2592000], ["year", 31536000]];
+    let best = units[0];
+    for (const u of units) if (secs >= u[1]) best = u;
+    const n = Math.floor(secs / best[1]);
+    return n + " " + best[0] + (n === 1 ? "" : "s") + " ago";
+  }
+
+  function renderDevices(devices) {
+    const wrap = $("devices-table");
+    clear(wrap);
+    if (!devices.length) {
+      wrap.appendChild(el("p", { class: "muted", text: "No devices enrolled yet." }));
+      return;
+    }
+
+    const head = el("tr", {}, ["Device", "Owner", "Last seen", "Enrolled", "Sharing key"]
+      .map((h) => el("th", { text: h })));
+
+    const rows = devices.map((d) => {
+      const seen = d.last_seen
+        ? el("td", { text: since(d.last_seen), attrs: { title: d.last_seen } })
+        : el("td", {}, [el("span", { class: "pill off", text: "never" })]);
+      // A device enrolled before v2 has no X25519 key and cannot receive a
+      // shared database until it updates. Worth seeing at a glance.
+      const key = d.has_public_key
+        ? el("span", { class: "pill ok", text: "yes" })
+        : el("span", { class: "pill off", text: "no" });
+      return el("tr", {}, [
+        el("td", { text: d.name || "—" }),
+        el("td", { text: d.username }),
+        seen,
+        el("td", {
+          text: (d.enrolled_at || "").replace("T", " ").replace(/\..*$/, ""),
+          attrs: { title: d.enrolled_at || "" },
+        }),
+        el("td", {}, [key]),
+      ]);
+    });
+
+    wrap.appendChild(el("table", {}, [el("thead", {}, [head]), el("tbody", {}, rows)]));
   }
 
   function renderUsers(users) {

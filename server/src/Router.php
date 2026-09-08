@@ -83,6 +83,7 @@ final class Router
         $this->add('DELETE', '/api/v1/admin/users/{id}',                                         'Admin\\UserController::destroy',         'admin');
         $this->add('POST',   '/api/v1/admin/users/{id}/enrollment',                              'Admin\\UserController::enrollment',      'admin');
         $this->add('POST',   '/api/v1/admin/databases/{id}/entries/{uuid}/restore/{num}',        'Admin\\EntryRestoreController::restore', 'admin');
+        $this->add('GET',    '/api/v1/admin/devices',                                            'Admin\\DeviceController::index',         'admin');
         $this->add('GET',    '/api/v1/admin/log',                                                'Admin\\LogController::index',            'admin');
         // Login/logout er 'public': de er vejen TIL legitimation. Beskyttelsen
         // er rate limiting pr. IP, ikke et token.
