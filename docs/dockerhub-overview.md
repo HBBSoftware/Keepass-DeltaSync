@@ -5,7 +5,7 @@ databases** across your devices (desktop CLI, Android). The server only ever
 stores ciphertext — it never sees your master password or keys.
 
 Canonical project & source: **https://gitlab.com/Star95/keepass-deltasync**
-(GPL-3.0). Mirror: https://github.com/HBBSoftware/Keepass-DeltaSync
+(server: AGPL-3.0-or-later). Mirror: https://github.com/HBBSoftware/Keepass-DeltaSync
 
 ## Tags
 
@@ -40,6 +40,14 @@ docker compose up -d
 docker compose logs app     # copy the one-time admin token from the banner
 ```
 
+Prefer to decide the admin token yourself? Set `ADMIN_TOKEN` (at least 24
+characters) or `ADMIN_TOKEN_FILE` on the `app` service, and the log-reading
+step disappears.
+
+Or set `ADMIN_USERNAME` + `ADMIN_PASSWORD` and the panel gets an ordinary
+sign-in form backed by an `HttpOnly` session cookie. Bearer tokens keep working
+for the CLI and API either way.
+
 The server is then on `http://<host>:8080`. A built-in `HEALTHCHECK`
 (`GET /api/v1/health`) surfaces real status in `docker ps` and NAS UIs. Manage
 it from the browser at `/admin.html` (token-authenticated admin panel: create
@@ -56,4 +64,8 @@ the exact env-var names):
 
 ## License
 
-GPL-3.0-or-later.
+AGPL-3.0-or-later.
+
+That covers this image. The project licenses per component: the desktop client,
+GUI, Android app and browser extension are GPL-3.0-or-later, and the docs are
+CC-BY-SA-4.0. The README has the full table.

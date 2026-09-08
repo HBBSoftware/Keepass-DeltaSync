@@ -7,6 +7,8 @@ namespace KeePassDeltaSync;
 
 use KeePassDeltaSync\Audit\AuditLogger;
 use KeePassDeltaSync\Audit\EventType;
+use KeePassDeltaSync\Auth\AdminSession;
+use KeePassDeltaSync\Auth\AuthContext;
 use KeePassDeltaSync\Auth\AuthenticationException;
 use KeePassDeltaSync\Auth\TokenAuthenticator;
 use KeePassDeltaSync\Auth\TokenType;
@@ -82,6 +84,10 @@ final class Router
         $this->add('POST',   '/api/v1/admin/users/{id}/enrollment',                              'Admin\\UserController::enrollment',      'admin');
         $this->add('POST',   '/api/v1/admin/databases/{id}/entries/{uuid}/restore/{num}',        'Admin\\EntryRestoreController::restore', 'admin');
         $this->add('GET',    '/api/v1/admin/log',                                                'Admin\\LogController::index',            'admin');
+        // Login/logout er 'public': de er vejen TIL legitimation. Beskyttelsen
+        // er rate limiting pr. IP, ikke et token.
+        $this->add('POST',   '/api/v1/admin/session',                                            'Admin\\SessionController::create',        'public');
+        $this->add('DELETE', '/api/v1/admin/session',                                            'Admin\\SessionController::destroy',       'public');
         $this->add('POST',   '/api/v1/admin/log/cleanup',                                        'Admin\\LogController::cleanup',          'admin');
     }
 
@@ -128,7 +134,16 @@ final class Router
             $requestLogger = $logger->forRequest($request);
         } else {
             $bearer = $request->bearerToken();
-            if ($bearer === null) {
+
+            // Admin-routes har to veje ind: bearer-token for maskiner
+            // (bin/admin, klientens `admin`-kommandoer) og session-cookie for
+            // browseren. Cookien er HttpOnly, så panelet aldrig behøver holde
+            // legitimation i JavaScript. Alle andre route-typer er token-only.
+            $sessionToken = $route['auth'] === 'admin'
+                ? $request->cookie(AdminSession::COOKIE_NAME)
+                : null;
+
+            if ($bearer === null && $sessionToken === null) {
                 $logger->forRequest($request)->info(EventType::AuthFailure, [
                     'details' => ['route' => $route['path'], 'reason' => 'missing_bearer'],
                     'success' => false,
@@ -139,9 +154,22 @@ final class Router
                 ]);
             }
 
-            try {
-                $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
-            } catch (AuthenticationException) {
+            $ctx = null;
+            if ($bearer !== null) {
+                try {
+                    $ctx = $authenticator->authenticate($bearer, TokenType::from($route['auth']));
+                } catch (AuthenticationException) {
+                    $ctx = null;
+                }
+            }
+            if ($ctx === null
+                && $sessionToken !== null
+                && AdminSession::validate($pdo, $sessionToken, $config->adminSessionTtlHours)
+            ) {
+                $ctx = new AuthContext(TokenType::Admin);
+            }
+
+            if ($ctx === null) {
                 $logger->forRequest($request)->info(EventType::AuthFailure, [
                     'details' => ['route' => $route['path'], 'reason' => 'invalid_token'],
                     'success' => false,

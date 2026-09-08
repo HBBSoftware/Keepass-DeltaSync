@@ -8,6 +8,44 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The admin panel has a real login** — username and password instead of
+  pasting a bearer token at every visit. The token had to live in the tab's
+  session storage while you worked, which put the credential that administers
+  every user within reach of any script on the page; the session now rides in
+  an `HttpOnly` cookie that JavaScript cannot read. Set it with
+  `ADMIN_USERNAME` + `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_FILE`, or
+  `bin/admin admin:set-password`). Passwords are Argon2id-hashed, which is what
+  the `ARGON2_*` settings were always for — a password is guessable in a way
+  32 random bytes are not, so the reasoning in `TokenHasher` does not apply
+  here. For the same reason login is rate-limited per IP with
+  `RATE_LIMIT_AUTH_PER_MINUTE`, emitting the `auth.rate_limited` audit event
+  that the enum already defined. Sessions last `ADMIN_SESSION_TTL_HOURS`
+  (8 by default) and slide forward with use; changing the password revokes
+  every open one.
+
+  **Bearer tokens are unaffected.** `bin/admin` and the client's `admin`
+  commands authenticate exactly as before — admin routes now accept either.
+
+  `TRUSTED_PROXIES` decides when the session cookie gets the `Secure` flag:
+  behind a TLS-terminating proxy the only evidence of HTTPS is
+  `X-Forwarded-Proto`, and any client can send that, so it counts only from
+  listed addresses. It also resolves the standing TODO in `Request::clientIp()`
+  — `X-Forwarded-For` is now honoured on the same terms, so the audit log and
+  the rate limiter can see real client IPs.
+
+- **The admin token can be set up front** — `ADMIN_TOKEN` (or
+  `ADMIN_TOKEN_FILE`, for a Docker secret) on the server container registers
+  that token at startup instead of minting a random one and printing it to the
+  log. Reading a credential out of a container log is awkward on a NAS, where
+  the log view is a web page, and it is unrecoverable once the log rotates.
+  `TokenHasher::hash()` is plain SHA-256, so the entrypoint computes the same
+  hash the application would and inserts it with `ON CONFLICT DO NOTHING` —
+  restarts are a no-op, and setting the variable on an existing deployment
+  adds a token rather than replacing one. Tokens shorter than 24 characters
+  are refused at startup: this credential administers every user, and the
+  generated ones are 43 characters. Unset, the previous behaviour is
+  unchanged.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with

@@ -6,6 +6,8 @@ declare(strict_types=1);
 namespace KeePassDeltaSync\Cli;
 
 use KeePassDeltaSync\Admin\UserAdmin;
+use KeePassDeltaSync\Auth\AdminAccount;
+use KeePassDeltaSync\Auth\AdminSession;
 use KeePassDeltaSync\Config;
 use KeePassDeltaSync\Crypto\TokenHasher;
 use KeePassDeltaSync\Db\Connection;
@@ -24,6 +26,9 @@ use KeePassDeltaSync\Db\Connection;
  */
 final class AdminCli
 {
+    /** Samme minimum som container-entrypointet håndhæver. */
+    private const MIN_PASSWORD_LENGTH = 12;
+
     public function __construct(private readonly Config $config) {}
 
     /** Entry point fra bin/admin. */
@@ -45,6 +50,8 @@ final class AdminCli
 
         return match ($command) {
             'token:create-admin'         => $this->createAdminToken(),
+            'admin:set-password'         => $this->setAdminPassword($rest),
+            'admin:ensure'               => $this->ensureAdminAccount(),
             'user:create'                => $this->createUser($rest),
             'user:enrollment'            => $this->createEnrollmentToken($rest),
             'user:list'                  => $this->listUsers(),
@@ -69,6 +76,16 @@ final class AdminCli
               Generér en ny admin-token. Token printes én gang til stdout
               og lagres kun som hash i DB.
 
+        Admin-login (browser-panelet):
+          admin:set-password <username>
+              Sæt brugernavn og adgangskode til admin-panelet. Adgangskoden
+              læses fra ADMIN_PASSWORD hvis den er sat, ellers spørges der
+              interaktivt. Alle åbne sessioner logges ud.
+
+          admin:ensure
+              Opret/opdatér kontoen ud fra ADMIN_USERNAME + ADMIN_PASSWORD.
+              Idempotent — kaldes af container-entrypointet ved hver opstart.
+
         Bruger-administration:
           user:create <username> [--display-name=...]
               Opret bruger og generér enrollment-token til den første enhed.
@@ -91,6 +108,123 @@ final class AdminCli
 
         HELP);
         return 0;
+    }
+
+    /**
+     * admin:set-password <username> — sæt legitimation til admin-panelet.
+     *
+     * Adgangskoden tages fra ADMIN_PASSWORD hvis den findes (så kommandoen
+     * kan scriptes), ellers spørges der interaktivt med slukket echo.
+     */
+    private function setAdminPassword(array $args): int
+    {
+        $username = $args[0] ?? null;
+        if (!is_string($username) || trim($username) === '') {
+            fwrite(STDERR, "Anvendelse: admin admin:set-password <username>\n");
+            return 2;
+        }
+        $username = trim($username);
+
+        $password = getenv('ADMIN_PASSWORD');
+        if (!is_string($password) || $password === '') {
+            $password = $this->promptHidden('Adgangskode: ');
+            $confirm  = $this->promptHidden('Gentag: ');
+            if ($password !== $confirm) {
+                fwrite(STDERR, "Adgangskoderne er ikke ens.\n");
+                return 1;
+            }
+        }
+
+        if (strlen($password) < self::MIN_PASSWORD_LENGTH) {
+            fwrite(STDERR, sprintf(
+                "Adgangskoden er %d tegn; mindst %d kræves.\n",
+                strlen($password),
+                self::MIN_PASSWORD_LENGTH,
+            ));
+            return 1;
+        }
+
+        try {
+            $pdo = Connection::fromConfig($this->config);
+            AdminAccount::set($pdo, $username, $password, $this->config);
+            // En ny adgangskode skal slå eksisterende browser-sessioner ihjel,
+            // ellers overlever en stjålet cookie netop den handling der er
+            // ment som svaret på tyveriet.
+            AdminSession::destroyAll($pdo);
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        fwrite(STDOUT, "Admin-konto '$username' opdateret. Alle sessioner er logget ud.\n");
+        return 0;
+    }
+
+    /**
+     * admin:ensure — kontoen ud fra environment. Kaldes ved hver opstart, så
+     * den skriver kun når noget faktisk er ændret.
+     */
+    private function ensureAdminAccount(): int
+    {
+        $username = getenv('ADMIN_USERNAME');
+        $password = getenv('ADMIN_PASSWORD');
+
+        if (!is_string($username) || $username === '' || !is_string($password) || $password === '') {
+            // Ikke en fejl: kontoen er valgfri, og uden den falder panelet
+            // tilbage på bearer-token som før.
+            return 0;
+        }
+
+        if (strlen($password) < self::MIN_PASSWORD_LENGTH) {
+            fwrite(STDERR, sprintf(
+                "ADMIN_PASSWORD er %d tegn; mindst %d kræves.\n",
+                strlen($password),
+                self::MIN_PASSWORD_LENGTH,
+            ));
+            return 1;
+        }
+
+        try {
+            $pdo     = Connection::fromConfig($this->config);
+            $changed = AdminAccount::set($pdo, trim($username), $password, $this->config);
+            if ($changed) {
+                AdminSession::destroyAll($pdo);
+                fwrite(STDOUT, "Admin-konto '" . trim($username) . "' sat fra environment.\n");
+            }
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        return 0;
+    }
+
+    /** Læs en linje fra stdin uden at vise den. Falder tilbage til synlig input. */
+    private function promptHidden(string $prompt): string
+    {
+        fwrite(STDOUT, $prompt);
+
+        $hasStty = false;
+        if (function_exists('shell_exec')) {
+            $probe   = shell_exec('command -v stty 2>/dev/null');
+            $hasStty = is_string($probe) && trim($probe) !== '';
+        }
+
+        if ($hasStty) {
+            $original = shell_exec('stty -g 2>/dev/null');
+            shell_exec('stty -echo 2>/dev/null');
+        }
+
+        $line = fgets(STDIN);
+
+        if ($hasStty) {
+            if (is_string($original) && trim($original) !== '') {
+                shell_exec('stty ' . trim($original) . ' 2>/dev/null');
+            } else {
+                shell_exec('stty echo 2>/dev/null');
+            }
+            fwrite(STDOUT, "\n");
+        }
+
+        return is_string($line) ? rtrim($line, "\r\n") : '';
     }
 
     private function unknownCommand(?string $cmd): int
