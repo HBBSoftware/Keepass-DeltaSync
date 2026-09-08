@@ -8,6 +8,30 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The admin panel lists devices** — `GET /api/v1/admin/devices`, and a
+  Devices tab showing every enrolled device, its owner, when it was enrolled
+  and when it last contacted the server, least recently seen first. The data
+  was already there: `TokenAuthenticator` writes `devices.last_seen` on every
+  successful device auth. It just was not reachable from an admin session —
+  `/api/v1/devices` requires a *device* token and only ever shows the caller's
+  own user, so an administrator could see that Alice had three devices but not
+  which three, or whether any of them had been in touch since spring.
+
+  Read-only, deliberately. An admin can already read the audit log with its
+  device ids, create users, issue enrollment tokens and delete users, so a
+  listing grants nothing new — it makes visible data legible. Revoking someone
+  else's device is a genuinely new power and belongs to its own decision.
+  `devices.token_hash` never leaves the query; columns are listed explicitly.
+
+  A device enrolled before v2 has no X25519 key and cannot receive a shared
+  database until it updates, so the table shows that per row.
+
+- **The panel says where to get a client.** An enrollment token is half of what
+  a new user needs; the other half is the software to paste it into. The token
+  box now links to the desktop releases and the site covering Android and
+  Firefox, and there is a *Get clients* link in the header for when no token is
+  being issued.
+
 - **A misconfigured server explains itself instead of refusing connections** —
   the entrypoint used to `exit 1` on a bad setting, which under
   `restart: unless-stopped` is a crash loop: the port never opens, the browser
