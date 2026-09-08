@@ -1,75 +1,6 @@
-# Changelog
-
-All notable changes to this project are documented here. The format
-follows [Keep a Changelog](https://keepachangelog.com/) and the
-project adheres to [Semantic Versioning](https://semver.org/).
-
 ## [Unreleased]
 
 ### Added
-
-- **The admin panel lists devices** — `GET /api/v1/admin/devices`, and a
-  Devices tab showing every enrolled device, its owner, when it was enrolled
-  and when it last contacted the server, least recently seen first. The data
-  was already there: `TokenAuthenticator` writes `devices.last_seen` on every
-  successful device auth. It just was not reachable from an admin session —
-  `/api/v1/devices` requires a *device* token and only ever shows the caller's
-  own user, so an administrator could see that Alice had three devices but not
-  which three, or whether any of them had been in touch since spring.
-
-  Read-only, deliberately. An admin can already read the audit log with its
-  device ids, create users, issue enrollment tokens and delete users, so a
-  listing grants nothing new — it makes visible data legible. Revoking someone
-  else's device is a genuinely new power and belongs to its own decision.
-  `devices.token_hash` never leaves the query; columns are listed explicitly.
-
-  A device enrolled before v2 has no X25519 key and cannot receive a shared
-  database until it updates, so the table shows that per row.
-
-- **The panel says where to get a client.** An enrollment token is half of what
-  a new user needs; the other half is the software to paste it into. The token
-  box now links to the desktop releases and the site covering Android and
-  Firefox, and there is a *Get clients* link in the header for when no token is
-  being issued.
-
-- **A misconfigured server explains itself instead of refusing connections** —
-  the entrypoint used to `exit 1` on a bad setting, which under
-  `restart: unless-stopped` is a crash loop: the port never opens, the browser
-  says "unable to connect", and the reason exists only for whoever thinks to
-  run `docker logs`. On a NAS, where the log is a web page you have to know to
-  open, that is most of the debugging cost. It now records the reason and
-  starts the web server anyway; every route answers 503 with that text, so the
-  container still reports **unhealthy** — it genuinely is — but says why. The
-  admin panel shows it as a banner and disables the sign-in button rather than
-  sitting there looking ordinary. Fixing the setting and restarting clears it.
-
-  The wait for PostgreSQL is now bounded at 120s instead of looping forever, so
-  a database that never arrives is reported rather than waited on silently.
-
-- **`ADMIN_TOKEN` and `ADMIN_PASSWORD` log their length at startup.** Not their
-  value. A credential that arrives shorter than it was typed is the signature
-  of something eating it in transit — Docker Compose expands an unescaped `$`
-  in a YAML value, and YAML drops everything after an unquoted ` #`. Both
-  produce a working server that rejects the password you are certain you set,
-  and the length is the one detail that names the problem instantly. The error
-  for a too-short value says so outright.
-
-- **Troubleshooting keyed on the exact error text.** The two failures that cost
-  the most time — a bind path that does not exist, and `db` never reporting
-  healthy because the Postgres 18 volume was mounted one directory too deep —
-  happen before any of our code runs, so no amount of reporting inside the
-  container reaches them. What can be done is to meet people where they land:
-  each section is titled with the literal string Docker prints, so it can be
-  searched for. Includes the detail that TrueNAS' log viewer truncates the
-  lines, which hides the part that names the cause.
-
-### Fixed
-
-- **An unreachable database returned an opaque 500 on every route**, including
-  `/api/v1/health`, whose whole purpose is to report exactly that. The
-  connection is opened before routing, so the failure was caught by the generic
-  handler and answered `an unexpected error occurred`. It now answers 503
-  `database_unavailable` with a message naming the settings to check.
 
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
@@ -202,6 +133,73 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [server/v0.4.0] — 2026-09-08
+
+### Added
+
+- **The admin panel lists devices** — `GET /api/v1/admin/devices`, and a
+  Devices tab showing every enrolled device, its owner, when it was enrolled
+  and when it last contacted the server, least recently seen first. The data
+  was already there: `TokenAuthenticator` writes `devices.last_seen` on every
+  successful device auth. It just was not reachable from an admin session —
+  `/api/v1/devices` requires a *device* token and only ever shows the caller's
+  own user, so an administrator could see that Alice had three devices but not
+  which three, or whether any of them had been in touch since spring.
+
+  Read-only, deliberately. An admin can already read the audit log with its
+  device ids, create users, issue enrollment tokens and delete users, so a
+  listing grants nothing new — it makes visible data legible. Revoking someone
+  else's device is a genuinely new power and belongs to its own decision.
+  `devices.token_hash` never leaves the query; columns are listed explicitly.
+
+  A device enrolled before v2 has no X25519 key and cannot receive a shared
+  database until it updates, so the table shows that per row.
+
+- **The panel says where to get a client.** An enrollment token is half of what
+  a new user needs; the other half is the software to paste it into. The token
+  box now links to the desktop releases and the site covering Android and
+  Firefox, and there is a *Get clients* link in the header for when no token is
+  being issued.
+
+- **A misconfigured server explains itself instead of refusing connections** —
+  the entrypoint used to `exit 1` on a bad setting, which under
+  `restart: unless-stopped` is a crash loop: the port never opens, the browser
+  says "unable to connect", and the reason exists only for whoever thinks to
+  run `docker logs`. On a NAS, where the log is a web page you have to know to
+  open, that is most of the debugging cost. It now records the reason and
+  starts the web server anyway; every route answers 503 with that text, so the
+  container still reports **unhealthy** — it genuinely is — but says why. The
+  admin panel shows it as a banner and disables the sign-in button rather than
+  sitting there looking ordinary. Fixing the setting and restarting clears it.
+
+  The wait for PostgreSQL is now bounded at 120s instead of looping forever, so
+  a database that never arrives is reported rather than waited on silently.
+
+- **`ADMIN_TOKEN` and `ADMIN_PASSWORD` log their length at startup.** Not their
+  value. A credential that arrives shorter than it was typed is the signature
+  of something eating it in transit — Docker Compose expands an unescaped `$`
+  in a YAML value, and YAML drops everything after an unquoted ` #`. Both
+  produce a working server that rejects the password you are certain you set,
+  and the length is the one detail that names the problem instantly. The error
+  for a too-short value says so outright.
+
+- **Troubleshooting keyed on the exact error text.** The two failures that cost
+  the most time — a bind path that does not exist, and `db` never reporting
+  healthy because the Postgres 18 volume was mounted one directory too deep —
+  happen before any of our code runs, so no amount of reporting inside the
+  container reaches them. What can be done is to meet people where they land:
+  each section is titled with the literal string Docker prints, so it can be
+  searched for. Includes the detail that TrueNAS' log viewer truncates the
+  lines, which hides the part that names the cause.
+
+### Fixed
+
+- **An unreachable database returned an opaque 500 on every route**, including
+  `/api/v1/health`, whose whole purpose is to report exactly that. The
+  connection is opened before routing, so the failure was caught by the generic
+  handler and answered `an unexpected error occurred`. It now answers 503
+  `database_unavailable` with a message naming the settings to check.
 
 ## [server/v0.3.0] — 2026-09-08
 
