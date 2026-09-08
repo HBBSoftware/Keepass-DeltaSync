@@ -10,7 +10,7 @@ so their version lines can never collide:
 |-----------|------------|-------------|
 | Desktop client (Go, `client/`) | `client/vX.Y.Z` | GitLab CI → cross-compiled binaries + GitLab Release |
 | Android app (`android/`) | `android/vX.Y.Z` | CI builds an **unsigned** APK; `android/publish-release.sh` signs it locally and publishes it (the release keystore never enters CI). The app also carries its own `versionCode` + `versionName` in `android/app/build.gradle.kts` |
-| Server (PHP, `server/`) | `server/vX.Y.Z` | Deployed directly; the tag is a marker only — no build artifact |
+| Server (PHP, `server/`) | `server/vX.Y.Z` | GitLab CI → multi-arch image (`linux/amd64` + `linux/arm64`) pushed to the GitLab registry, and to Docker Hub and GHCR when their tokens are configured |
 | Firefox extension (`extension/`) | `extension/vX.Y.Z` | CI packages an **unsigned**, byte-reproducible `.xpi` via `extension/package.sh` and attaches it to a GitLab Release; signing happens outside CI. The extension also carries its own `version` in `extension/manifest.json` |
 | Desktop GUI (Go/Fyne, `gui/`) | `gui/vX.Y.Z` | CI cross-compiles the Linux `.tar.xz` + Windows `.exe` and publishes a GitLab Release. The GUI also carries its own `Version` in `gui/FyneApp.toml`. The same tag also builds the combined Windows installer (GUI + CLI in one `setup.exe`) — see below |
 
@@ -117,12 +117,31 @@ from. `gui/installer/build.ps1` builds the same thing on Windows and is still
 the way to produce one off a tag — keep it and the CI jobs in step if the
 staging layout changes.
 
-**Server**: deploy `server/`, then tag for the record:
+**Server**: tag, and CI builds and pushes the image:
 
 ```
-git tag server/v1.0.0
-git push origin server/v1.0.0
+git tag server/v0.3.0
+git push origin server/v0.3.0
 ```
+
+`publish:server-image` cross-builds `linux/amd64` + `linux/arm64` with buildx
+and pushes `:X.Y.Z` **and** `:latest` to the GitLab Container Registry, which
+needs no setup. Two mirrors activate only when their variables are set, so the
+job keeps working untouched until you opt in:
+
+- Docker Hub — `DOCKERHUB_USER` + `DOCKERHUB_TOKEN`
+- GHCR — `GITHUB_TOKEN`, the same PAT the GitHub release job uses, with
+  `write:packages` added to its scopes
+
+A newly created GHCR package is **private**. After the first push it has to be
+made public once by hand, or an anonymous pull — which is what a NAS does —
+gets a 404.
+
+If `COSIGN_PRIVATE_KEY` is set, the same manifest digest is signed in every
+registry it was pushed to.
+
+Note that `:latest` moves on every server tag. There is no pre-release channel;
+tag only what you are willing to have pulled by anything following `latest`.
 
 ## Legacy tags — do not reuse
 
