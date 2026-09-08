@@ -188,6 +188,88 @@ safely.
 
 ---
 
+## Troubleshooting
+
+Since 0.3.1 the server explains most misconfigurations itself: it starts, and
+every request — including `/api/v1/health` — answers 503 with the reason, which
+the admin panel shows as a banner. If you can reach the address at all, read
+what it says there first.
+
+What follows is the class it *cannot* report, because the container never
+starts. On TrueNAS those live in `/var/log/app_lifecycle.log`. Note that the
+pager truncates the lines, and the useful part is at the end:
+
+```sh
+sudo tail -n 3 /var/log/app_lifecycle.log | fold -w 150
+```
+
+### `bind source path does not exist: /mnt/...`
+
+The directory has to exist before the container starts. Docker will not create
+it — `create_host_path` is false — and this is the first thing that bites when
+a path is copied from an example and the pool is named something else.
+
+```sh
+zfs list -d 1                                   # what are the pools called?
+sudo zfs create -p <pool>/apps/deltasync/postgres-data
+```
+
+Or sidestep it: use a named volume (`pgdata:/var/lib/postgresql`) and there is
+no host path to get wrong. The trade is that the data then lives in Docker's
+storage rather than a dataset you can snapshot on its own.
+
+### `dependency failed to start: container ... is unhealthy`
+
+When the unhealthy container is `db`, this is nearly always the Postgres volume
+path. Postgres 18 sets `PGDATA=/var/lib/postgresql/18/docker` and declares
+`/var/lib/postgresql` as its volume, so mounting at `/var/lib/postgresql/data`
+— correct for Postgres 16 and still in older examples — nests a volume inside a
+volume. The database ends up in an anonymous volume, the container never
+reports healthy, and `app` is held back by `depends_on`.
+
+Mount the parent:
+
+```yaml
+    volumes:
+      - pgdata:/var/lib/postgresql        # not .../data
+```
+
+### Sign-in rejects a password you are certain is right
+
+Something ate part of it on the way in, and both culprits are silent:
+
+- **Docker Compose expands `$`.** `"Kode$xyz123"` becomes `Kode`. Write a
+  literal dollar sign as `$$`, or avoid them.
+- **YAML truncates at an unquoted ` #`.** Everything after it is a comment.
+
+Quote every password value, and check the startup log — the server prints the
+length it received, which settles it in one line:
+
+```
+[entrypoint] admin account: username=[admin], password is 4 characters.
+```
+
+Fix the value and redeploy; the account is updated in place, so there is
+nothing to clean up first.
+
+### Nothing answers at all
+
+If the address refuses the connection rather than returning an error page, the
+container is not running:
+
+```sh
+sudo docker ps -a --filter name=deltasync --format '{{.Names}}\t{{.Status}}'
+sudo docker logs <the app container> 2>&1 | tail -20
+```
+
+`Restarting` means it starts and dies; the log says why.
+
+> Installing from the TrueNAS app catalog avoids the first three of these
+> outright: the dataset is created for you, the library sets the Postgres data
+> directory itself, and it escapes `$` in every value before Compose sees it.
+
+---
+
 ## Notes
 
 - **No public/default server exists** — DeltaSync only works against a server
