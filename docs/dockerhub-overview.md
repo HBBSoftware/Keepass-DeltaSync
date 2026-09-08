@@ -62,6 +62,15 @@ the exact env-var names):
 > [`compose.yml`](https://gitlab.com/Star95/keepass-deltasync/-/blob/main/compose.yml)
 > uses a YAML anchor so you only set the password once.
 
+## Troubleshooting
+
+A misconfigured server starts anyway and answers 503 with the reason on every
+route, so open the address and read the banner. The failures it *cannot* report
+— the container never starts — are covered under
+[Troubleshooting](https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/self-hosting-docker.md#troubleshooting),
+along with the two that catch people out most: the Postgres 18 volume path, and
+Docker Compose eating an unescaped `$` in a password.
+
 ## License
 
 AGPL-3.0-or-later.

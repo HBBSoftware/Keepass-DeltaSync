@@ -30,6 +30,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
   and the length is the one detail that names the problem instantly. The error
   for a too-short value says so outright.
 
+- **Troubleshooting keyed on the exact error text.** The two failures that cost
+  the most time — a bind path that does not exist, and `db` never reporting
+  healthy because the Postgres 18 volume was mounted one directory too deep —
+  happen before any of our code runs, so no amount of reporting inside the
+  container reaches them. What can be done is to meet people where they land:
+  each section is titled with the literal string Docker prints, so it can be
+  searched for. Includes the detail that TrueNAS' log viewer truncates the
+  lines, which hides the part that names the cause.
+
 ### Fixed
 
 - **An unreachable database returned an opaque 500 on every route**, including
