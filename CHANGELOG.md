@@ -1,39 +1,12 @@
+# Changelog
+
+All notable changes to this project are documented here. The format
+follows [Keep a Changelog](https://keepachangelog.com/) and the
+project adheres to [Semantic Versioning](https://semver.org/).
+
 ## [Unreleased]
 
 ### Added
-
-- **A Next steps tab in the admin panel.** Creating a user and issuing a token
-  is the easy half; the admin was then left to work out what to send the person
-  and what they should do with it. The tab lays out the four steps, shows this
-  server's address as the page itself reached it — so it stays right behind a
-  proxy or under `APP_BASE_PATH` instead of being something to work out — and
-  names the exact release assets per platform: one installer on Windows, and on
-  Linux the client and the GUI as two downloads, because the GUI drives the
-  client. It closes with a link to the website.
-
-  Only the graphical route is described. The CLI is what the GUI runs
-  underneath, but presenting it as the way in excludes everyone who does not
-  want a terminal. The previous *Get clients* link in the header is gone; it
-  read as a stray button next to Log out rather than as part of the panel's
-  four tabs.
-
-  When the panel itself was reached over plain HTTP, the tab says so: the
-  Android app sets `usesCleartextTraffic="false"` and cannot enroll against an
-  `http://` server, which surfaces as a raw platform message that reads like
-  the server is broken. The note appears only when it applies — behind an HTTPS
-  proxy it would be noise, and a warning that fires when it should not is soon
-  ignored.
-
-  Android points at the GitHub mirror's releases, where the signed APK actually
-  is. The APK is built unsigned in CI and signed outside it, so it is the one
-  artefact that does not land on GitLab with the rest — and the website only
-  mentions the pending F-Droid submission, so sending people there would have
-  been a dead end.
-
-  macOS is listed too, pointing at the website and saying plainly that there is
-  no prebuilt macOS app — `release:gui` cross-compiles Linux and Windows only.
-  Sending Mac users to the CLI would contradict the point of the tab, and
-  leaving them off the table entirely reads as an oversight.
 
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
@@ -166,6 +139,43 @@
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [server/v0.4.1] — 2026-09-08
+
+### Added
+
+- **A Next steps tab in the admin panel.** Creating a user and issuing a token
+  is the easy half; the admin was then left to work out what to send the person
+  and what they should do with it. The tab lays out the four steps, shows this
+  server's address as the page itself reached it — so it stays right behind a
+  proxy or under `APP_BASE_PATH` instead of being something to work out — and
+  names the exact release assets per platform: one installer on Windows, and on
+  Linux the client and the GUI as two downloads, because the GUI drives the
+  client. It closes with a link to the website.
+
+  Only the graphical route is described. The CLI is what the GUI runs
+  underneath, but presenting it as the way in excludes everyone who does not
+  want a terminal. The previous *Get clients* link in the header is gone; it
+  read as a stray button next to Log out rather than as part of the panel's
+  four tabs.
+
+  When the panel itself was reached over plain HTTP, the tab says so: the
+  Android app sets `usesCleartextTraffic="false"` and cannot enroll against an
+  `http://` server, which surfaces as a raw platform message that reads like
+  the server is broken. The note appears only when it applies — behind an HTTPS
+  proxy it would be noise, and a warning that fires when it should not is soon
+  ignored.
+
+  Android points at the GitHub mirror's releases, where the signed APK actually
+  is. The APK is built unsigned in CI and signed outside it, so it is the one
+  artefact that does not land on GitLab with the rest — and the website only
+  mentions the pending F-Droid submission, so sending people there would have
+  been a dead end.
+
+  macOS is listed too, pointing at the website and saying plainly that there is
+  no prebuilt macOS app — `release:gui` cross-compiles Linux and Windows only.
+  Sending Mac users to the CLI would contradict the point of the tab, and
+  leaving them off the table entirely reads as an oversight.
 
 ## [server/v0.4.0] — 2026-09-08
 
