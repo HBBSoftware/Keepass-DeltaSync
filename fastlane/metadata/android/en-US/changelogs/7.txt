@@ -1,0 +1,7 @@
+Self-hosting on a local network, and a phone can now start on its own.
+
+• A server on your own network can be reached over plain HTTP. The app refused unencrypted connections outright, which ruled out the setup it exists for — a NAS or a box on the LAN with no certificate. The enrollment screen marks an http:// address as unencrypted while you type it, so the choice is yours to make knowingly. What travels is encrypted vault data and a token either way.
+• You can create a database from the phone. Until now the first one had to be made with the desktop client, so starting on Android led to "no databases on the server" with no way forward.
+• Leaving the device name empty no longer breaks enrollment. The field is optional and now behaves like it.
+• Denying the camera permission says so, instead of claiming the camera had a problem.
+• The keyboard no longer covers the field you are typing into.
