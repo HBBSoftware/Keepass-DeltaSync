@@ -112,7 +112,14 @@
     <section id="tab-users">
       <div class="card">
         <h2>Create user</h2>
-        <p class="muted">Creates the user and issues a one-time enrollment token for their first device.</p>
+        <p class="muted">A user is a <strong>person</strong>. Their phone and their
+        computer each enroll as a separate device under that user, and all of a
+        user's devices see the same databases — there is nothing to share between
+        them. For two people to share one database, create them as separate users;
+        the owner shares it with the other afterwards.</p>
+        <p class="muted">Creating a user issues a one-time enrollment token for
+        their first device. Use <em>Enroll token</em> on an existing user for each
+        further device.</p>
         <div class="row">
           <div>
             <label for="new-username">Username</label>
@@ -146,9 +153,10 @@
           <button id="refresh-devices" class="secondary small">Refresh</button>
         </div>
         <p class="muted">Every enrolled device and when it last contacted the
-        server. Least recently seen first, so a device that has gone quiet is
-        at the top. For a full connection history with IP addresses, filter the
-        audit log on <code>auth.success</code>.</p>
+        server. A device belongs to one user and inherits that user's databases.
+        Least recently seen first, so a device that has gone quiet is at the top.
+        For a full connection history with IP addresses, filter the audit log on
+        <code>auth.success</code>.</p>
         <div id="devices-table"></div>
         <div id="devices-err" class="err"></div>
       </div>
