@@ -8,37 +8,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **`bin/admin database:create <username> <name>`** — an administrator can
-  create a database on a user's behalf. `POST /databases` derives the owner
-  from the auth context and so needs a *device* token, which left a gap with
-  no way across it: an admin could create users and issue enrollment tokens,
-  but not the database those users are supposed to sync. A freshly enrolled
-  Android device lands on a screen that says "no databases on the server —
-  create one with the desktop client first", which is not an answer if the
-  desktop client is not what you have.
-
-  Nothing about it needs a client. A database is a name, an owner row and a
-  sequence counter; the master key is derived locally from the passphrase with
-  Argon2id and never reaches the server, which is why `wrapped_master_key` is
-  NULL for owners. So an admin can create the row without gaining access to
-  anything stored in it.
-
-- **`compose.truenas.yml`** — a TrueNAS-shaped variant of `compose.yml`, and the
-  file the self-hosting guide now points at for that platform. Every difference
-  in it was learned by getting it wrong on a real box: a named volume, because
-  a bind mount to a dataset that does not exist yet fails with
-  `bind source path does not exist` and Docker will not create it; the Postgres
-  18 data directory mounted at `/var/lib/postgresql` rather than
-  `.../data`, which is correct for Postgres 16 and makes 18 nest a volume inside
-  a volume so the container never reports healthy; a published port outside the
-  range TrueNAS uses; and the admin login pre-wired so there is no token to read
-  out of a container log.
-
-  Its header carries the password rules, which is the one that costs the most
-  time to work out alone: Docker Compose expands an unescaped `$` after YAML is
-  parsed, so `"Kode$xyz"` reaches the server as `Kode` — a server that works
-  perfectly and rejects the password you are certain you set.
-
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
@@ -170,6 +139,94 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [android/v0.4.2] — 2026-09-09
+
+### Added
+
+- **The Android app can create a database (Android)** — a phone could not be
+  someone's first device. The setup screen listed what the server had and
+  offered no way to add to it, so a new user starting on Android reached "no
+  databases on the server, create one with the desktop client first" and
+  stopped. Creating one lived only in the desktop client's `init`.
+
+  Nothing about it needed a privileged client: `POST /databases` takes a name,
+  ownership comes from the device token, and the master key is derived locally
+  with Argon2id and never leaves the device. The app had every credential and
+  lacked only a button.
+
+  The button follows the situation, because an option that is always there is
+  one that gets skipped. Before the list is fetched, nothing shows. If the list
+  is empty it appears filled and explained, as the only way forward. If there
+  are databases it drops to a quiet text button, so it does not compete with
+  the choice being made. The red "no databases on the server" is gone from the
+  empty case — an empty list is a starting point, not a failure, and that
+  wording was misleading anyway: it said *the server* when it meant *your
+  account*.
+
+### Fixed
+
+- **A self-hosted server could not be reached over plain HTTP (Android)** — the
+  manifest set `usesCleartextTraffic="false"`, which rules out exactly the setup
+  the app is built for: a NAS on the LAN with no certificate. The project's own
+  compose files serve plain HTTP, so a self-hoster met it on the first attempt,
+  and what they saw was the platform's raw *CLEARTEXT communication … not
+  permitted by network security policy* — which reads like a broken server.
+
+  Limiting cleartext to private ranges turns out not to be expressible:
+  `<domain>` takes a hostname or one IP literal, never a CIDR block. The choice
+  is between allowing it and refusing to work on a LAN. So the enrollment screen
+  carries the weight instead, marking an `http://` address as unencrypted while
+  it is typed. What the transport carries is ciphertext and a bearer token
+  either way.
+
+- **An optional device name made enrollment fail (Android)** — leaving the field
+  empty meant the server answered `"name": null`, and the response model
+  declared it non-nullable, so parsing a valid response threw. The failure
+  landed after the server had created the device and consumed the one-time
+  token, leaving the user with a spent token and an error about JSON offsets.
+  There is now a test for the null case; the old one always sent a name.
+
+- **The keyboard covered the field being typed into (Android)** — from
+  targetSdk 35, Android 15 draws edge-to-edge and no longer honours
+  `windowSoftInputMode="adjustResize"` as before; an app must read the IME inset
+  itself. This one read no insets at all. All four screens now pad by the system
+  bars, or by the keyboard when it is up.
+
+## [server/v0.5.0] — 2026-09-09
+
+### Added
+
+- **`bin/admin database:create <username> <name>`** — an administrator can
+  create a database on a user's behalf. `POST /databases` derives the owner
+  from the auth context and so needs a *device* token, which left a gap with
+  no way across it: an admin could create users and issue enrollment tokens,
+  but not the database those users are supposed to sync. A freshly enrolled
+  Android device lands on a screen that says "no databases on the server —
+  create one with the desktop client first", which is not an answer if the
+  desktop client is not what you have.
+
+  Nothing about it needs a client. A database is a name, an owner row and a
+  sequence counter; the master key is derived locally from the passphrase with
+  Argon2id and never reaches the server, which is why `wrapped_master_key` is
+  NULL for owners. So an admin can create the row without gaining access to
+  anything stored in it.
+
+- **`compose.truenas.yml`** — a TrueNAS-shaped variant of `compose.yml`, and the
+  file the self-hosting guide now points at for that platform. Every difference
+  in it was learned by getting it wrong on a real box: a named volume, because
+  a bind mount to a dataset that does not exist yet fails with
+  `bind source path does not exist` and Docker will not create it; the Postgres
+  18 data directory mounted at `/var/lib/postgresql` rather than
+  `.../data`, which is correct for Postgres 16 and makes 18 nest a volume inside
+  a volume so the container never reports healthy; a published port outside the
+  range TrueNAS uses; and the admin login pre-wired so there is no token to read
+  out of a container log.
+
+  Its header carries the password rules, which is the one that costs the most
+  time to work out alone: Docker Compose expands an unescaped `$` after YAML is
+  parsed, so `"Kode$xyz"` reaches the server as `Kode` — a server that works
+  perfectly and rejects the password you are certain you set.
 
 ## [server/v0.4.1] — 2026-09-08
 
