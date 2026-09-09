@@ -108,16 +108,24 @@ TrueNAS SCALE (Electric Eel and newer) runs native Docker and accepts a
 compose file directly.
 
 1. **Apps → Discover Apps → Custom App → Install via YAML.**
-2. Paste the contents of [`compose.yml`](../compose.yml).
-3. Change the `CHANGE_THIS` password line. (One edit — a YAML anchor feeds it to
-   all services.)
-4. *(Optional)* change the published port `8080:80` if 8080 is taken.
-5. Install. When it's running, open the app's **Logs** and copy the one-time
-   **admin token** from the startup banner.
+2. Paste the contents of [`compose.truenas.yml`](../compose.truenas.yml).
+3. Change the two `CHANGE_THIS` passwords. **Read the password rules in the
+   file's header first** — Compose expands an unescaped `$`, which silently
+   shortens the value and leaves a server that rejects the password you set.
+4. *(Optional)* change the published port `30486:80`.
+5. Install, then open `http://<nas>:30486/admin.html` and sign in with the admin
+   username and password you just set.
+
+Use [`compose.truenas.yml`](../compose.truenas.yml) rather than the general
+[`compose.yml`](../compose.yml) here. It differs in ways that only matter on a
+NAS: a named volume, so no dataset has to exist before the first install;
+Postgres 18's data directory mounted at `/var/lib/postgresql` rather than one
+level deeper, which is what stops the database container ever reporting healthy
+if you get it wrong; and a published port outside the range TrueNAS uses itself.
 
 The data lives in the `pgdata` Docker volume, so it survives restarts and
-updates. (For a host-path dataset instead of a named volume, point the
-`db` volume at a TrueNAS dataset.)
+updates. To put it on a dataset you can snapshot on its own, create the dataset
+first and point the `db` volume at it — the file's footer has the exact line.
 
 ---
 

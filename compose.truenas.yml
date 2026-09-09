@@ -1,0 +1,94 @@
+# KeePass DeltaSync on TrueNAS SCALE — paste into:
+#   Apps -> Discover Apps -> Custom App -> Install via YAML
+#
+# A TrueNAS-shaped variant of compose.yml. It differs in three ways that all
+# come from mistakes made the hard way on a real box: a named volume so no
+# dataset has to exist first, the Postgres 18 data directory mounted at the
+# right level, and quoting rules for the passwords.
+#
+# Two passwords to change, each marked CHANGE_THIS. Nothing else needs
+# editing, and no dataset has to exist first.
+#
+# ---------------------------------------------------------------------------
+# PASSWORD RULES — read these, they cost an hour to learn the hard way:
+#
+#   * Keep the quotes. Without them a space followed by # truncates the value.
+#   * NO DOLLAR SIGNS. Docker Compose expands $foo as a variable long after
+#     YAML is parsed, so "Kode$xyz123" silently becomes "Kode" — and the
+#     server stores that shortened value while you keep typing the full one.
+#     If you must use one, double it: $$ means a literal $.
+#   * The admin password must be at least 12 characters.
+#
+# A password that is always safe here:
+#   openssl rand -base64 24 | tr -d '=+/'
+# ---------------------------------------------------------------------------
+#
+# Afterwards: http://<nas>:30486/admin.html — sign in with ADMIN_USERNAME and
+# ADMIN_PASSWORD below. There is no token to read from any log.
+
+# Written once, used by both containers. Change it here and nowhere else.
+x-db-password: &db_password "CHANGE_THIS_database_password"
+
+services:
+  db:
+    image: postgres:18.6-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keepass_deltasync
+      POSTGRES_USER: deltasync
+      POSTGRES_PASSWORD: *db_password
+    volumes:
+      # NOT /var/lib/postgresql/data. Postgres 18 sets
+      # PGDATA=/var/lib/postgresql/18/docker and declares /var/lib/postgresql
+      # as its volume, so the mount has to be the parent — otherwise the data
+      # lands in an anonymous volume nested under this one and the container
+      # never reports healthy.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deltasync -d keepass_deltasync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: registry.gitlab.com/star95/keepass-deltasync/server:0.4.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "30486:80"
+    environment:
+      # --- Admin panel login ---
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "CHANGE_THIS_admin_password"
+
+      # --- Database ---
+      DATABASE_URL: "pgsql:host=db;port=5432;dbname=keepass_deltasync"
+      DATABASE_USER: "deltasync"
+      DATABASE_PASSWORD: *db_password
+      PGHOST: "db"
+      PGPORT: "5432"
+      PGDATABASE: "keepass_deltasync"
+      PGUSER: "deltasync"
+      PGPASSWORD: *db_password
+
+      # --- Optional ---
+      LOG_LEVEL: "INFO"
+      ADMIN_SESSION_TTL_HOURS: "8"
+      # Behind a TLS-terminating reverse proxy, list its address here so the
+      # session cookie gets the Secure flag. On plain HTTP leave it out: a
+      # Secure cookie over HTTP is discarded and nobody could sign in.
+      # TRUSTED_PROXIES: "172.16.0.0/12"
+
+volumes:
+  pgdata:
+
+# Same image on other registries, if you prefer one:
+#   hbbsoftware/deltasync-server:0.4.1
+#   ghcr.io/hbbsoftware/deltasync-server:0.4.1   (make the package public first)
+#
+# Want the data on a dataset you can snapshot? Create it first —
+#   sudo zfs create -p PoolApp/apps/keepass-deltasync/postgres-data
+# — then replace the db volume line with:
+#   - /mnt/PoolApp/apps/keepass-deltasync/postgres-data:/var/lib/postgresql
