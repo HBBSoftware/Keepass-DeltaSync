@@ -80,6 +80,8 @@
     <string name="enroll_scan_filled">Scannet. Tjek detaljerne og tryk Enroll.</string>
     <string name="enroll_error_required_fields">Server-URL og enrollment-token er påkrævet.</string>
     <string name="enroll_error_url_scheme">Server-URL skal starte med https:// eller http://</string>
+    <string name="enroll_warning_cleartext">Ukrypteret forbindelse. Alle på netværket mellem denne enhed og serveren kan læse trafikken. Fint på et LAN du stoler på; brug https:// over internettet.</string>
+    <string name="enroll_error_camera_denied">Kameratilladelse afvist. Giv den for at scanne en QR-kode, eller indtast server-URL og token manuelt.</string>
     <string name="enroll_error_server_format">Server afviste: %1$d %2$s %3$s</string>
     <string name="enroll_error_generic_format">Enrollment fejlede: %1$s</string>
 
