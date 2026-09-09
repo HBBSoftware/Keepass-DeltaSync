@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -83,6 +84,7 @@ class EnrollActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_enroll)
+        applySystemAndImeInsets()
 
         serverUrlInput = findViewById(R.id.serverUrlInput)
         serverUrlLayout = findViewById(R.id.serverUrlLayout)

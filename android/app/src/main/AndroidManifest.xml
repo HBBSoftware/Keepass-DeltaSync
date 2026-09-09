@@ -28,6 +28,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -38,16 +39,19 @@
 
         <activity
             android:name=".EnrollActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false"
             android:label="Enroll device" />
 
         <activity
             android:name=".SetupActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false"
             android:label="Set up database" />
 
         <activity
             android:name=".ShareActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false"
             android:label="@string/share_title" />
 

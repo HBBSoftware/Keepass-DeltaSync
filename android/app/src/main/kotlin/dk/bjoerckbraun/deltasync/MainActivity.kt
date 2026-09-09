@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -86,6 +87,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        applySystemAndImeInsets()
 
         tokenStore = KeystoreTokenStore(applicationContext)
         configStore = DatabaseConfigStore(applicationContext)

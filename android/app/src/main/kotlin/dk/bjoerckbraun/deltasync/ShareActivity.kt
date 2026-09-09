@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
@@ -57,6 +58,7 @@ class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_share)
+        applySystemAndImeInsets()
 
         val credentials = KeystoreTokenStore(applicationContext).load()
         configStore = DatabaseConfigStore(applicationContext)

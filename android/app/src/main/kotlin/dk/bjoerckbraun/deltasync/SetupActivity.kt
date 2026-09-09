@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -67,6 +68,7 @@ class SetupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
+        applySystemAndImeInsets()
 
         configStore = DatabaseConfigStore(applicationContext)
         pickedFileText = findViewById(R.id.pickedFileText)
