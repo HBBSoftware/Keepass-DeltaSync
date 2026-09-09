@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace KeePassDeltaSync\Cli;
 
+use KeePassDeltaSync\Admin\DatabaseAdmin;
 use KeePassDeltaSync\Admin\UserAdmin;
 use KeePassDeltaSync\Auth\AdminAccount;
 use KeePassDeltaSync\Auth\AdminSession;
@@ -58,6 +59,7 @@ final class AdminCli
             'user:disable'               => $this->setUserDisabled($rest, true),
             'user:enable'                => $this->setUserDisabled($rest, false),
             'user:delete'                => $this->deleteUser($rest),
+            'database:create'            => $this->createDatabase($rest),
             null, '-h', '--help', 'help' => $this->printHelp(),
             default                      => $this->unknownCommand($command),
         };
@@ -105,6 +107,14 @@ final class AdminCli
           user:delete <username>
               Slet bruger permanent. CASCADE fjerner enheder, databaser
               og entries. Kan ikke fortrydes.
+
+        Database-administration:
+          database:create <username> <navn>
+              Opret en database med brugeren som ejer. POST /databases kan
+              kun nås med et device-token, så uden den her kan en admin
+              oprette brugere men ikke den database de skal synkronisere.
+              Der er ingen kryptografi i det: masternøglen udledes lokalt
+              hos ejeren og når aldrig serveren.
 
         HELP);
         return 0;
@@ -225,6 +235,50 @@ final class AdminCli
         }
 
         return is_string($line) ? rtrim($line, "\r\n") : '';
+    }
+
+    /** database:create <username> <navn> */
+    private function createDatabase(array $args): int
+    {
+        $username = $args[0] ?? null;
+        $name     = $args[1] ?? null;
+
+        if (!is_string($username) || trim($username) === ''
+            || !is_string($name) || trim($name) === ''
+        ) {
+            fwrite(STDERR, "Anvendelse: admin database:create <username> <navn>\n");
+            return 2;
+        }
+        $username = trim($username);
+        $name     = trim($name);
+
+        if (strlen($name) > DatabaseAdmin::MAX_NAME_LENGTH) {
+            fwrite(STDERR, sprintf(
+                "Navnet er %d tegn; højst %d tilladt.\n",
+                strlen($name),
+                DatabaseAdmin::MAX_NAME_LENGTH,
+            ));
+            return 1;
+        }
+
+        try {
+            $pdo = Connection::fromConfig($this->config);
+            $row = (new DatabaseAdmin($pdo))->create($username, $name);
+        } catch (\RuntimeException $e) {
+            fwrite(STDERR, $e->getMessage() . "\n");
+            return 1;
+        } catch (\PDOException $e) {
+            return $this->reportDbError($e);
+        }
+
+        fwrite(STDOUT, sprintf(
+            "Database '%s' oprettet med '%s' som ejer.\n  id: %s\n",
+            $row['name'],
+            $username,
+            $row['id'],
+        ));
+        fwrite(STDOUT, "Klienten kan nu vælge den under 'Match til server-database'.\n");
+        return 0;
     }
 
     private function unknownCommand(?string $cmd): int

@@ -8,6 +8,21 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`bin/admin database:create <username> <name>`** — an administrator can
+  create a database on a user's behalf. `POST /databases` derives the owner
+  from the auth context and so needs a *device* token, which left a gap with
+  no way across it: an admin could create users and issue enrollment tokens,
+  but not the database those users are supposed to sync. A freshly enrolled
+  Android device lands on a screen that says "no databases on the server —
+  create one with the desktop client first", which is not an answer if the
+  desktop client is not what you have.
+
+  Nothing about it needs a client. A database is a name, an owner row and a
+  sequence counter; the master key is derived locally from the passphrase with
+  Argon2id and never reaches the server, which is why `wrapped_master_key` is
+  NULL for owners. So an admin can create the row without gaining access to
+  anything stored in it.
+
 - **`compose.truenas.yml`** — a TrueNAS-shaped variant of `compose.yml`, and the
   file the self-hosting guide now points at for that platform. Every difference
   in it was learned by getting it wrong on a real box: a named volume, because
