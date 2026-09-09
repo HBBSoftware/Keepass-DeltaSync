@@ -393,8 +393,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   Docker Hub. TrueNAS' app catalog prefers ghcr.io, and the reason is
   practical: a NAS pulls anonymously and so shares Docker Hub's rate limit
   with everything else on the box. All three registries receive the same
-  multi-arch manifest from one build, and cosign signs the same digest in
-  each.
+  multi-arch manifest from one build. (They would also carry the same cosign
+  signature, but `COSIGN_PRIVATE_KEY` has never been configured, so that step
+  has always been skipped — see VERSIONING.md.)
 
 ## [client/v1.8.1] — 2026-08-26
 

@@ -138,7 +138,10 @@ made public once by hand, or an anonymous pull — which is what a NAS does —
 gets a 404.
 
 If `COSIGN_PRIVATE_KEY` is set, the same manifest digest is signed in every
-registry it was pushed to.
+registry it was pushed to. **It is not currently set**, so no published image
+carries a signature — the registries hold no `.sig` tags. Turning it on needs a
+`cosign generate-key-pair`, the private half as a masked CI variable alongside
+`COSIGN_PASSWORD`, and `cosign.pub` committed so others can verify.
 
 Note that `:latest` moves on every server tag. There is no pre-release channel;
 tag only what you are willing to have pulled by anything following `latest`.
