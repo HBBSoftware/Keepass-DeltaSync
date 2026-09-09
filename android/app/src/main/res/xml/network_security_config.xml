@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Cleartext HTTP is permitted, deliberately.
+
+  DeltaSync only ever talks to a server the user typed in themselves, and
+  that server is very often on their own LAN: a NAS on 192.168.x.y, a box on
+  10.x.x.x, a container on localhost. Refusing cleartext made those setups
+  impossible — the enrollment failed with the platform's raw "CLEARTEXT
+  communication ... not permitted by network security policy", which reads
+  like the server is broken rather than like a policy decision. The project's
+  own compose files serve plain HTTP, so a self-hoster met it on the first
+  attempt.
+
+  Restricting this to private ranges was the obvious middle ground and is not
+  expressible here: <domain> takes a hostname or a single IP literal, never a
+  CIDR block, so 192.168.0.0/16 cannot be written down. The choice is
+  therefore between "all cleartext" and "no self-hosting on a LAN".
+
+  What carries the safety instead is the UI: the enrollment screen marks an
+  http:// address as unencrypted while it is being typed, so the user is told
+  what they are choosing at the moment they choose it. Everything the server
+  stores is client-encrypted regardless — the transport carries ciphertext
+  and a bearer token, never the master password or the keys.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -80,6 +80,8 @@
     <string name="enroll_scan_filled">Scannet. Tjek detaljerne og tryk Enroll.</string>
     <string name="enroll_error_required_fields">Server-URL og enrollment-token er påkrævet.</string>
     <string name="enroll_error_url_scheme">Server-URL skal starte med https:// eller http://</string>
+    <string name="enroll_warning_cleartext">Ukrypteret forbindelse. Alle på netværket mellem denne enhed og serveren kan læse trafikken. Fint på et LAN du stoler på; brug https:// over internettet.</string>
+    <string name="enroll_error_camera_denied">Kameratilladelse afvist. Giv den for at scanne en QR-kode, eller indtast server-URL og token manuelt.</string>
     <string name="enroll_error_server_format">Server afviste: %1$d %2$s %3$s</string>
     <string name="enroll_error_generic_format">Enrollment fejlede: %1$s</string>
 
@@ -90,6 +92,13 @@
     <string name="setup_action_pick_file">Vælg fil…</string>
     <string name="setup_step_match_database">2. Match til server-database</string>
     <string name="setup_action_list_databases">List databases på serveren</string>
+    <string name="setup_action_create_database">Opret en database på serveren…</string>
+    <string name="setup_action_create_another">Opret endnu en database…</string>
+    <string name="setup_create_hint">Der er endnu ingen databaser til din bruger på denne server. Opret én her, og match så din .kdbx-fil til den nedenfor. Det skal kun gøres én gang — andre enheder vælger den samme database fra listen.</string>
+    <string name="setup_dialog_create_title">Ny database</string>
+    <string name="setup_dialog_create_hint">Navn</string>
+    <string name="setup_dialog_create_ok">Opret</string>
+    <string name="setup_created_format">Databasen \"%1$s\" er oprettet. Vælg den nedenfor og gem.</string>
     <string name="setup_action_save">Gem konfiguration</string>
     <string name="setup_error_not_enrolled">Ikke enrolled.</string>
     <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>

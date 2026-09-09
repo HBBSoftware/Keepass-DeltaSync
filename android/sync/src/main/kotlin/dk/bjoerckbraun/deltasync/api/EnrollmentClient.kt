@@ -101,7 +101,8 @@ class EnrollmentClient(
 /** Resultat af succesfuld enrollment. */
 data class EnrollmentResult(
     val deviceId: String,
-    val deviceName: String,
+    /** Null når enheden blev enrollet uden navn. */
+    val deviceName: String?,
     val enrolledAt: String,
     /** Permanent device-token. Skal gemmes i [TokenStore]. */
     val deviceToken: String,
@@ -122,6 +123,11 @@ internal data class EnrollmentEnvelope(
 @Serializable
 internal data class EnrolledDevice(
     val id: String,
-    val name: String,
+    // Nullable, fordi enhedsnavnet ER valgfrit: udelades det i requesten,
+    // står devices.name som NULL og serveren svarer "name": null. Med en
+    // ikke-nullable String fejlede parsingen af et fuldt gyldigt svar, og
+    // enrollment slog fejl for alle der lod feltet stå tomt — efter at
+    // serveren havde oprettet enheden og brugt éngangs-tokenet.
+    val name: String? = null,
     @SerialName("enrolled_at") val enrolledAt: String,
 )

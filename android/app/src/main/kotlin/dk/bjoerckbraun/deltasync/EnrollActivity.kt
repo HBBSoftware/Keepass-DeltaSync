@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dk.bjoerckbraun.deltasync.api.ApiException
@@ -38,6 +45,7 @@ import kotlinx.coroutines.withContext
 class EnrollActivity : ComponentActivity() {
 
     private lateinit var serverUrlInput: TextInputEditText
+    private lateinit var serverUrlLayout: TextInputLayout
     private lateinit var tokenInput: TextInputEditText
     private lateinit var deviceNameInput: TextInputEditText
     private lateinit var errorText: TextView
@@ -49,11 +57,37 @@ class EnrollActivity : ComponentActivity() {
         onScanned(contents)
     }
 
+    // Kameratilladelsen spørges der om HER, ikke inde i ZXing. Overlader man
+    // det til scanneren, viser den ved afslag sin egen besked — "the Android
+    // camera encountered a problem, you may need to restart the device" — som
+    // hverken er sand eller til at handle på. Nu siger vi hvad der faktisk
+    // skete, og manuel indtastning står stadig åben.
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                launchScanner()
+            } else {
+                errorText.setText(R.string.enroll_error_camera_denied)
+                errorText.visibility = View.VISIBLE
+            }
+        }
+
+    private fun launchScanner() {
+        scanLauncher.launch(ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt(getString(R.string.enroll_scan_prompt))
+            setBeepEnabled(false)
+            setOrientationLocked(false)
+        })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_enroll)
+        applySystemAndImeInsets()
 
         serverUrlInput = findViewById(R.id.serverUrlInput)
+        serverUrlLayout = findViewById(R.id.serverUrlLayout)
         tokenInput = findViewById(R.id.tokenInput)
         deviceNameInput = findViewById(R.id.deviceNameInput)
         errorText = findViewById(R.id.enrollError)
@@ -63,12 +97,27 @@ class EnrollActivity : ComponentActivity() {
 
         scanButton.setOnClickListener {
             errorText.visibility = View.GONE
-            scanLauncher.launch(ScanOptions().apply {
-                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                setPrompt(getString(R.string.enroll_scan_prompt))
-                setBeepEnabled(false)
-                setOrientationLocked(false)
-            })
+            val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                launchScanner()
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+
+        // Cleartext er tilladt, fordi en selv-hostet server næsten altid står
+        // på et LAN uden certifikat (se res/xml/network_security_config.xml).
+        // Prisen er, at brugeren skal vide det — så det siges her, mens
+        // adressen skrives, i stedet for bagefter eller slet ikke.
+        serverUrlInput.doAfterTextChanged { text ->
+            val url = text?.toString()?.trim().orEmpty()
+            serverUrlLayout.helperText =
+                if (url.startsWith("http://", ignoreCase = true)) {
+                    getString(R.string.enroll_warning_cleartext)
+                } else {
+                    null
+                }
         }
 
         submitButton.setOnClickListener {

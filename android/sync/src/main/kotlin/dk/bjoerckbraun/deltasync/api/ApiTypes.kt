@@ -75,6 +75,15 @@ data class Database(
 @Serializable
 data class DatabaseListResponse(val databases: List<Database> = emptyList())
 
+/** Body til `POST /databases`. Serveren tager kun et navn — ejeren udledes
+ *  af device-tokenet, og masternøglen når aldrig serveren. */
+@Serializable
+data class CreateDatabaseRequest(val name: String)
+
+/** Respons fra `POST /databases`. */
+@Serializable
+data class DatabaseEnvelope(val database: Database)
+
 /** Respons fra `GET /users/lookup?username=X` — bruger + den enhed vi skal
  *  wrappe master_key til (nyeste enhed med en public_key). */
 @Serializable

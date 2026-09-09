@@ -71,6 +71,36 @@
             android:layout_marginTop="8dp"
             android:text="@string/setup_action_list_databases" />
 
+        <!-- Begge er skjult indtil "List databases" er trykket: før det ved
+             hverken brugeren eller vi, om der er noget at vælge imellem.
+             Er listen tom, vises den fremhævede knap med en forklaring —
+             det er så den eneste vej videre. Er der databaser, står den
+             diskrete udgave i stedet, så den ikke konkurrerer med valget. -->
+        <TextView
+            android:id="@+id/createDatabaseHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            android:textSize="14sp"
+            android:text="@string/setup_create_hint" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/createDatabaseButtonPrimary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            android:text="@string/setup_action_create_database" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/createDatabaseButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="@string/setup_action_create_another" />
+
         <RadioGroup
             android:id="@+id/databaseRadios"
             android:layout_width="match_parent"
