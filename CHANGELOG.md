@@ -70,6 +70,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The admin panel explains what a user is.** The Users tab said only what the
+  button did — "creates the user and issues a one-time enrollment token" — and
+  never what a user *is*, so the model had to be inferred from behaviour. It now
+  says it: a user is a person, their phone and computer each enroll as a device
+  under that user, and all of a user's devices see the same databases with
+  nothing to share between them. Sharing is for two people, not two devices.
+
+  The Devices tab says the same thing from the other side. Between them the two
+  sentences answer the question that actually comes up — why a freshly enrolled
+  phone sees no databases — which is usually that the device belongs to a
+  different user than the one owning them.
+
 - **The Firefox extension connects by itself** (`extension/`) — on a machine
   where everything is set up, opening the popup (toolbar button or
   Alt+Shift+K) used to land on an *Unlock* button whose only job was to ask
