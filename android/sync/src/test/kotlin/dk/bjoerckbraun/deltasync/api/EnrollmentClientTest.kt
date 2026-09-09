@@ -34,6 +34,34 @@ class EnrollmentClientTest {
     }
 
     @Test
+    fun `enroll accepts a null device name`() {
+        // Enhedsnavnet er valgfrit, så serveren svarer "name": null når det
+        // ikke blev sendt. Med en ikke-nullable String fejlede parsingen af
+        // et fuldt gyldigt svar — efter at serveren havde oprettet enheden og
+        // brugt éngangs-tokenet, så brugeren stod med en tabt token og
+        // beskeden "Expected string literal but 'null' literal was found".
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(201)
+                .setBody("""
+                    {"device":{"id":"dev-abc","name":null,"enrolled_at":"2026-05-29T10:00:00Z"},
+                     "token":"perma-token-xyz"}
+                """.trimIndent())
+                .addHeader("Content-Type", "application/json")
+        )
+
+        val result = client.enroll(
+            enrollmentToken = "one-time-enroll",
+            deviceName = null,
+            devicePublicKey = ByteArray(32) { 0x42.toByte() },
+        )
+
+        assertEquals("dev-abc", result.deviceId)
+        assertNull(result.deviceName)
+        assertEquals("perma-token-xyz", result.deviceToken)
+    }
+
+    @Test
     fun `enroll posts public key and returns device-token`() {
         server.enqueue(
             MockResponse()
