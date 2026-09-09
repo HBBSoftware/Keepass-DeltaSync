@@ -8,6 +8,22 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`compose.truenas.yml`** — a TrueNAS-shaped variant of `compose.yml`, and the
+  file the self-hosting guide now points at for that platform. Every difference
+  in it was learned by getting it wrong on a real box: a named volume, because
+  a bind mount to a dataset that does not exist yet fails with
+  `bind source path does not exist` and Docker will not create it; the Postgres
+  18 data directory mounted at `/var/lib/postgresql` rather than
+  `.../data`, which is correct for Postgres 16 and makes 18 nest a volume inside
+  a volume so the container never reports healthy; a published port outside the
+  range TrueNAS uses; and the admin login pre-wired so there is no token to read
+  out of a container log.
+
+  Its header carries the password rules, which is the one that costs the most
+  time to work out alone: Docker Compose expands an unescaped `$` after YAML is
+  parsed, so `"Kode$xyz"` reaches the server as `Kode` — a server that works
+  perfectly and rejects the password you are certain you set.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
