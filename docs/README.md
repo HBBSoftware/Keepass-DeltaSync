@@ -27,6 +27,8 @@ Fælles dokumentation — protokol-specifikation, betjeningsguides, threat model
 - `v4-group-sync.md` — gruppesynkronisering: struktur og entry-tilhørsforhold
 - `v5-multi-server-sync.md` — udveksling af blobs mellem to servere, i tre
   niveauer: kopi, fuld synk, filtreret pr. enhed
+- `backup-restore.md` — hvad en backup skal indeholde, og hvorfor restore
+  hører hjemme i opsætningen, ikke blandt de administrative handlinger
 
 ## Testplaner
 
