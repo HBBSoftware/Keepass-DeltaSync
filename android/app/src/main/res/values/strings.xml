@@ -93,6 +93,13 @@
     <string name="setup_action_pick_file">Choose file…</string>
     <string name="setup_step_match_database">2. Match to server database</string>
     <string name="setup_action_list_databases">List databases on server</string>
+    <string name="setup_action_create_database">Create a database on the server…</string>
+    <string name="setup_action_create_another">Create another database…</string>
+    <string name="setup_create_hint">This server has no databases for your account yet. Create one here — then match your .kdbx file to it below. You only need to do this once; other devices pick the same database from the list.</string>
+    <string name="setup_dialog_create_title">New database</string>
+    <string name="setup_dialog_create_hint">Name</string>
+    <string name="setup_dialog_create_ok">Create</string>
+    <string name="setup_created_format">Database \"%1$s\" created. Select it below and save.</string>
     <string name="setup_action_save">Save configuration</string>
     <string name="setup_error_not_enrolled">Not enrolled.</string>
     <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>

@@ -46,6 +46,34 @@ class ApiClient(
         }
     }
 
+    /**
+     * POST `/api/v1/databases` — opret en database med denne enheds bruger
+     * som ejer.
+     *
+     * Serveren vil kun have et navn. Ejerskabet kommer fra device-tokenet, og
+     * masternøglen udledes lokalt med Argon2id og forlader aldrig enheden —
+     * derfor kan en klient oprette en database uden at aflevere noget hemmeligt.
+     * Uden det her kunne appen kun vælge blandt databaser, en anden allerede
+     * havde oprettet, hvilket gjorde en telefon ubrugelig som første enhed.
+     */
+    @Throws(ApiException::class, IOException::class)
+    fun createDatabase(name: String): Database {
+        val body = json.encodeToString(
+            CreateDatabaseRequest.serializer(),
+            CreateDatabaseRequest(name = name),
+        )
+        val url = "${baseUrl.trimEnd('/')}/api/v1/databases".toHttpUrl()
+        val req = Request.Builder()
+            .url(url)
+            .post(body.toRequestBody(JSON_MEDIA))
+            .authed()
+            .build()
+        return httpClient.newCall(req).execute().use { resp ->
+            ensureSuccess(resp)
+            json.decodeFromString(DatabaseEnvelope.serializer(), resp.bodyString()).database
+        }
+    }
+
     /** GET `/api/v1/databases/{id}/changes?since=N`. */
     @Throws(ApiException::class, IOException::class)
     fun getChanges(databaseId: String, since: Long, includeGroups: Boolean = false): ChangesResponse {
