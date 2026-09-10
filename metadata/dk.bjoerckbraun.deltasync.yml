@@ -18,9 +18,9 @@ Binaries:
   https://github.com/HBBSoftware/Keepass-DeltaSync/releases/download/android/v%v/DeltaSync-%v.apk
 
 Builds:
-  - versionName: 0.4.1
-    versionCode: 6
-    commit: 2c07a062a2a9787d276dc50b1d623eba91b89119
+  - versionName: 0.4.2
+    versionCode: 7
+    commit: dce1172fbd5353be89dbc417616e1ff253c916e1
     subdir: android/app
     sudo:
       - apt-get update
@@ -53,5 +53,5 @@ AllowedAPKSigningKeys: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51e
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$
-CurrentVersion: 0.4.1
-CurrentVersionCode: 6
+CurrentVersion: 0.4.2
+CurrentVersionCode: 7
