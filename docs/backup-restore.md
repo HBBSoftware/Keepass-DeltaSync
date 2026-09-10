@@ -1,8 +1,8 @@
 # Backup og restore
 
-Status: **DESIGN / forslag** (2026-09-09). Ingen kode endnu, og ikke det næste
-der bygges: F-Droid-indsendelsen (fdroiddata!41661) og TrueNAS-katalog-appen
-(truenas/apps#5766) skal i mål først.
+Status: **DESIGN / forslag** (2026-09-09). Ingen kode endnu. F-Droid-
+indsendelsen (fdroiddata!41661) er i mål — merget 2026-09-10 — så det er
+TrueNAS-katalog-appen (truenas/apps#5766) der står foran denne.
 
 ## Hvad en backup skal indeholde
 

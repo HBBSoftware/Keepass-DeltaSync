@@ -77,8 +77,8 @@ holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
     target-enhedens public-key) + `ApiClient.lookupUser/listShares/
     shareDatabase/unshareDatabase`. Server håndhæver owner-only (403 →
     pæn besked).
-  - Mangler stadig: F-Droid-submit (metadata findes; reproducible build
-    skal valideres + opdateres for minSdk 23 og nye deps).
+  - F-Droid-submit er gennemført: MR !41661 blev merget 2026-09-10 på
+    0.4.2 / versionCode 7, med reproducible builds slået til.
 
 ## Arkitektur
 
@@ -185,12 +185,16 @@ trække JNI-laget med ind i ren-JVM-tests.
 
 ## Distribution
 
-- **F-Droid** (prioriteret): reproducible builds, fuld open source-toolchain.
-  Kræver at vi undgår Google Play Services — ingen FCM push, så sync
-  drives af WorkManager-polling med rimelig interval (15–30 min) plus
-  manuel "sync now" fra UI. Status: se [`F-DROID.md`](F-DROID.md).
+- **F-Droid** (optaget 2026-09-10): reproducible builds, fuld open
+  source-toolchain. Kræver at vi undgår Google Play Services — ingen FCM
+  push, så sync drives af WorkManager-polling med rimelig interval
+  (15–30 min) plus manuel "sync now" fra UI. Nye udgivelser samles op af
+  `fdroid checkupdates` fra `android/v*`-tags uden ny MR, men hver version
+  skal have vores signerede APK på GitHub og skal reproducere
+  bit-for-bit. Se [`F-DROID.md`](F-DROID.md).
 - **Obtainium** (tilgængelig nu): signeret APK på GitHub Releases, som
-  Obtainium selv holder opdateret. Se nedenfor.
+  Obtainium selv holder opdateret. Samme signatur som F-Droid-kanalen.
+  Se nedenfor.
 - **Play** (senere): standard Android-signering. Kan tilføjes uden ændringer
   af kerne-arkitekturen.
 
@@ -227,11 +231,12 @@ $ apksigner verify --print-certs DeltaSync-<version>.apk
 Signer #1 certificate SHA-256 digest: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
 ```
 
-⚠️ **Skifter du senere til F-Droid-versionen, kan Android ikke opdatere
-hen over det** — F-Droid signerer med deres egen nøgle, og et
-signaturskifte kræver afinstallation. Det betyder at appdata (enrollment,
-gemt password, valgt .kdbx-fil) går tabt og enheden skal enrolles igen via
-QR. Vælg én kanal og bliv på den.
+**Du kan skifte frit mellem Obtainium og F-Droid.** F-Droid udgiver netop
+denne APK — den er reproducerbar, så de transplanterer vores signatur i
+stedet for at signere med deres egen nøgle (`Binaries:` +
+`AllowedAPKSigningKeys:` i recipen). Begge kanaler leverer dermed samme
+signatur, og Android opdaterer hen over skiftet uden afinstallation.
+Appdata — enrollment, gemt password, valgt `.kdbx`-fil — overlever.
 
 ### Udgiv en ny Obtainium-release
 

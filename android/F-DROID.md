@@ -6,7 +6,9 @@ reproducible builds.
 
 ## Status
 
-- **Submittet:** [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). **Pipelinen er grøn hele vejen** — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer.
+- **MERGET 2026-09-10** på 0.4.2 / versionCode 7: [fdroiddata MR !41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661) (fra fork `Star95/fdroiddata`, branch `deltasync`). Reproducible builds er slået til, så F-Droid udgiver **vores egen signerede APK** i stedet for at signere med deres nøgle. Pipelinen var grøn hele vejen — `fdroid build` bygger gomobile-bind'et i F-Droids egen container, og alle metadata-tjek (`fdroid lint`, `fdroid rewritemeta`, `schema validation`, `check apk`/`check source code`) passerer.
+- **Nye udgivelser kræver INGEN ny MR.** `AutoUpdateMode: Version` + `UpdateCheckMode: Tags ^android/v[\d.]+$` gør at `fdroid checkupdates` selv samler et nyt `android/v*`-tag op. Til gengæld er der to ufravigelige krav pr. version, fordi `Binaries:` + `AllowedAPKSigningKeys:` er i spil: vores signerede APK SKAL ligge på GitHub-URL'en, og F-Droids build skal reproducere den bit-for-bit. Gør den ikke det, springes versionen over.
+- **Læg fastlane-changeloggen i selve version-commit'et.** F-Droid læser `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` fra den commit den bygger. Ved 0.4.2 landede `7.txt` ét commit efter cuttet, så tagget måtte flyttes og CI køre igen.
 - **Alle reviewkrav besvaret (2026-07-29).** linsuis punkter er lukket i
   rækkefølge: summary/description fjernet (kommer fra fastlane), Go bygges fra
   kilde via `go`-srclib'en, build-trinnene flyttet fra `prebuild:` til
