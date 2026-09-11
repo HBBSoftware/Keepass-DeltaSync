@@ -10,3 +10,10 @@ docker-entrypoint.sh text eol=lf
 # differs from CI's by one byte per line — which is exactly the check anyone
 # verifying the package against the tag would run.
 extension/* text eol=lf
+
+# Samme aftale for Chrome/Edge-pakken. Den bygges oven på de samme kilder, og
+# zip'en er byte-reproducerbar af samme grund — men kun hvis bytes er ens til
+# at begynde med. Mønstret rammer kun mappens egne filer; ikonerne under
+# icons/ er binære og skal ikke røres.
+extension-chromium/* text eol=lf
+extension-chromium/icons/*.png binary

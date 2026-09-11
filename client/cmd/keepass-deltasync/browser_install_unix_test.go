@@ -19,6 +19,10 @@ func isolate(t *testing.T) (home, sysRoot string) {
 	sysRoot = t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", "")
+	// Uden denne ville Chromium-målene blive slået op i testmaskinens egen
+	// konfiguration, og testen ville sige noget forskelligt alt efter om der
+	// tilfældigvis er en Chrome installeret.
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	oldSnap, oldFlatpak := snapRoots, flatpakSystemDir
 	snapRoots = []string{filepath.Join(sysRoot, "snap")}
@@ -27,20 +31,36 @@ func isolate(t *testing.T) (home, sysRoot string) {
 	return home, sysRoot
 }
 
+// wantLabels er hele listen af mål, i den rækkefølge hostTargets bygger den.
+// Alle skal altid være med — uninstall rydder op efter en browser der er
+// afinstalleret siden registreringen, og det kan kun lade sig gøre hvis målet
+// stadig står på listen.
+var wantLabels = []string{
+	"Firefox (system)", "Firefox (snap)", "Firefox (flatpak)",
+	"Chrome", "Chromium", "Edge",
+}
+
 func byLabel(t *testing.T, targets []hostTarget) map[string]hostTarget {
 	t.Helper()
-	if len(targets) != 3 {
-		t.Fatalf("expected all 3 variants in the list, got %d: %+v", len(targets), targets)
+	if len(targets) != len(wantLabels) {
+		t.Fatalf("expected all %d variants in the list, got %d: %+v", len(wantLabels), len(targets), targets)
 	}
 	m := make(map[string]hostTarget, len(targets))
-	seen := make(map[string]bool, len(targets)*2)
+	// To mål må gerne dele launcher — den er den samme uanset hvem der kalder
+	// den — men aldrig manifest: Firefox og Chromium skriver hvem-må-kalde på
+	// hver sin måde, så den ene ville overskrive den anden med en form
+	// browseren ikke forstår.
+	seen := make(map[string]string, len(targets))
 	for _, tgt := range targets {
 		m[tgt.Label] = tgt
-		for _, p := range []string{tgt.Manifest, tgt.Launcher} {
-			if seen[p] {
-				t.Fatalf("two variants share the path %s — one would overwrite the other", p)
-			}
-			seen[p] = true
+		if other, dup := seen[tgt.Manifest]; dup {
+			t.Fatalf("%s and %s share the manifest %s — one would overwrite the other", other, tgt.Label, tgt.Manifest)
+		}
+		seen[tgt.Manifest] = tgt.Label
+	}
+	for _, label := range wantLabels {
+		if _, ok := m[label]; !ok {
+			t.Fatalf("%s missing from the target list", label)
 		}
 	}
 	return m
@@ -160,6 +180,65 @@ func TestHostTargets_SnapAndFlatpak(t *testing.T) {
 	}
 	if flatpak.Hint == "" {
 		t.Fatal("flatpak needs a hint about the required override — it cannot work without it")
+	}
+}
+
+// TestHostTargets_Chromium: de tre Chromium-browsere findes på profilmappen,
+// hver sit sted, og de er ikke "fundet" på en maskine hvor ingen af dem har
+// kørt.
+func TestHostTargets_Chromium(t *testing.T) {
+	home, _ := isolate(t)
+	mustMkdir(t, filepath.Join(home, ".config", "google-chrome"))
+
+	targets, err := hostTargets("/opt/kp/keepass-deltasync")
+	if err != nil {
+		t.Fatalf("hostTargets: %v", err)
+	}
+	m := byLabel(t, targets)
+
+	chrome := m["Chrome"]
+	if !chrome.Detected {
+		t.Fatal("a profile directory is there, but Chrome was not detected")
+	}
+	if !chrome.Chromium {
+		t.Fatal("Chrome must be marked as Chromium — it decides the manifest format")
+	}
+	want := filepath.Join(home, ".config", "google-chrome", "NativeMessagingHosts", hostName+".json")
+	if chrome.Manifest != want {
+		t.Fatalf("Chrome manifest = %q, want %q", chrome.Manifest, want)
+	}
+	for _, label := range []string{"Chromium", "Edge"} {
+		if m[label].Detected {
+			t.Fatalf("%s reported as detected on a machine that never ran it", label)
+		}
+	}
+}
+
+// TestManifestFor_TwoFormats er hele grunden til at målene bærer et flag frem
+// for at dele ét manifest: Firefox læser allowed_extensions og Chromium
+// allowed_origins. Får en browser den anden forms felt, starter hosten aldrig,
+// og hverken browseren eller hosten siger hvorfor.
+func TestManifestFor_TwoFormats(t *testing.T) {
+	gecko := manifestFor(hostTarget{Launcher: "/x/launch.sh"}, []string{"abc"})
+	if len(gecko.AllowedExtensions) != 1 || gecko.AllowedExtensions[0] != browserExtensionID {
+		t.Fatalf("gecko manifest must allow %s, got %+v", browserExtensionID, gecko.AllowedExtensions)
+	}
+	if gecko.AllowedOrigins != nil {
+		t.Fatalf("gecko manifest must not carry allowed_origins, got %+v", gecko.AllowedOrigins)
+	}
+
+	chromium := manifestFor(hostTarget{Launcher: "/x/launch.sh", Chromium: true}, []string{"abc", "def"})
+	want := []string{"chrome-extension://abc/", "chrome-extension://def/"}
+	if len(chromium.AllowedOrigins) != len(want) {
+		t.Fatalf("chromium origins = %+v, want %+v", chromium.AllowedOrigins, want)
+	}
+	for i, origin := range want {
+		if chromium.AllowedOrigins[i] != origin {
+			t.Fatalf("chromium origin %d = %q, want %q", i, chromium.AllowedOrigins[i], origin)
+		}
+	}
+	if chromium.AllowedExtensions != nil {
+		t.Fatalf("chromium manifest must not carry allowed_extensions, got %+v", chromium.AllowedExtensions)
 	}
 }
 

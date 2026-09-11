@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "DeltaSync — KeePass search & go",
+  "version": "0.1.0",
+  "description": "Search your KeePass entries and open their website. Filling in credentials stays with KeePassXC-Browser.",
+
+  "minimum_chrome_version": "116",
+
+  "permissions": ["nativeMessaging", "storage"],
+
+  "background": {
+    "service_worker": "sw.js"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Search KeePass entries",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "omnibox": {
+    "keyword": "kp"
+  },
+
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+K"
+      },
+      "description": "Search KeePass entries"
+    }
+  }
+}

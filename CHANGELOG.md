@@ -8,6 +8,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chrome and Edge extension** (`extension-chromium/`) — the same search &
+  go extension, ported to the two Chromium browsers. The popup, the search and
+  the background logic are not copied: `extension-chromium/package.sh` reads
+  them out of `extension/` at build time, so the two browsers cannot drift
+  apart, and it fails the build if one of the few strings that say "Firefox"
+  to the user has been reworded. What this directory holds is what Chromium
+  needs differently — a service worker entry point, raster icons redrawn from
+  the same SVG, and `compat.js`, which builds the `browser` namespace the
+  shared code calls and bridges the one difference that is not cosmetic:
+  Firefox lets a message listener answer by returning a promise, Chromium
+  wants `sendResponse`. Without that bridge every popup would open empty.
+
+  `install-browser-host` now registers with Chrome, Chromium and Edge
+  alongside Firefox, writing one manifest per browser — the two families
+  disagree about whether the caller is named in `allowed_extensions` or in
+  `allowed_origins`, and the wrong form means the host never starts, silently.
+  Chromium derives an extension's ID from the store's signing key, so the ID
+  does not exist until the extension is uploaded and differs between the two
+  stores; until then it comes in with `--extension-id`, and those browsers are
+  skipped rather than registered with an empty allow-list. See
+  [`extension-chromium/README.md`](extension-chromium/README.md).
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with
