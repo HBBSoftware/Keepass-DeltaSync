@@ -40,6 +40,11 @@ VIEWBOX = 256          # icon.svg's koordinatsystem
 SUPERSAMPLE = 4        # tegn 4x op og skalér ned; Pillow kantudjaevner ikke selv
 SIZES = (16, 32, 48, 128)
 
+# Butikkernes logo er ikke en del af pakken. Edge Add-ons vil have 300x300,
+# og Chrome Web Store bruger de 128 der allerede ligger i manifestet.
+STORE_DIR = HERE / "store"
+STORE_SIZES = (300,)
+
 BG_FROM, BG_TO = "#1E3A8A", "#0F172A"
 BOW_FROM, BOW_TO = "#FDE047", "#F59E0B"
 ARC = "#38BDF8"
@@ -186,6 +191,22 @@ def main():
         path = OUT_DIR / f"icon-{size}.png"
         icon = master.resize((size, size), Image.Resampling.LANCZOS)
         # optimize=True holder filerne smaa; butikkerne vejer pakken.
+        tmp = path.with_suffix(".tmp")
+        icon.save(tmp, "PNG", optimize=True)
+        fresh = tmp.read_bytes()
+        if args.check:
+            tmp.unlink()
+            current = path.read_bytes() if path.exists() else b""
+            if hashlib.sha256(current).digest() != hashlib.sha256(fresh).digest():
+                stale.append(path.name)
+            continue
+        tmp.replace(path)
+        print(f"wrote {path.relative_to(HERE)} ({len(fresh)} bytes)")
+
+    STORE_DIR.mkdir(exist_ok=True)
+    for size in STORE_SIZES:
+        path = STORE_DIR / f"logo-{size}.png"
+        icon = master.resize((size, size), Image.Resampling.LANCZOS)
         tmp = path.with_suffix(".tmp")
         icon.save(tmp, "PNG", optimize=True)
         fresh = tmp.read_bytes()
