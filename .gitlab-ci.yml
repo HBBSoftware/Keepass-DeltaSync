@@ -79,6 +79,29 @@ test:extension:
     # .sh-filen som "unnecessary", og --warnings-as-errors gør det fatalt.
     - npx --yes web-ext lint --source-dir extension --ignore-files package.sh README.md --warnings-as-errors
 
+# Chrome/Edge-pakken bygges af den delte kode i extension/, saa dette job er
+# lige saa meget en vagt over DEN mappe: pakker package.sh ikke laengere, er
+# en af de faa Firefox-formuleringer den erstatter blevet rettet, og en
+# Chrome-bruger ville ellers blive sendt til en Firefox-vejledning uden at
+# nogen opdagede det. Derfor koerer det ogsaa naar kun extension/ er roert.
+#
+# smoke-test.mjs koerer bagefter baggrundskoden mod et opdigtet chrome og
+# fanger det kald compat.js maatte mangle. Begge dele er sekunder, uden
+# browser og uden pakker at hente.
+test:extension-chromium:
+  stage: test
+  image: node:22-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension-chromium\/v\d+\.\d+\.\d+$/
+    - changes:
+        - extension/**/*
+        - extension-chromium/**/*
+  before_script:
+    - apk add --no-cache python3
+  script:
+    - sh extension-chromium/package.sh
+    - node extension-chromium/smoke-test.mjs
+
 # Fyne'ens desktop-driver kræver CGO + OpenGL/X11-headere for overhovedet at
 # kompilere, så dette job apt-installerer dem. Det kører derfor kun når gui/
 # faktisk er rørt — ligesom test:extension holder sit npm-hentende job væk fra
@@ -375,6 +398,45 @@ build:extension:
     paths:
       - dist/*.xpi
       - dist/SHA256SUMS-extension
+    expire_in: never
+
+# ----------------------------------------------------------------------
+# Build the Chrome/Edge package (only on extension-chromium/vX.Y.Z tags)
+# ----------------------------------------------------------------------
+#
+# Samme model som build:extension: CI producerer pakken, og den bliver ikke
+# signeret her. Chrome Web Store og Edge Add-ons signerer selv ved upload, saa
+# der er ingen noegle at holde ude af pipelinen — men der er heller ingen
+# grund til at lade CI logge ind i en butik.
+
+build:extension-chromium:
+  stage: build
+  image: python:3-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension-chromium\/v\d+\.\d+\.\d+$/
+    # Escape hatch til at arbejde paa selve jobbet uden at flytte et tag.
+    - if: $CI_COMMIT_BRANCH =~ /^ci\/extension-chromium/
+  script:
+    - |
+      set -eu
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        # extension-chromium/v0.1.0 -> 0.1.0. package.sh afviser at bygge hvis
+        # manifest.json siger noget andet end taggen.
+        VERSION="${CI_COMMIT_TAG#extension-chromium/v}"
+      else
+        VERSION=""
+        echo "==> branch build (not a release)"
+      fi
+      sh extension-chromium/package.sh $VERSION
+      echo "VERSION=$VERSION" >> build.env
+      echo "BUILD_JOB_ID=$CI_JOB_ID" >> build.env
+  artifacts:
+    name: "deltasync-extension-chromium-${CI_COMMIT_REF_SLUG}"
+    reports:
+      dotenv: build.env
+    paths:
+      - dist/keepass-deltasync-chromium-*.zip
+      - dist/SHA256SUMS-extension-chromium
     expire_in: never
 
 # ----------------------------------------------------------------------
@@ -883,6 +945,44 @@ release:extension:
           link_type: 'package'
         - name: 'SHA256SUMS-extension'
           url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS-extension'
+          link_type: 'other'
+
+release:extension-chromium:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^extension-chromium\/v\d+\.\d+\.\d+$/
+  needs:
+    - job: build:extension-chromium
+      artifacts: true
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG} (chromium extension ${VERSION})"
+  release:
+    name: 'DeltaSync Chrome/Edge extension ${VERSION}'
+    description: |
+      Search your KeePass entries from Chrome's or Edge's address bar and open
+      the entry's site. Filling in credentials stays with KeePassXC-Browser.
+
+      **This .zip is the store package, not an installable file.** Chrome and
+      Edge only install extensions from their own stores, or unpacked from a
+      folder with developer mode on: unzip it and use *Load unpacked*.
+
+      It needs the `keepass-deltasync` client, and no server or account. The
+      client must know the extension's ID before it will talk to it, so run
+      `keepass-deltasync install-browser-host --extension-id <id>` with the ID
+      the browser shows on chrome://extensions.
+
+      The package is byte-reproducible — the files inside it are the sources
+      verbatim, on top of the shared code in extension/. Verify with
+      SHA256SUMS-extension-chromium.
+    tag_name: '${CI_COMMIT_TAG}'
+    assets:
+      links:
+        - name: 'Chrome/Edge extension — .zip (unsigned)'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/keepass-deltasync-chromium-${VERSION}.zip'
+          link_type: 'package'
+        - name: 'SHA256SUMS-extension-chromium'
+          url: '${CI_PROJECT_URL}/-/jobs/${BUILD_JOB_ID}/artifacts/raw/dist/SHA256SUMS-extension-chromium'
           link_type: 'other'
 # ----------------------------------------------------------------------
 # Mirror the client release to GitHub Releases (optional)

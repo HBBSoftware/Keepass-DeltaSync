@@ -95,7 +95,45 @@ func hostTargets(exe string) ([]hostTarget, error) {
 			"    flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox",
 	})
 
+	// Chromium-browserne. De deler launcher med systemets Firefox — den er
+	// den samme uanset hvem der kalder den — men har hver sin manifest-mappe
+	// under browserens egen konfiguration.
+	//
+	// Kun de pakkede varianter er med. En snap- eller flatpak-Chrome ville
+	// have samme sandkasse-problemer som Firefox har det, og de er ikke
+	// afprøvet; dukker de op, hører de til her ved siden af med hvert sit
+	// hint, ikke som en stiltiende antagelse om at det nok går.
+	for _, b := range []struct{ label, dir string }{
+		{"Chrome", "google-chrome"},
+		{"Chromium", "chromium"},
+		{"Edge", "microsoft-edge"},
+	} {
+		root := filepath.Join(configHome(home), b.dir)
+		targets = append(targets, hostTarget{
+			Label:    b.label,
+			Manifest: filepath.Join(root, "NativeMessagingHosts", hostName+".json"),
+			Launcher: filepath.Join(dataDir, launcherFileName),
+			Script:   launcherScript(exe),
+			// Her er profilmappen det eneste vi har at gå efter: en Chrome
+			// fra en .deb ligger i /opt, en fra distroen i /usr, og en
+			// bruger kan have lagt den et tredje sted. Mappen findes fra
+			// første gang browseren har kørt, hvilket er godt nok — det er
+			// også først dér der er en profil at registrere manifestet i.
+			Detected: dirExists(root),
+			Chromium: true,
+		})
+	}
+
 	return targets, nil
+}
+
+// configHome følger XDG. Chromium-browserne gør det samme, til forskel fra
+// Firefox, hvis manifest-mappe ligger fast under ~/.mozilla.
+func configHome(home string) string {
+	if base := os.Getenv("XDG_CONFIG_HOME"); base != "" {
+		return base
+	}
+	return filepath.Join(home, ".config")
 }
 
 // Detektionen må IKKE se på de mapper vi selv skriver i. Både ~/.var/app/<id>
@@ -152,6 +190,6 @@ func dirExists(path string) bool {
 // registrere.
 func registerManifest(hostTarget) error { return nil }
 
-func unregisterManifest() error { return nil }
+func unregisterManifest(hostTarget) error { return nil }
 
 func registrationHint(hostTarget) string { return "" }
