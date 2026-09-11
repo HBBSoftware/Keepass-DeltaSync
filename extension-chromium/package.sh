@@ -12,8 +12,17 @@
 #
 #   ./package.sh              # version tages fra manifest.json
 #   ./package.sh 0.1.0        # og krydstjekkes mod manifest.json
+#   ./package.sh --dev        # samme, men med et fast id til Load unpacked
 #
 # build/unpacked/ er dét man peger chrome://extensions -> Load unpacked på.
+#
+# --dev lægger den offentlige nøgle fra dev-key.pub ind i det UDPAKKEDE
+# manifest, og kun dér. Uden den giver Chrome udvidelsen et id udledt af
+# mappens sti, så det skifter fra maskine til maskine og skal slås op hver
+# gang. Med den er id'et det samme alle steder, og scriptet skriver den
+# install-browser-host-kommando der passer til det. Zip'en til butikken røres
+# ikke: butikken laver sin egen nøgle ved upload, og et fremmed `key`-felt i
+# pakken er i bedste fald til ingen nytte.
 #
 # Kør fra extension-chromium/ eller fra repo-roden; scriptet finder selv sin
 # egen mappe.
@@ -22,7 +31,15 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-EXPECTED_VERSION="${1:-}"
+# --dev må stå hvor som helst; resten af argumentet er versionen.
+DEV=0
+EXPECTED_VERSION=""
+for arg in "$@"; do
+    case "$arg" in
+        --dev) DEV=1 ;;
+        *) EXPECTED_VERSION="$arg" ;;
+    esac
+done
 
 # python3 hedder bare python under Git Bash på Windows.
 PYTHON=$(command -v python3 || command -v python || true)
@@ -31,7 +48,8 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
-"$PYTHON" - "$SCRIPT_DIR" "$REPO_ROOT" "$EXPECTED_VERSION" <<'PYTHON'
+"$PYTHON" - "$SCRIPT_DIR" "$REPO_ROOT" "$EXPECTED_VERSION" "$DEV" <<'PYTHON'
+import base64
 import hashlib
 import json
 import os
@@ -40,6 +58,7 @@ import sys
 import zipfile
 
 script_dir, repo_root, expected_version = sys.argv[1], sys.argv[2], sys.argv[3]
+dev = sys.argv[4] == "1"
 shared_dir = os.path.join(repo_root, "extension")
 
 # Filer der hører til denne pakke alene.
@@ -132,7 +151,24 @@ for name in SHARED:
         text = text.replace(old, new)
     payload[name] = text.encode("utf-8")
 
-for name, blob in payload.items():
+def extension_id(public_key_b64):
+    """Chromium udleder id'et af den offentlige nøgle: de første 128 bit af
+    dens SHA-256, skrevet med a-p i stedet for 0-f."""
+    digest = hashlib.sha256(base64.b64decode(public_key_b64)).hexdigest()[:32]
+    return "".join(chr(ord("a") + int(c, 16)) for c in digest)
+
+
+unpacked = dict(payload)
+dev_id = None
+if dev:
+    with open(os.path.join(script_dir, "dev-key.pub"), encoding="utf-8") as fh:
+        public_key = fh.read().strip()
+    dev_manifest = json.loads(payload["manifest.json"])
+    dev_manifest["key"] = public_key
+    unpacked["manifest.json"] = (json.dumps(dev_manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    dev_id = extension_id(public_key)
+
+for name, blob in unpacked.items():
     target = os.path.join(stage, name)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "wb") as fh:
@@ -164,4 +200,8 @@ size = os.path.getsize(zip_path)
 print(f"built {os.path.relpath(zip_path, repo_root)} ({size} bytes, {len(payload)} files)")
 print(f"sha256 {digest}")
 print(f"unpacked {os.path.relpath(stage, repo_root)}")
+if dev_id:
+    print(f"dev extension id {dev_id}")
+    print("register the host with:")
+    print(f"  keepass-deltasync install-browser-host --extension-id {dev_id}")
 PYTHON

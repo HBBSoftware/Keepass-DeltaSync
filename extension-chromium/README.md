@@ -21,6 +21,7 @@ cannot drift apart. This directory holds only what Chromium needs differently:
 | `icons/*.png` | Chrome and Edge reject an SVG icon |
 | `make-icons.py` | Redraws those PNGs from `../extension/icon.svg` |
 | `package.sh` | Assembles the package and substitutes the few strings that say "Firefox" |
+| `dev-key.pub` | Fixes the extension's ID while testing, so it is the same on every machine |
 | `smoke-test.mjs` | Runs the shared background code against a fake `chrome` |
 
 The one difference worth knowing about is in `compat.js`: Firefox lets a
@@ -30,12 +31,14 @@ that bridge every popup would open empty.
 ## Build it
 
 ```sh
+./package.sh --dev      # -> build/unpacked/, with a fixed extension ID
 ./package.sh            # -> ../dist/keepass-deltasync-chromium-<version>.zip
 node smoke-test.mjs     # optional, needs node; catches a missing shim call
 ```
 
-`package.sh` also leaves an unpacked tree in `build/unpacked/`. That is the
-folder to point *Load unpacked* at.
+`package.sh` always leaves an unpacked tree in `build/unpacked/`. That is the
+folder to point *Load unpacked* at. Use `--dev` for that tree, for the reason
+under [Install it](#install-it) below; it changes nothing in the zip.
 
 The zip is byte-reproducible: two builds of the same commit give the same
 file, so anyone can check that the package matches the sources.
@@ -49,35 +52,48 @@ than quietly sending a Chrome user to a Firefox page.
 
 ### Load the extension
 
-1. Build it, as above.
+1. Build it with `./package.sh --dev`.
 2. Open `chrome://extensions` (or `edge://extensions`) and turn on
    **Developer mode**.
 3. **Load unpacked**, and pick `extension-chromium/build/unpacked`.
-4. Note the **ID** the browser now shows under the extension's name. The next
-   step needs it.
 
 ### Set up the native host
 
 The extension talks to the `keepass-deltasync` client through native
-messaging. The client writes the manifest that lets the browser find it:
+messaging, and the client writes the manifest that lets the browser find it.
+That manifest has to name the extension, so the browser needs an ID first:
 
 ```sh
-keepass-deltasync install-browser-host --extension-id <the ID from step 4>
+keepass-deltasync install-browser-host --extension-id iocbdcgjepgmakdgfnhlanbncnfmgeof
 ```
 
-Unlike Firefox, where the extension's ID is a name we choose, Chromium derives
-the ID from the key the package is signed with — and the store makes that key
-when the item is first uploaded. So the ID is not known in advance, it differs
-between Chrome Web Store and Edge Add-ons, and it has to be passed in. Once
-the extension is published, the published IDs go into `chromiumExtensionIDs`
-in `client/cmd/keepass-deltasync/browser_install.go` and the flag stops being
-necessary.
+Restart the browser afterwards. It reads the manifest at startup.
+
+That ID is not a secret and not a placeholder: it is what Chromium derives
+from `dev-key.pub`, and `package.sh --dev` prints the whole command after a
+build. The same ID works on every machine and in both browsers.
+
+Without `--dev` the browser makes up an ID from the absolute path of the
+folder, so it changes between machines and has to be read off
+`chrome://extensions` each time. Either way there is no way to skip the ID:
+Chromium's native messaging manifest identifies callers by ID, and an empty
+list means nobody may call — not everybody.
 
 `--dry-run` prints what would be written without touching anything.
-`--extension-id` may be repeated, which is what you want when the same machine
-runs the unpacked build and the store build.
+`--extension-id` may be repeated, which is what you want when one machine runs
+both the unpacked build and the store build.
 
-Restart the browser afterwards. It reads the manifest at startup.
+**Why a key at all, and where is the private half?** Chromium derives an
+extension's ID from a public key: the first 128 bits of its SHA-256, written
+with the letters a to p. Signing is the store's job, so the private half was
+never needed for this and was thrown away when `dev-key.pub` was generated.
+The key is only in the unpacked tree — the store makes its own at upload, and
+the published IDs then belong in `chromiumExtensionIDs` in
+`client/cmd/keepass-deltasync/browser_install.go`, after which no flag is
+needed for the published extension. The development ID stays out of that list
+on purpose: this key is public, so anyone could build an extension carrying
+the same ID, and the client should not trust it unless its owner asks for it
+by hand.
 
 ### Add a local database
 
