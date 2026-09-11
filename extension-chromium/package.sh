@@ -96,16 +96,13 @@ SUBSTITUTIONS = {
         ),
     ],
     "popup.js": [
-        # Vejledningen ligger i extension-chromium/README.md indtil der findes
-        # en side på hjemmesiden for de to Chromium-browsere. firefox.html
-        # forklarer det samme, men ingen Chrome-bruger skal sendes derhen.
+        # Kun værten skifter. chrome.html bærer med vilje de samme to ankre
+        # som firefox.html, så de to linjer der udleder #host og #standalone
+        # kan blive stående — og skrives de om i Firefox-udgaven, følger
+        # begge udgaver med på én gang.
         (
-            'const SETUP_URL = "https://deltasync.bjoerck-braun.dk/firefox.html";\n'
-            'const SETUP_HOST_URL = SETUP_URL + "#host";\n'
-            'const SETUP_DATABASE_URL = SETUP_URL + "#standalone";',
-            'const SETUP_URL = "https://gitlab.com/Star95/keepass-deltasync/-/blob/main/extension-chromium/README.md";\n'
-            'const SETUP_HOST_URL = SETUP_URL + "#set-up-the-native-host";\n'
-            'const SETUP_DATABASE_URL = SETUP_URL + "#add-a-local-database";',
+            'const SETUP_URL = "https://deltasync.bjoerck-braun.dk/firefox.html";',
+            'const SETUP_URL = "https://deltasync.bjoerck-braun.dk/chrome.html";',
         ),
         (
             '      "Firefox cannot reach the keepass-deltasync host. It has to be installed and registered once, outside the browser.",',
