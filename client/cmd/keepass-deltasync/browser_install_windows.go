@@ -22,10 +22,16 @@ const launcherFileName = "browser-host.bat"
 // HKCU-nøglerne browserne slår op i. Hver browser har sin egen gren, og
 // Chromium-grenene ligner hinanden nok til at de er værd at skrive ud:
 // Chrome ser kun under Google, Edge kun under Microsoft.
+//
+// Opera har ingen gren. Deres egen dokumentation henviser til Chromes nøgle,
+// så en Opera bliver betjent af Chrome-målet og har ikke sit eget.
 const (
-	firefoxRegistryKey = `Software\Mozilla\NativeMessagingHosts\` + hostName
-	chromeRegistryKey  = `Software\Google\Chrome\NativeMessagingHosts\` + hostName
-	edgeRegistryKey    = `Software\Microsoft\Edge\NativeMessagingHosts\` + hostName
+	firefoxRegistryKey  = `Software\Mozilla\NativeMessagingHosts\` + hostName
+	chromeRegistryKey   = `Software\Google\Chrome\NativeMessagingHosts\` + hostName
+	chromiumRegistryKey = `Software\Chromium\NativeMessagingHosts\` + hostName
+	edgeRegistryKey     = `Software\Microsoft\Edge\NativeMessagingHosts\` + hostName
+	braveRegistryKey    = `Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\` + hostName
+	vivaldiRegistryKey  = `Software\Vivaldi\NativeMessagingHosts\` + hostName
 )
 
 func hostDataDir() (string, error) {
@@ -70,6 +76,36 @@ func hostTargets(exe string) ([]hostTarget, error) {
 	}
 	launcher := filepath.Join(dir, launcherFileName)
 
+	// Opera læser Chromes nøgle, så den tæller med i om Chrome-målet skal
+	// skrives — ellers ville en maskine med Opera og uden Chrome ikke få
+	// noget skrevet overhovedet.
+	opera := installed(operaExecutables)
+	chrome := hostTarget{
+		Label:       "Chrome",
+		Manifest:    filepath.Join(dir, hostName+".chrome.json"),
+		Launcher:    launcher,
+		Script:      launcherScript(exe),
+		Detected:    installed(chromeExecutables) || opera,
+		Chromium:    true,
+		RegistryKey: chromeRegistryKey,
+	}
+	if opera {
+		chrome.Hint = "Opera is installed, and it reads Chrome's registration rather than\n" +
+			"    keeping its own — so this entry covers Opera too."
+	}
+
+	chromium := func(label, manifest, key string, present bool) hostTarget {
+		return hostTarget{
+			Label:       label,
+			Manifest:    filepath.Join(dir, hostName+"."+manifest+".json"),
+			Launcher:    launcher,
+			Script:      launcherScript(exe),
+			Detected:    present,
+			Chromium:    true,
+			RegistryKey: key,
+		}
+	}
+
 	return []hostTarget{
 		{
 			Label:       "Firefox",
@@ -79,24 +115,11 @@ func hostTargets(exe string) ([]hostTarget, error) {
 			Detected:    true,
 			RegistryKey: firefoxRegistryKey,
 		},
-		{
-			Label:       "Chrome",
-			Manifest:    filepath.Join(dir, hostName+".chrome.json"),
-			Launcher:    launcher,
-			Script:      launcherScript(exe),
-			Detected:    installed(chromeExecutables),
-			Chromium:    true,
-			RegistryKey: chromeRegistryKey,
-		},
-		{
-			Label:       "Edge",
-			Manifest:    filepath.Join(dir, hostName+".edge.json"),
-			Launcher:    launcher,
-			Script:      launcherScript(exe),
-			Detected:    installed(edgeExecutables),
-			Chromium:    true,
-			RegistryKey: edgeRegistryKey,
-		},
+		chrome,
+		chromium("Chromium", "chromium", chromiumRegistryKey, installed(chromiumExecutables)),
+		chromium("Edge", "edge", edgeRegistryKey, installed(edgeExecutables)),
+		chromium("Brave", "brave", braveRegistryKey, installed(braveExecutables)),
+		chromium("Vivaldi", "vivaldi", vivaldiRegistryKey, installed(vivaldiExecutables)),
 	}, nil
 }
 
@@ -110,8 +133,26 @@ var (
 	chromeExecutables = []string{
 		`Google\Chrome\Application\chrome.exe`,
 	}
+	chromiumExecutables = []string{
+		`Chromium\Application\chrome.exe`,
+	}
 	edgeExecutables = []string{
 		`Microsoft\Edge\Application\msedge.exe`,
+	}
+	braveExecutables = []string{
+		`BraveSoftware\Brave-Browser\Application\brave.exe`,
+	}
+	vivaldiExecutables = []string{
+		`Vivaldi\Application\vivaldi.exe`,
+	}
+	// Opera installerer normalt per bruger under %LOCALAPPDATA%\Programs, og
+	// starteren hedder launcher.exe; opera.exe ligger i en versioneret
+	// undermappe. Begge navne er med, for det har ikke altid været sådan.
+	operaExecutables = []string{
+		`Programs\Opera\launcher.exe`,
+		`Programs\Opera\opera.exe`,
+		`Opera\launcher.exe`,
+		`Opera\opera.exe`,
 	}
 	// programRoots gennemsøges for de relative stier ovenfor.
 	programRoots = []string{"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"}

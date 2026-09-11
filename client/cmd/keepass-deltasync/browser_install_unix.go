@@ -103,10 +103,17 @@ func hostTargets(exe string) ([]hostTarget, error) {
 	// have samme sandkasse-problemer som Firefox har det, og de er ikke
 	// afprøvet; dukker de op, hører de til her ved siden af med hvert sit
 	// hint, ikke som en stiltiende antagelse om at det nok går.
+	//
+	// Braves mappe ligger to niveauer nede, og Operas hedder ikke som
+	// programmet. Navnene er hentet fra hver browsers egen dokumentation,
+	// ikke gættet ud fra programnavnet.
 	for _, b := range []struct{ label, dir string }{
 		{"Chrome", "google-chrome"},
 		{"Chromium", "chromium"},
 		{"Edge", "microsoft-edge"},
+		{"Brave", filepath.Join("BraveSoftware", "Brave-Browser")},
+		{"Vivaldi", "vivaldi"},
+		{"Opera", "opera"},
 	} {
 		root := filepath.Join(configHome(home), b.dir)
 		targets = append(targets, hostTarget{

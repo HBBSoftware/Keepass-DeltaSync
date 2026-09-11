@@ -60,15 +60,22 @@ func hostTargets(exe string) ([]hostTarget, error) {
 	// Chromium-browserne. Profilmappen er det eneste vi kan gå efter, og den
 	// findes fra første gang browseren har kørt — hvilket også er første gang
 	// der er en profil at registrere manifestet i.
+	// Opera har ingen egen mappe her: deres dokumentation henviser til
+	// Chromes, så en Opera betjenes af Chrome-målet. Den tæller derfor med i
+	// om Chrome-målet skal skrives, ellers ville en Mac med Opera og uden
+	// Chrome ikke få noget.
+	_, operaErr := os.Stat("/Applications/Opera.app")
 	for _, b := range []struct{ label, dir, app string }{
 		{"Chrome", filepath.Join("Google", "Chrome"), "Google Chrome.app"},
 		{"Chromium", "Chromium", "Chromium.app"},
-		{"Edge", filepath.Join("Microsoft Edge"), "Microsoft Edge.app"},
+		{"Edge", "Microsoft Edge", "Microsoft Edge.app"},
+		{"Brave", filepath.Join("BraveSoftware", "Brave-Browser"), "Brave Browser.app"},
+		{"Vivaldi", "Vivaldi", "Vivaldi.app"},
 	} {
 		root := filepath.Join(support, b.dir)
 		_, appErr := os.Stat(filepath.Join("/Applications", b.app))
 		info, dirErr := os.Stat(root)
-		targets = append(targets, hostTarget{
+		t := hostTarget{
 			Label:    b.label,
 			Manifest: filepath.Join(root, "NativeMessagingHosts", hostName+".json"),
 			Launcher: launcher,
@@ -76,7 +83,13 @@ func hostTargets(exe string) ([]hostTarget, error) {
 			Detected: appErr == nil || (dirErr == nil && info.IsDir()),
 			Chromium: true,
 			Hint:     quarantine,
-		})
+		}
+		if b.label == "Chrome" && operaErr == nil {
+			t.Detected = true
+			t.Hint = "Opera is installed, and it reads Chrome's location rather than keeping\n" +
+				"    its own — so this entry covers Opera too.\n    " + quarantine
+		}
+		targets = append(targets, t)
 	}
 
 	return targets, nil
