@@ -37,7 +37,7 @@ func isolate(t *testing.T) (home, sysRoot string) {
 // stadig står på listen.
 var wantLabels = []string{
 	"Firefox (system)", "Firefox (snap)", "Firefox (flatpak)",
-	"Chrome", "Chromium", "Edge",
+	"Chrome", "Chromium", "Edge", "Brave", "Vivaldi", "Opera",
 }
 
 func byLabel(t *testing.T, targets []hostTarget) map[string]hostTarget {
@@ -207,10 +207,18 @@ func TestHostTargets_Chromium(t *testing.T) {
 	if chrome.Manifest != want {
 		t.Fatalf("Chrome manifest = %q, want %q", chrome.Manifest, want)
 	}
-	for _, label := range []string{"Chromium", "Edge"} {
+	for _, label := range []string{"Chromium", "Edge", "Brave", "Vivaldi", "Opera"} {
 		if m[label].Detected {
 			t.Fatalf("%s reported as detected on a machine that never ran it", label)
 		}
+	}
+
+	// Brave er den eneste hvis mappe ligger to niveauer nede. Skrives den
+	// fladt ud, lander manifestet et sted Brave aldrig kigger, og kommandoen
+	// melder succes alligevel.
+	brave := filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser", "NativeMessagingHosts", hostName+".json")
+	if m["Brave"].Manifest != brave {
+		t.Fatalf("Brave manifest = %q, want %q", m["Brave"].Manifest, brave)
 	}
 }
 

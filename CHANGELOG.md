@@ -30,6 +30,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
   skipped rather than registered with an empty allow-list. See
   [`extension-chromium/README.md`](extension-chromium/README.md).
 
+  Brave, Vivaldi and Opera are covered as well. Opera is the odd one:
+  its own documentation sends you to Chrome's registry key and Chrome's
+  directory rather than keeping a branch of its own, so it is served by the
+  Chrome entry, and an installed Opera makes that entry count as found even
+  where Chrome is absent. Only Chrome and Edge have been run against this;
+  the other four follow each vendor's documentation and are untested.
+
 - **Firefox extension — search & go** (`extension/`) — search your KeePass
   entries from Firefox' address bar (`kp` keyword) or a popup, and open the
   entry's website. Filling in credentials deliberately stays with

@@ -107,16 +107,41 @@ No server and no account are involved. The host reads that file and nothing
 else, and the index it hands the extension holds titles, URLs and group paths
 — never a password.
 
-## Where it runs
+## Which browsers
 
-| | Manifest goes to |
-|---|---|
-| Windows | a file in `%LOCALAPPDATA%\keepass-deltasync`, found through `HKCU\Software\Google\Chrome` or `...\Microsoft\Edge` |
-| Linux | `~/.config/google-chrome/NativeMessagingHosts/`, `chromium` and `microsoft-edge` likewise |
-| macOS | `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`, Edge and Chromium likewise |
+`install-browser-host` writes one manifest per browser it finds, and knows
+these:
+
+| Browser | Where its manifest goes |
+|---------|-------------------------|
+| Chrome | `HKCU\Software\Google\Chrome\…` · `~/.config/google-chrome/…` · `~/Library/Application Support/Google/Chrome/…` |
+| Chromium | `HKCU\Software\Chromium\…` · `~/.config/chromium/…` · `~/Library/Application Support/Chromium/…` |
+| Edge | `HKCU\Software\Microsoft\Edge\…` · `~/.config/microsoft-edge/…` · `~/Library/Application Support/Microsoft Edge/…` |
+| Brave | `HKCU\Software\BraveSoftware\Brave-Browser\…` · `~/.config/BraveSoftware/Brave-Browser/…` · `~/Library/Application Support/BraveSoftware/Brave-Browser/…` |
+| Vivaldi | `HKCU\Software\Vivaldi\…` · `~/.config/vivaldi/…` · `~/Library/Application Support/Vivaldi/…` |
+| Opera | Chrome's, on Windows and macOS. Its own `~/.config/opera/…` on Linux |
+
+Each ends in `NativeMessagingHosts` and then the host's name. On Windows the
+manifests are files in `%LOCALAPPDATA%\keepass-deltasync`, and the registry
+key points at them.
+
+Opera has no branch of its own on Windows or macOS: [its own
+documentation](https://help.opera.com/en/extensions/message-passing/) sends
+you to Chrome's registry key and Chrome's directory. So an Opera is served by
+the Chrome entry, and an installed Opera is enough to make that entry count as
+found even when Chrome itself is absent.
+
+Only Chrome and Edge have actually been run against this. The other four are
+written from each vendor's documentation and are untested.
 
 A snap or flatpak Chromium is not covered. Those sandboxes need the same
 special handling the Firefox variants get, and none of it has been tried.
+
+Safari cannot run this extension: it uses a different extension model, and a
+local program is only reachable from a macOS app built around the extension.
+No mobile browser can either — Firefox for Android has no native messaging,
+and Chrome for Android has no extensions at all. Without a local host there is
+nothing to search.
 
 ## One behavioural difference from Firefox
 
