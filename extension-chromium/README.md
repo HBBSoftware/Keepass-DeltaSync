@@ -18,8 +18,9 @@ cannot drift apart. This directory holds only what Chromium needs differently:
 | `manifest.json` | Chromium wants a service worker and raster icons; Firefox wants neither |
 | `compat.js` | Chromium has no `browser` namespace, and answers a message differently |
 | `sw.js` | The service worker entry point; Firefox lists its background scripts in the manifest instead |
+| `icon.svg` | The mark, copied from the website's `assets/logo.svg` |
 | `icons/*.png` | Chrome and Edge reject an SVG icon |
-| `make-icons.py` | Redraws those PNGs from `../extension/icon.svg` |
+| `make-icons.py` | Renders those PNGs from `icon.svg`, using any installed Chromium |
 | `package.sh` | Assembles the package and substitutes the few strings that say "Firefox" |
 | `dev-key.pub` | Fixes the extension's ID while testing, so it is the same on every machine |
 | `smoke-test.mjs` | Runs the shared background code against a fake `chrome` |
