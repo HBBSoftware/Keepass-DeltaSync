@@ -29,6 +29,9 @@ Fælles dokumentation — protokol-specifikation, betjeningsguides, threat model
   niveauer: kopi, fuld synk, filtreret pr. enhed
 - `backup-restore.md` — hvad en backup skal indeholde, og hvorfor restore
   hører hjemme i opsætningen, ikke blandt de administrative handlinger
+- `device-lifecycle.md` — sletning af enhed fra web, re-enroll fra en
+  eksisterende enhed, og hvorfor en delt nøgle hænger på enheden og ikke på
+  brugeren
 
 ## Testplaner
 
