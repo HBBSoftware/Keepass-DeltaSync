@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting started — DeltaSync</title>
+    <meta name="description" content="User and administrator guide for DeltaSync.">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/getting-started.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/getting-started.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/getting-started.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Home</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="getting-started.html" class="active">Getting started</a>
+            <a href="deploy-server.html">Deploy server</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="getting-started.html" class="active" hreflang="en">EN</a>
+                <a href="da/getting-started.html" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Getting started</h1>
+
+        <p>This page covers both how to <strong>get started as a user</strong> (your administrator has invited you) and how to <strong>deploy a server</strong> yourself.</p>
+
+        <h2>As a user</h2>
+
+        <p>You need:</p>
+        <ul>
+            <li>An enrollment token from your administrator</li>
+            <li><a href="https://keepassxc.org/">KeePassXC</a> installed (the desktop client uses its <code>keepassxc-cli</code> to read and merge .kdbx files)</li>
+            <li>A <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">pre-built binary</a> for Linux, macOS or Windows — or Go 1.26+ if you prefer to build it yourself</li>
+        </ul>
+
+        <p>On a phone you don't need any of the above — just install the <strong>Android app</strong> (see <a href="#android">On Android</a> below).</p>
+
+        <h3 id="desktop-app">The desktop app, if you would rather not use a terminal</h3>
+
+        <p>Everything below can be done in a window instead. The desktop app is a thin shell around the same command-line client — it owns no encryption, no server logic and no configuration of its own, it just runs the client for you and shows the result. Anything you do in one is visible in the other.</p>
+
+        <p><strong>On Windows</strong>, take <code>KeePass-Delta-Sync-Setup-&lt;version&gt;.exe</code> from the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases page</a>. It installs both programs into the same folder, which is what lets the app find the client without any PATH setup, and it installs for your user only — no administrator prompt. <strong>On Linux</strong> take the <code>.tar.xz</code> from the same page; <strong>on macOS</strong> build it with <code>make package-darwin</code>, since a signed <code>.app</code> needs a Mac to build on.</p>
+
+        <p>The first time you start it, a wizard asks for the server address and your enrollment token, then for a name and a file for your <code>.kdbx</code> — the same two steps as <code>enroll</code> and <code>init</code> below. After that you get a dashboard with tabs for <em>Databases</em>, <em>Devices</em>, <em>Activity</em>, <em>Log</em>, <em>Administration</em> and <em>Settings</em>, so you can sync one database or all of them, watch what the client is doing, and switch the interface between Danish and English.</p>
+
+        <p>Under <em>Settings</em> there is also <strong>autostart</strong>, which asks your operating system to run <code>keepass-deltasync daemon</code> when you log in — a logon task in Task Scheduler on Windows, launchd on macOS, <code>systemd --user</code> on Linux. It is set up entirely inside your own user account, so it needs no administrator either, and background sync then keeps running whether or not the app is open.</p>
+
+        <h3>Steps</h3>
+
+        <ol class="steps">
+            <li>
+                <strong>Build the client</strong>
+<pre><code>git clone https://gitlab.com/Star95/keepass-deltasync.git
+cd keepass-deltasync/client
+go build -o keepass-deltasync ./cmd/keepass-deltasync</code></pre>
+                Put <code>keepass-deltasync</code> on your PATH or invoke it directly with <code>./keepass-deltasync</code>.
+            </li>
+            <li>
+                <strong>Enroll your device</strong> with the one-time token from your admin:
+<pre><code>./keepass-deltasync enroll --server https://deltasync.example.com &lt;your-token&gt;</code></pre>
+                The client generates an X25519 keypair locally and sends the public part to the server. The private part stays on your device.
+            </li>
+            <li>
+                <strong>Bind a local .kdbx file</strong>:
+<pre><code>./keepass-deltasync init mypasswords ~/keepass/my.kdbx</code></pre>
+                Or, if you already have the same database synced on another device:
+<pre><code>./keepass-deltasync databases   # find the UUID of the existing one
+./keepass-deltasync init mypasswords ~/keepass/my.kdbx --bind &lt;UUID&gt;</code></pre>
+            </li>
+            <li>
+                <strong>Sync</strong>:
+<pre><code>./keepass-deltasync sync mypasswords</code></pre>
+                You will be prompted for your master password. The client runs Argon2id locally (~200 ms) and syncs.
+            </li>
+            <li>
+                <strong>Let the daemon run in the background</strong> for automatic sync:
+<pre><code>./keepass-deltasync daemon --store-keyring</code></pre>
+                The first time, it prompts for your password and stores it in the OS keyring (Windows Credential Manager / macOS Keychain / libsecret). Subsequent starts are fully non-interactive.
+            </li>
+        </ol>
+
+        <h3 id="autostart">Run the daemon automatically at login</h3>
+
+        <p>Once the daemon works when you run it by hand, you can have your computer start it for you at every login, so syncing "just happens". <strong>Run the manual <code>--store-keyring</code> command first</strong> (step 5 above) and enter your master password once — autostart depends on the password already being saved in the OS keyring, because nobody is there to type it at boot.</p>
+
+        <h4>Windows</h4>
+
+        <p>The simplest reliable approach is a tiny launcher that starts the daemon <em>hidden</em> (no black console window), placed in your Startup folder.</p>
+
+        <ol class="steps">
+            <li>
+                Next to <code>keepass-deltasync.exe</code>, create a text file named <code>start-daemon-hidden.vbs</code> with this content (change the folder path to where your <code>.exe</code> actually lives):
+<pre><code>Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = "C:\Tools\keepass-deltasync"
+sh.Run "keepass-deltasync.exe daemon", 0, False</code></pre>
+                The <code>0</code> means "run hidden".
+            </li>
+            <li>
+                Press <code>Windows</code>+<code>R</code>, type <code>shell:startup</code>, and press Enter. Windows opens your personal Startup folder.
+            </li>
+            <li>
+                Right-click <code>start-daemon-hidden.vbs</code> → <em>Copy</em>, then right-click inside the Startup folder → <em>Paste shortcut</em>. That's it — the daemon now starts hidden every time you log in.
+            </li>
+        </ol>
+
+        <p><strong>Optional — Task Scheduler</strong> (more robust: it can restart the daemon if it ever crashes). Open <em>Task Scheduler</em> → <em>Create Task…</em>, add a trigger <em>"At log on"</em>, and an action <em>"Start a program"</em> with program <code>wscript.exe</code> and argument the full path to your <code>.vbs</code> file. Choose <em>"Run only when user is logged on"</em> — that is required so the task can read your password from Windows Credential Manager. The same as a one-liner in PowerShell:</p>
+<pre><code>schtasks /create /tn "KeePass DeltaSync" /sc onlogon /rl limited /f /tr "wscript.exe \"C:\Tools\keepass-deltasync\start-daemon-hidden.vbs\""</code></pre>
+
+        <h4>Linux</h4>
+
+        <p>Use a <strong>systemd user service</strong>. Create the file <code>~/.config/systemd/user/keepass-deltasync.service</code>:</p>
+<pre><code>[Unit]
+Description=KeePass DeltaSync daemon
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/keepass-deltasync daemon
+Restart=on-failure
+
+[Install]
+WantedBy=default.target</code></pre>
+
+        <p>Change the <code>ExecStart</code> path to wherever you put the binary. Then enable and start it:</p>
+<pre><code>systemctl --user daemon-reload
+systemctl --user enable --now keepass-deltasync.service
+systemctl --user status keepass-deltasync.service   # confirm it is running</code></pre>
+
+        <p>View its log output any time with:</p>
+<pre><code>journalctl --user -u keepass-deltasync -f</code></pre>
+
+        <div class="callout">
+            <strong>Keyring note (Linux):</strong> the daemon reads your saved password from the desktop secret service (GNOME Keyring / KWallet, via libsecret), which is unlocked when you log in to your graphical desktop — so the service starts cleanly in a normal desktop session. On a <em>headless</em> server with no unlocked keyring, the keyring lookup will fail; there, run the daemon with <code>--password-stdin</code> reading from a protected file instead. If you want the service to keep running after you log out, enable lingering: <code>loginctl enable-linger $USER</code>.
+        </div>
+
+        <h3 id="android">On Android</h3>
+
+        <p>The Android app is a <strong>sync service</strong>: it has no built-in entry editor. It keeps your <code>.kdbx</code> file in sync in the background, and you read and edit your passwords in your usual Android KeePass app — <a href="https://github.com/PhilippC/keepass2android">Keepass2Android</a> or <a href="https://github.com/Kunzisoft/KeePassDX">KeePassDX</a>, both of which open the same file.</p>
+
+        <ol class="steps">
+            <li>
+                <strong>Install the app.</strong> The quickest route today is <a href="https://github.com/ImranR98/Obtainium">Obtainium</a>, which installs the signed APK straight from <a href="https://github.com/HBBSoftware/Keepass-DeltaSync/releases">GitHub Releases</a> and keeps it up to date. Point it at that repository, filter release titles by <code>^DeltaSync Android</code> and extract the version with <code>[0-9.]+$</code> — the same repository publishes desktop releases, and the two filters keep them apart. F-Droid took the app into its catalogue on 10 September 2026, so that channel is on its way; the builds are reproducible and carry the same signature, so you can move between the two without uninstalling.
+            </li>
+            <li>
+                <strong>Enroll the device</strong> on the main screen. Tap <em>Scan QR code</em> and point the camera at the code shown in the admin panel, or type the server URL and the one-time enrollment token in by hand. The app generates an X25519 keypair and stores the device token in the Android Keystore. A server reached over plain HTTP works too, for one that only answers on your own network.
+            </li>
+            <li>
+                <strong>Pick your .kdbx</strong> via the system file picker and match it to the database on the server. If the server has no database yet, the app creates one for you — the desktop client is no longer needed to get the first one in place.
+            </li>
+            <li>
+                <strong>Sync now</strong> — enter your master password to sync once. To keep it in sync automatically, flip on <em>“Auto-sync in the background”</em> on the main screen: you confirm once with biometrics (or your device PIN), and the password is stored encrypted in the Android Keystore (never in plaintext). After that the app syncs on its own — no password, no fingerprint — at an interval you choose (15, 30 or 60 minutes). Idle checks are cheap: it only runs the full decrypt-and-merge when the file or the server has actually changed.
+            </li>
+            <li>
+                <strong>Share from the app</strong> if you are the owner: the Share screen lists members, adds one by username, and removes access again — the same flow as the desktop <code>share</code> command.
+            </li>
+        </ol>
+
+        <p>Deletions made in Keepass2Android / KeePassDX (recycle bin or permanent) propagate to the server and to your other devices, just like on desktop.</p>
+
+        <h3>Receive a shared database</h3>
+
+        <p>If someone shares a database with you, it shows up in your list:</p>
+<pre><code>./keepass-deltasync databases
+# NAME          ID                                    ...  role=member</code></pre>
+
+        <p>Bootstrap a local copy with <code>init-shared</code>:</p>
+<pre><code>./keepass-deltasync init-shared shared-vault ~/keepass/shared.kdbx</code></pre>
+
+        <p>You choose a new local password for your copy — it does not have to match the owner's. After that, you can sync, edit, and share back like any other vault.</p>
+
+        <h3>Share a database with another user</h3>
+
+<pre><code># Share 'mypasswords' with user 'alice'
+./keepass-deltasync share mypasswords alice
+
+# List members
+./keepass-deltasync shares mypasswords
+
+# Remove membership
+./keepass-deltasync unshare mypasswords alice</code></pre>
+
+        <div class="callout">
+            <strong>Trust model:</strong> when you share a database, the recipient gets full read-write access to all entries. Sharing is asymmetrically encrypted but not "revocable" in a cryptographic sense — see <a href="architecture.html">architecture</a> for details.
+        </div>
+
+        <h2 id="firefox">In Firefox — search and go</h2>
+
+        <p>The Firefox extension answers one question: <em>which page was that account on again?</em> Type <code>kp</code> in the address bar followed by a search, or press <code>Alt+Shift+K</code> for a popup, and it takes you to the entry's website. Logging in is still <a href="https://github.com/keepassxreboot/keepassxc-browser">KeePassXC-Browser</a>'s job — this only gets you to the page so that it can do its work, which is why it never needs to see a password. It receives titles, addresses and group names, and requests no host permissions at all.</p>
+
+        <p>It does <strong>not</strong> need a DeltaSync server: a search never touches the network, because the helper reads your local <code>.kdbx</code> through <code>keepassxc-cli</code> and answers from that alone. If you only want the search and have no interest in syncing, you can run the client purely locally.</p>
+
+        <p><a href="firefox.html">Installing the Firefox extension</a> covers both routes — with your existing DeltaSync setup, or standalone with no server — plus registering the native messaging host and what to do when nothing happens.</p>
+
+        <h2>As an administrator</h2>
+
+        <p>You will typically be responsible for deploying the server and creating user accounts. The full deployment guide lives in the repo:</p>
+
+        <ul>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/deployment.md">docs/deployment.md</a> — three concrete deployment recipes</li>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/threat-model.md">docs/threat-model.md</a> — what the server sees, doesn't see, and the trust model</li>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/server/README.md">server/README.md</a> — server overview</li>
+        </ul>
+
+        <h3>Fastest deployment flow</h3>
+
+        <ol class="steps">
+            <li>
+                <strong>Upload the server/ code</strong> to your web host (Hetzner shared hosting or similar PHP + PostgreSQL).
+            </li>
+            <li>
+                <strong>Create the PostgreSQL database</strong> and run the migrations from <code>server/schema/</code> (sequentially 001 through 007).
+            </li>
+            <li>
+                <strong>Fill out <code>server/.env</code></strong> based on <code>.env.example</code> (DB credentials, log level).
+            </li>
+            <li>
+                <strong>Generate the first admin token</strong> via a SQL snippet:
+<pre><code>./keepass-deltasync admin token-sql
+# copy the output to DBeaver, run it, save 'admin_token' from the result</code></pre>
+            </li>
+            <li>
+                <strong>Create users</strong> via the admin CLI:
+<pre><code>$env:KEEPASS_DELTASYNC_ADMIN_TOKEN = "&lt;token&gt;"   # PowerShell
+./keepass-deltasync admin user-create alice --display-name "Alice Smith"
+# Returns an enrollment token for Alice</code></pre>
+            </li>
+            <li>
+                <strong>Send the enrollment token to the user</strong> via a secure channel (not email). They use it once in the <code>enroll</code> command and then get a permanent device token stored in their local config.
+            </li>
+        </ol>
+
+        <h3>Day-to-day operations</h3>
+
+        <p>Admin commands:</p>
+<pre><code>./keepass-deltasync admin user-list                 # tabular overview
+./keepass-deltasync admin user-enrollment alice     # new enroll token for an extra device
+./keepass-deltasync admin user-disable alice        # block login without deleting data
+./keepass-deltasync admin user-enable alice
+./keepass-deltasync admin user-delete alice --yes   # permanent, CASCADE</code></pre>
+
+        <p>Audit log is available via:</p>
+<pre><code>./keepass-deltasync log                             # your own activity
+# admin /api/v1/admin/log endpoint returns the entire log</code></pre>
+
+        <h2>Troubleshooting</h2>
+
+        <h3>"keepassxc-cli not found"</h3>
+        <p>The client looks for <code>keepassxc-cli</code> on PATH, or on Windows in <code>C:\Program Files\KeePassXC\</code>. If it lives elsewhere, set an env var:</p>
+<pre><code>$env:KEEPASSXC_CLI = "C:\path\to\keepassxc-cli.exe"
+# or pass --keepassxc-cli FLAG to each command</code></pre>
+
+        <h3>"empty password on stdin"</h3>
+        <p>You piped something empty to <code>--password-stdin</code>. Use the interactive prompt instead (drop the flag), or verify your pipe actually delivers content. On Windows, <code>echo "pw" | client ...</code> is tricky — use PowerShell syntax: <code>"pw" | client ...</code>.</p>
+
+        <h3>"server URL not configured"</h3>
+        <p>You haven't run <code>enroll</code> yet, or your config.toml is gone. Find the file:</p>
+        <ul>
+            <li>Windows: <code>%APPDATA%\keepass-deltasync\config.toml</code></li>
+            <li>macOS: <code>~/Library/Application Support/keepass-deltasync/config.toml</code></li>
+            <li>Linux: <code>~/.config/keepass-deltasync/config.toml</code></li>
+        </ul>
+
+        <h3>The daemon spams "Fetching..." in logs</h3>
+        <p>Shouldn't happen — the daemon runs in quiet mode. If it does, you probably have an old binary — rebuild from HEAD.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Home</a>
+            &nbsp;·&nbsp;
+            <a href="architecture.html">Architecture</a>
+            &nbsp;·&nbsp;
+            <a href="da/getting-started.html">Dansk</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

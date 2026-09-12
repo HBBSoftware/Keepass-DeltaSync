@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ — DeltaSync</title>
+    <meta name="description" content="Ofte stillede spørgsmål om DeltaSync: tilkobling af nye enheder, bindinger, det gemte masterpassword og hvor mange enheder der er koblet til.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/faq.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/faq.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/faq.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html">Server-opsætning</a>
+            <a href="faq.html" class="active">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="../faq.html" hreflang="en">EN</a>
+                <a href="faq.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Ofte stillede spørgsmål</h1>
+
+        <p>Svarene bruger desktop-klientens kommandoer. På Android gælder de samme begreber via app'ens skærme — Android-specifikke noter er nævnt, hvor det er anderledes. Er du ny, så læs <a href="getting-started.html">Kom i gang</a> først.</p>
+
+        <div class="callout">
+            <strong>Tre ord, det er værd at holde adskilt:</strong>
+            en <strong>enhed</strong> er én computer eller telefon, der er enrollet til din konto (den har sin egen nøgle);
+            en <strong>database</strong> er en boks på serveren (ét fælles UUID, uanset hvor mange enheder der bruger den);
+            en <strong>binding</strong> er den lokale kobling på én enhed mellem en <code>.kdbx</code>-fil og en server-database. De fleste spørgsmål herunder handler i virkeligheden om én af disse tre.
+        </div>
+
+        <h2>Enheder &amp; tokens</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Hvordan får jeg en token til en ny enhed, så den kobles sammen med de andre?</summary>
+                <div class="answer">
+                    <p>Hver enhed skal bruge sin <em>egen</em> engangs-enrollment-token — tokens kan kun bruges én gang, så du kan ikke genbruge den fra din første enhed. Bed din administrator om at udstede en ny:</p>
+<pre><code># Administratoren kører:
+./keepass-deltasync admin user-enrollment &lt;dit-brugernavn&gt;
+# → udskriver en ny enrollment-token</code></pre>
+                    <p>På den nye enhed enroller du så med den token:</p>
+<pre><code>./keepass-deltasync enroll --server https://deltasync.bjoerck-braun.dk &lt;ny-token&gt;</code></pre>
+                    <p>Enrollment kobler <em>enheden</em> til din konto. Den peger endnu ikke på nogen boks — for rent faktisk at dele data med dine andre enheder binder du derefter enheden til den eksisterende database (se <a href="#bind">»Hvordan binder jeg en enhed til en eksisterende DeltaSync-database?«</a> nedenfor). På Android gør du det samme på hovedskærmen: scan QR-koden fra admin-panelet, eller indtast server-URL og den nye enrollment-token i hånden.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvordan ser jeg, hvor mange enheder der er koblet til min synk?</summary>
+                <div class="answer">
+                    <p>Kør <code>devices</code> — den lister alle enheder, der er enrollet til din konto, med den du sidder ved markeret med en stjerne:</p>
+<pre><code>./keepass-deltasync devices
+#    NAME        ID        ENROLLED     LAST SEEN
+# *  laptop      ab12…     2026-05-27   2026-06-09
+#    work-pc     cd34…     2026-05-30   2026-06-08
+#    telefon     ef56…     2026-06-01   2026-06-09</code></pre>
+                    <p><code>LAST SEEN</code> viser, hvornår hver enhed sidst synkede — nyttigt til at opdage en enhed, du havde glemt. Administratorer kan også se et enhedstal pr. bruger med <code>admin user-list</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvordan fjerner jeg en enhed, jeg ikke længere bruger?</summary>
+                <div class="answer">
+                    <p>Vil du blot stoppe en database fra at synke på en enhed, du stadig har adgang til, kører du <code>forget</code> på den enhed (se nedenfor). At tilbagekalde en <em>enhed</em> helt — fx en tabt eller stjålet laptop eller telefon — er en administrator-handling; bed din admin om at fjerne den (en fuld konto-nulstilling med <code>admin user-delete</code> fjerner via CASCADE alle enheder, men sletter også dine databaser, så det er kun til at nedlægge kontoen). Hvis en enhed kan være kompromitteret, så skift også dit KeePass-masterpassword bagefter.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Bindinger</h2>
+
+        <div class="faq">
+
+            <details id="bind">
+                <summary>Hvordan binder jeg en enhed til en eksisterende DeltaSync-database?</summary>
+                <div class="answer">
+                    <p>Dette er det normale »anden enhed«-flow: du synker allerede en boks på én enhed og vil have en ny enhed til at dele de samme data. Find først databasens UUID:</p>
+<pre><code>./keepass-deltasync databases
+# NAME          ID                                    ...
+# mypasswords   3f2b9c1a-…-…-…-…                      role=owner</code></pre>
+                    <p>Bind så en lokal <code>.kdbx</code>-fil på den nye enhed til det UUID i stedet for at oprette en helt ny boks:</p>
+<pre><code>./keepass-deltasync init mypasswords ~/keepass/my.kdbx --bind &lt;UUID&gt;
+./keepass-deltasync sync mypasswords</code></pre>
+                    <p>Den lokale fil må gerne være en tom/ny <code>.kdbx</code> med det rigtige masterpassword — den første <code>sync</code> henter server-entries ind i den. På Android vælger du din <code>.kdbx</code> med filvælgeren og matcher den til databasen, der vises fra serveren.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvordan sletter jeg en tidligere binding?</summary>
+                <div class="answer">
+                    <p>Brug <code>forget</code> på den enhed, hvis binding du vil fjerne:</p>
+<pre><code>./keepass-deltasync forget mypasswords</code></pre>
+                    <p>Dette fjerner kun den <em>lokale</em> kobling i den enheds config. <strong>Server-databasen og <code>.kdbx</code>-filen røres slet ikke</strong> — dine passwords slettes ikke, og dine andre enheder synker videre. Det er præcis, hvad du vil have efter et konto-skift, hvor en gammel binding er blevet forældet, eller når du simpelthen vil stoppe med at synke en boks fra netop denne enhed. List dine nuværende bindinger når som helst med <code>databases</code>. Vil du samle databasen op igen senere, kører du bare <code>init … --bind &lt;UUID&gt;</code> som ovenfor.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvordan sletter jeg en hel database på serveren (fx en overskydende duplikat)?</summary>
+                <div class="answer">
+                    <p>Det er noget andet end <code>forget</code>. <code>forget</code> fjerner kun den <em>lokale</em> binding; server-boksen lever videre. Viser <code>databases</code> en række markeret <code>?</code> / <code>(not bound locally)</code>, som du vil af med for altid — typisk en duplikat oprettet ved et uheld — skal du slette selve <em>server</em>-databasen.</p>
+                    <p>Kun <strong>ejeren</strong> kan det. Brug kommandoen <code>delete-database</code>, der tager enten et lokalt navn eller et rå UUID — angiv UUID'et for en ikke-bundet duplikat, der ikke har noget lokalt navn:</p>
+<pre><code># Slå UUID'et op først
+./keepass-deltasync databases
+
+# Slet via UUID (eller via lokalt navn, hvis den er bundet)
+./keepass-deltasync delete-database &lt;UUID&gt;</code></pre>
+                    <p>Den viser databasens rigtige server-navn, beder dig skrive <code>yes</code> for at bekræfte og sletter den så. Tilføj <code>--yes</code> for at springe bekræftelsen over. Var databasen også bundet lokalt, fjernes bindingen samtidig (din <code>.kdbx</code>-fil røres ikke). Kør <code>databases</code> igen for at bekræfte.</p>
+                    <div class="callout warn">
+                        <strong>Det er permanent.</strong> At slette en database CASCADE-fjerner alle dens entries og versionshistorik på serveren. Dobbelttjek at du sender UUID'et på den uønskede række — den markeret <code>?</code> — og ikke den <code>*</code>-database, du faktisk synker.
+                    </div>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Det gemte masterpassword</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Mit nye password er i wallet'en, men jeg har skiftet forbindelse — hvordan får jeg det til at virke igen?</summary>
+                <div class="answer">
+                    <p>Daemonen cacher dit masterpassword i OS' »wallet« (Windows Credential Manager / macOS Keychain / Linux Secret Service) <strong>pr. database</strong>, nøglet på databasens UUID. Når du skifter forbindelse — ny binding til en anden boks, eller ændring af boksens masterpassword — kan wallet'en stadig indeholde den <em>gamle</em> entry, så daemonen bliver ved med at prøve det forældede password, og synk fejler.</p>
+                    <p>Løsningen er at rydde den forældede entry og lade daemonen gemme den nye:</p>
+                    <ol class="steps">
+                        <li>Stop daemonen, hvis den kører.</li>
+                        <li>Fjern det gemte credential fra OS-wallet'en. På Windows: <em>Kontrolpanel → Legitimationsoplysninger (Credential Manager) → Windows-legitimationsoplysninger</em>, find entries ved navn <code>keepass-deltasync</code> og fjern dem. På macOS: åbn <em>Nøglering (Keychain Access)</em>, søg <code>keepass-deltasync</code>, slet. På Linux: brug <em>Seahorse</em> (»Adgangskoder og nøgler«) og slet <code>keepass-deltasync</code>-elementerne.</li>
+                        <li>Kør daemonen igen, så den spørger én gang efter det nye password og gemmer det igen:
+<pre><code>./keepass-deltasync daemon --store-keyring</code></pre></li>
+                    </ol>
+                    <p>Hvis du blot <code>forget</code>'er og re-<code>init --bind</code>'er til en ny boks, har den nye database et nyt UUID, så daemonen spørger af sig selv — ingen manuel oprydning nødvendig (den gamle wallet-entry bliver bare harmløs død vægt, du kan slette i ro og mag).</p>
+                    <p><strong>På Android</strong> ligger masterpasswordet krypteret i Android Keystore. For at opdatere det slår du <em>»Auto-synk i baggrunden«</em> fra og til igen — du bekræfter med biometri og indtaster det nuværende masterpassword, som erstatter det gemte.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Jeg har skiftet mit KeePass-masterpassword — hvad gør jeg på mine andre enheder?</summary>
+                <div class="answer">
+                    <p>Masterpasswordet gemmes aldrig på serveren, så hver enhed, der havde det cachet, skal have det nye. På hver af de andre enheder opdaterer du wallet-entryen præcis som i forrige svar (ryd det gamle credential, kør så <code>daemon --store-keyring</code>), eller slå auto-synk fra og til på Android. Indtil du gør det, vil den enhed fejle med at dekryptere og synke.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Deling &amp; gendannelse</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Hvordan deler jeg en database med en anden bruger?</summary>
+                <div class="answer">
+                    <p>Hvis du ejer databasen:</p>
+<pre><code>./keepass-deltasync share mypasswords alice    # giv adgang
+./keepass-deltasync shares mypasswords         # list medlemmer
+./keepass-deltasync unshare mypasswords alice  # fjern et medlem</code></pre>
+                    <p>Modtageren bootstrapper sin egen lokale kopi med <code>init-shared</code> og vælger sit eget lokale password — det behøver ikke matche dit. Deling er asymmetrisk krypteret: kun modtagerens enhed kan pakke nøglen ud. Se <a href="getting-started.html#android">Kom i gang</a> for Del-skærmen på Android og <a href="architecture.html">arkitektur-siden</a> for tillidsmodellen.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Jeg slettede en entry ved et uheld — kan jeg få den tilbage?</summary>
+                <div class="answer">
+                    <p>Serveren gemmer op til tre tidligere versioner af hver entry. List dem og rul tilbage:</p>
+<pre><code>./keepass-deltasync versions mypasswords &lt;entry-uuid&gt;
+./keepass-deltasync restore mypasswords &lt;entry-uuid&gt; 1</code></pre>
+                    <p>Find entry-UUID'et i KeePassXC eller fra <code>versions</code>-/log-output.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvor gemmes min konfiguration?</summary>
+                <div class="answer">
+                    <p>Klienten holder sine bindinger og enheds-token i <code>config.toml</code>:</p>
+                    <ul>
+                        <li>Windows: <code>%APPDATA%\keepass-deltasync\config.toml</code></li>
+                        <li>macOS: <code>~/Library/Application Support/keepass-deltasync/config.toml</code></li>
+                        <li>Linux: <code>~/.config/keepass-deltasync/config.toml</code></li>
+                    </ul>
+                    <p>Dit masterpassword ligger <em>ikke</em> der — det findes kun i OS-wallet'en (hvis du har valgt <code>--store-keyring</code>) eller i dit hoved.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Skrivebordsprogrammet &amp; Firefox</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Er jeg nødt til at bruge kommandolinjen?</summary>
+                <div class="answer">
+                    <p>Nej. Skrivebordsprogrammet klarer det daglige i et vindue: en guide til tilmelding og din første database, derefter et dashboard til at synkronisere én database eller dem alle, se dine enheder og din aktivitet, og slå baggrunds-sync ved login til.</p>
+                    <p>Det er med vilje en tynd skal om den samme klient — det rummer hverken kryptering, server-logik eller sin egen konfiguration, det kører blot klienten og viser dig dens output. De to kan derfor bruges i flæng: tilmeld dig i programmet, og kommandolinjen kan se det, og omvendt. Et par ting findes fortsat kun som kommandoer, især deling (<code>share</code>, <code>init-shared</code>) og versionshistorik (<code>versions</code>, <code>restore</code>).</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvor får jeg Windows-installeren, og kræver den administrator-rettigheder?</summary>
+                <div class="answer">
+                    <p><code>KeePass-Delta-Sync-Setup-&lt;version&gt;.exe</code> ligger på <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases-siden</a>. Den installerer <em>kun for din egen bruger</em> og beder aldrig om administrator-rettigheder — hvilket passer med resten af DeltaSync, hvor baggrunds-sync ved login også sættes op inde i din egen konto.</p>
+                    <p>Den indeholder både skrivebordsprogrammet og kommandolinje-klienten og lægger dem i samme mappe med vilje: det er dét der lader programmet finde klienten, uden nogen PATH at sætte op. Der er en valgfri komponent med et kildekode-arkiv af begge dele, som er fravalgt som standard.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Kan jeg bruge Firefox-udvidelsen uden at køre en DeltaSync-server?</summary>
+                <div class="answer">
+                    <p>Ja. En søgning rører aldrig netværket — native messaging-hosten læser din lokale <code>.kdbx</code> gennem <code>keepassxc-cli</code> og svarer ud fra den alene. Vil du bare finde den rigtige side hurtigt, kan du fuldstændig se bort fra projektets sync-halvdel.</p>
+                    <p>Registrering af databasen har sin egen kommando til netop dette tilfælde — <code>init</code> ville kræve tilmelding, det gør denne ikke:</p>
+<pre><code>keepass-deltasync add-local privat ~/keepass/min.kdbx
+keepass-deltasync install-browser-host</code></pre>
+                    <p>Indlæs så udvidelsen, og dét er hele opsætningen. Sæt <code>--save-password</code> på den første kommando for at holde masterpasswordet i styresystemets nøglering; uden det spørger popup'en ved første søgning, og hosten holder det kun i hukommelsen — det slettes når idle-låsen udløber, eller når du trykker <em>Lås</em>. Trin for trin står det <a href="firefox.html#standalone">på Firefox-siden</a>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Hvor henter jeg udvidelsen?</summary>
+                <div class="answer">
+                    <p>Fra <a href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">addons.mozilla.org</a>, signeret og gennemgået som enhver anden udvidelse. Den kræver at <code>keepass-deltasync</code>-klienten er installeret og registreret først — <a href="firefox.html">opsætningssiden</a> er tre trin.</p>
+                    <p>To ting er værd at vide så længe: udvidelsen beder ikke om adgang til nogen websider overhovedet, så den kan ikke læse de sider du besøger. Og den modtager aldrig et password — hosten giver den titler, adresser og gruppenavne, og intet andet. Den begrænsning håndhæves i hosten, så en fejl i udvidelsen ikke kan udvide den.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">Fandt du ikke dit svar? Den fulde gennemgang er på <a href="getting-started.html">Kom i gang</a>, og designdetaljerne er på <a href="architecture.html">arkitektur-siden</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Hjem</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Kom i gang</a>
+            &nbsp;·&nbsp;
+            <a href="../faq.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

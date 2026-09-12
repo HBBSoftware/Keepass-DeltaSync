@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sæt din egen server op — DeltaSync</title>
+    <meta name="description" content="Sæt din egen DeltaSync-server op. Den nemme vej med Docker / en NAS (TrueNAS), eller trin-for-trin-guiden til klassisk PHP-webhotel.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/deploy-server.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/deploy-server.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/deploy-server.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html" class="active">Server-opsætning</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="../deploy-server.html" hreflang="en">EN</a>
+                <a href="deploy-server.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Sæt din egen server op</h1>
+
+        <p>Dette er den <strong>komplette guide hvor vi holder dig i hånden hele vejen</strong> til at køre din egen DeltaSync-server. Vi går ud fra at du <em>ikke</em> har prøvet at sætte en server op før. Du skal uploade nogle filer, åbne en side i din browser, klikke dig igennem tre korte trin, og oprette din første bruger. Sæt cirka <strong>30 minutter</strong> af.</p>
+
+        <div class="callout">
+            <strong>Den gode nyhed med det samme:</strong> der er <strong>ingenting der skal kompileres</strong> og <strong>ingen Composer / npm-trin</strong>. Serveren er ren PHP — du uploader den bare som den er. Og husk: serveren gemmer kun <em>krypterede</em> data. Selv du som administrator kan aldrig læse nogens adgangskoder.
+        </div>
+
+        <div class="callout">
+            <strong>Har du Docker eller en NAS?</strong> Den <a href="#docker">nemmeste vej er Docker</a> — lige nedenfor. Det tager få minutter og springer både upload og opsætnings-guiden helt over. Den lange trin-for-trin-guide længere nede er til <strong>klassisk PHP-webhotel uden Docker</strong>.
+        </div>
+
+        <h2 id="docker">Den nemmeste vej: Docker</h2>
+
+        <p>Hvis du har <strong>Docker</strong> — på en VPS, en hjemmeserver eller en NAS som <strong>TrueNAS SCALE</strong>, Unraid eller Synology — er det her langt den hurtigste vej. Du uploader ingen kode og kører ingen opsætnings-guide: du indsætter et par linjer YAML, sætter ét password, og starter den. PostgreSQL er inkluderet, og databasetabellerne oprettes automatisk ved første start.</p>
+
+        <p>Brug denne <code>compose.yml</code>. Den henter et færdigbygget multi-arkitektur-image (virker på både x86 og ARM, så NAS-bokse i Raspberry Pi-klassen er også med):</p>
+
+<pre><code>x-db-password: &amp;db_password "CHANGE_THIS_to_a_long_random_string"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keepass_deltasync
+      POSTGRES_USER: deltasync
+      POSTGRES_PASSWORD: *db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deltasync -d keepass_deltasync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: registry.gitlab.com/star95/keepass-deltasync/server:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      DATABASE_URL: "pgsql:host=db;port=5432;dbname=keepass_deltasync"
+      DATABASE_USER: deltasync
+      DATABASE_PASSWORD: *db_password
+      LOG_LEVEL: INFO
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: "CHANGE_THIS_to_a_long_admin_passphrase"
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: keepass_deltasync
+      PGUSER: deltasync
+      PGPASSWORD: *db_password
+
+volumes:
+  pgdata:</code></pre>
+
+        <ol class="steps">
+            <li>
+                <strong>Skift de to hemmeligheder.</strong>
+                Erstat begge linjer markeret <code>CHANGE_THIS</code>. Den første er database-passwordet; et YAML-anker sender den ene værdi til alle services, så du retter den kun ét sted. Den anden er det password du logger ind i admin-panelet med — mindst 12 tegn, gemt Argon2id-hashet, aldrig i klartekst.
+            </li>
+            <li>
+                <strong>Start den.</strong>
+                På en server: gem filen og kør <code>docker compose up -d</code>. På en NAS indsætter du i stedet YAML'en i app-brugerfladen — på <strong>TrueNAS SCALE</strong>: <em>Apps → Discover Apps → Custom App → Install via YAML</em>. TrueNAS er mere kræsen end almindelig Docker med volumes og med hvad et password må indeholde, så indsæt <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/compose.truenas.yml">den TrueNAS-formede compose-fil</a> i stedet for den ovenfor.
+            </li>
+            <li>
+                <strong>Log ind i admin-panelet.</strong>
+                Åbn <code>http://&lt;host&gt;:8080/admin.html</code> og log ind med brugernavnet og passwordet fra trin 1. Glemt dem siden? De står i din compose-fil.
+            </li>
+            <li>
+                <strong>Opret din første bruger.</strong>
+                Skriv et brugernavn under <em>Users</em> og klik <strong>Create</strong>. Du får en engangs-<strong>enrollment-token</strong>, vist både som tekst og som QR-kode. På en telefon scanner brugeren QR-koden; på en computer kører de <code>keepass-deltasync enroll --server https://dit-domæne &lt;token&gt;</code> og følger derefter <a href="getting-started.html">Kom i gang</a>. Panelets <em>Next steps</em>-faneblad forklarer det for dem, så du ikke kun rækker en token videre.
+            </li>
+        </ol>
+
+        <p>Serveren svarer nu på <code>http://&lt;host&gt;:8080</code>. Inden du eksponerer den mod internettet, så sæt en HTTPS-reverse-proxy foran — din NAS' indbyggede reverse proxy, eller Caddy/Traefik/nginx. Opdatering senere er bare <code>docker compose pull &amp;&amp; docker compose up -d</code>; skema-migrationer kører automatisk.</p>
+
+        <p>Panelet har to faneblade mere: <em>Devices</em> viser hvilke enheder der er enrollet, og hvornår hver af dem sidst kaldte serveren, og <em>Audit log</em> viser hvad der er sket, med en knap der rydder gamle rækker op.</p>
+
+        <p>Foretrækker du kommandolinjen? Det medfølgende værktøj gør det samme inde i containeren. <code>docker compose exec app php bin/admin user:create alice</code> opretter en bruger og udskriver en enrollment-token, og <code>docker compose exec app php bin/admin database:create alice Personal</code> opretter en database til en, der ikke har en desktop-klient til at gøre det med.</p>
+
+        <div class="callout">
+            <strong>Mere detalje:</strong> <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/self-hosting-docker.md">Docker self-hosting-guiden</a> dækker TrueNAS-specifikt, HTTPS, opdatering og backup.
+        </div>
+
+        <hr>
+
+        <h2>Uden Docker: klassisk PHP-webhotel</h2>
+
+        <p>Ingen Docker? Resten af denne side er den fulde, begynder-venlige guide til at køre serveren på et almindeligt delt PHP-webhotel.</p>
+
+        <h2>Hvad du skal bruge</h2>
+
+        <p>Inden du går i gang, så sørg for at have alle fem ting klar. Mangler du én af dem, så ordn det først — guiden går ud fra at de er på plads.</p>
+
+        <ul>
+            <li><strong>Webhotel med PHP 8.2 eller nyere.</strong> Næsten alle delte webhoteller virker (Hetzner, one.com, Simply.com, din egen VPS…). Det skal have disse PHP-udvidelser slået til: <code>pdo_pgsql</code>, <code>sodium</code> og <code>json</code>. De to første er dem du skal dobbelttjekke — spørg dit webhotel eller kig i kontrolpanelets PHP-indstillinger hvis du er i tvivl.</li>
+            <li><strong>En tom PostgreSQL 14+-database</strong> plus en database-bruger der kan skrive til den. Mange webhoteller lader dig oprette dette i kontrolpanelet med et par klik. Du skal <em>ikke</em> selv oprette nogen tabeller — det klarer guiden.</li>
+            <li><strong>Et domæne eller subdomæne</strong> til serveren, fx <code>deltasync.eksempel.dk</code>, hvor du kan bestemme hvilken mappe det viser filer fra ("document root" / "web root").</li>
+            <li><strong>HTTPS</strong> på det domæne. Næsten alle webhoteller tilbyder et gratis certifikat (Let's Encrypt) med ét klik. DeltaSync sender login-tokens, så ren <code>http://</code> er ikke i orden i rigtig brug.</li>
+            <li><strong>En måde at uploade filer på</strong> til dit webhotel: et grafisk FTP/SFTP-program som <a href="https://filezilla-project.org/">FileZilla</a>, dit webhotels web-baserede filhåndtering, eller <code>scp</code>/<code>rsync</code> hvis du er fortrolig med en terminal. Alle metoder duer.</li>
+        </ul>
+
+        <h2>Det store billede</h2>
+
+        <p>Du skal gøre tre ting, i denne rækkefølge:</p>
+
+        <ol>
+            <li><strong>Læg koden op på dit webhotel</strong> og peg dit domæne på den rigtige mappe.</li>
+            <li><strong>Kør opsætnings-guiden</strong> i din browser — den spørger om dine database-oplysninger, bygger alle tabellerne, og giver dig et admin-token.</li>
+            <li><strong>Opret din første bruger</strong> og giv vedkommende en invitation (et "enrollment-token").</li>
+        </ol>
+
+        <h2>Trin for trin</h2>
+
+        <ol class="steps">
+            <li>
+                <strong>Hent server-koden.</strong>
+                Hent projektet fra GitLab. Hvis du har <code>git</code>:
+<pre><code>git clone https://gitlab.com/Star95/keepass-deltasync.git</code></pre>
+                Eller hent det som en ZIP fra <a href="https://gitlab.com/Star95/keepass-deltasync">projektsiden</a> ("Code" → "Download source code") og pak den ud. Alt du skal bruge ligger i undermappen <code>server/</code> — du kan ignorere resten for nu.
+            </li>
+
+            <li>
+                <strong>Opret en tom PostgreSQL-database.</strong>
+                I dit webhotels kontrolpanel: opret en ny PostgreSQL-database (fx med navnet <code>keepass_deltasync</code>) og en database-bruger med en stærk adgangskode og fuld adgang til den. Skriv disse fire ting ned — du skal taste dem ind i guiden om lidt:
+                <ul>
+                    <li><strong>vært</strong> (ofte <code>localhost</code> på delte webhoteller)</li>
+                    <li><strong>port</strong> (PostgreSQL bruger som standard <code>5432</code>)</li>
+                    <li><strong>databasenavn</strong></li>
+                    <li><strong>bruger</strong> og dens <strong>adgangskode</strong></li>
+                </ul>
+                Lad databasen være helt tom — ingen tabeller. Det er guidens opgave.
+            </li>
+
+            <li>
+                <strong>Upload <code>server/</code>-mappen til dit webhotel.</strong>
+                Med FileZilla, din filhåndtering, eller <code>scp</code>/<code>rsync</code>: kopiér hele <code>server/</code>-mappen op på din konto — fx til <code>~/deltasync/server/</code>. Upload det hele: <code>public/</code>, <code>src/</code>, <code>schema/</code>, <code>bootstrap.php</code> og så videre.
+                <div class="callout">
+                    <strong>Det allervigtigste i hele guiden:</strong> dit domænes document root skal pege på mappen <code>server/public/</code> — <em>ikke</em> på <code>server/</code> selv. Alt uden for <code>public/</code> (din database-adgangskode, kildekoden) skal blive liggende <em>over</em> web-roden, så det aldrig kan hentes ned.
+                </div>
+            </li>
+
+            <li>
+                <strong>Peg dit domæne på <code>server/public/</code>.</strong>
+                I dit webhotels kontrolpanel: sæt document root (kaldes nogle gange "web root" eller "mappe") for dit domæne til den <code>public/</code>-mappe du lige har uploadet — fx <code>~/deltasync/server/public</code>. Sørg for at HTTPS er slået til for domænet. På Apache-hosting (den mest udbredte slags) klarer den medfølgende <code>.htaccess</code>-fil resten automatisk; du behøver ikke røre den.
+            </li>
+
+            <li>
+                <strong>Åbn opsætnings-guiden i din browser.</strong>
+                Gå til:
+<pre><code>https://dit-domæne/setup.php</code></pre>
+                Du bør se en side med titlen <em>"DeltaSync — Førstegangs-opsætning"</em>. Guiden er på engelsk som standard — klik <em>Dansk</em> i hjørnet, eller tilføj <code>?lang=da</code> til adressen. Får du i stedet en fejl eller en blank side, så spring ned til <a href="#trouble">Fejlfinding</a> nederst.
+            </li>
+
+            <li>
+                <strong>Guide — Trin 1: Database-forbindelse.</strong>
+                Udfyld formularen med database-oplysningerne fra trin 2. "DSN"-feltet er bare én linje der beskriver hvor databasen ligger; brug denne form (indsæt din egen vært, port og databasenavn):
+<pre><code>pgsql:host=localhost;port=5432;dbname=keepass_deltasync</code></pre>
+                Indtast derefter database-<strong>bruger</strong> og <strong>adgangskode</strong>. Du kan lade <em>Log-niveau</em> stå på <code>INFO</code>, <em>Audit-retention</em> på <code>30</code> og <em>Enrollment-token TTL</em> på <code>24</code>. Lad <em>App-base-path</em> være <strong>tom</strong> (den skal du kun bruge til den avancerede sub-sti-opsætning nederst på siden). Klik <strong>"Test forbindelse og gem .env"</strong>. Guiden tester forbindelsen og skriver — hvis den virker — indstillingerne ind i <code>server/.env</code> for dig. Melder den en forbindelsesfejl, er dine database-oplysninger forkerte — tjek vært, port, navn, bruger og adgangskode igen.
+            </li>
+
+            <li>
+                <strong>Guide — Trin 2: Kør migrationerne.</strong>
+                Guiden viser nu de SQL-filer der bygger tabellerne. Klik bare <strong>"Kør alle migrationer"</strong>. Det opretter alt hvad serveren skal bruge (brugere, enheder, entries, audit-log, …). Det er sikkert at køre; hvis tabellerne allerede fandtes, ville den bare stoppe og sige det.
+            </li>
+
+            <li>
+                <strong>Guide — Trin 3: Generér dit admin-token.</strong>
+                Klik <strong>"Generér admin-token"</strong>. Guiden viser dig en lang hemmelig tekststreng.
+                <div class="callout warn">
+                    <strong>Kopiér dette token NU og gem det et sikkert sted</strong> (din egen adgangskode-manager er ideel). Det vises <strong>kun én gang</strong> og kan ikke hentes frem igen senere. Det er dette token der lader dig oprette brugere.
+                </div>
+            </li>
+
+            <li>
+                <strong>Slet <code>setup.php</code>.</strong>
+                Tilbage i FileZilla / din filhåndtering: slet filen <code>setup.php</code> fra <code>public/</code>-mappen på dit webhotel. Guiden nægter at køre en gang til når der findes et token, men filen er unødvendig, og at fjerne den holder din server ren. <em>Din server er nu live.</em>
+            </li>
+
+            <li>
+                <strong>Opret din første bruger.</strong>
+                Brugere (og dig selv) styres med det lille kommandolinje-program. Hent den færdigbyggede <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">klient til din computer</a> (Windows / macOS / Linux). Derefter, i en terminal:
+<pre><code># 1. Fortæl klienten dit admin-token (PowerShell på Windows):
+$env:KEEPASS_DELTASYNC_ADMIN_TOKEN = "&lt;tokenet-fra-trin-8&gt;"
+#    …eller på macOS/Linux:
+export KEEPASS_DELTASYNC_ADMIN_TOKEN="&lt;tokenet-fra-trin-8&gt;"
+
+# 2. Opret den første bruger:
+keepass-deltasync admin user-create alice --display-name "Alice"</code></pre>
+                <div class="callout">
+                    <strong>Engangs-bootstrap:</strong> allerførste gang kender klienten endnu ikke din servers adresse, så kommandoen ovenfor melder måske <em>"server URL not configured"</em>. Det løser du ved at oprette en lille config-fil med blot din server-URL og køre kommandoen igen:
+                    <ul>
+                        <li>Windows: <code>%APPDATA%\keepass-deltasync\config.toml</code></li>
+                        <li>macOS: <code>~/Library/Application Support/keepass-deltasync/config.toml</code></li>
+                        <li>Linux: <code>~/.config/keepass-deltasync/config.toml</code></li>
+                    </ul>
+                    med disse to linjer:
+<pre><code>[server]
+url = "https://dit-domæne"</code></pre>
+                </div>
+            </li>
+
+            <li>
+                <strong>Send invitationen til brugeren.</strong>
+                Kommandoen udskriver et <strong>enrollment-token</strong> til Alice. Send det til hende via en sikker kanal (en privat besked, helst ikke e-mail). Hun bruger det én gang:
+<pre><code>keepass-deltasync enroll --server https://dit-domæne &lt;hendes-enrollment-token&gt;</code></pre>
+                Herfra følger hun den almindelige <a href="getting-started.html">Kom i gang</a>-vejledning for at binde og synkronisere sin database. Gentag trin 10–11 for hver ekstra bruger (din config kender nu server-URL'en, så der skal ikke bootstrappes mere).
+            </li>
+        </ol>
+
+        <h2>Tjek at det virker</h2>
+
+        <p>Det enkleste bevis er at trin 11 lykkedes — en bruger kunne enrolle. Vil du teste API'en direkte, returnerer denne dine egne konto-oplysninger når admin (eller en hvilken som helst enrollet bruger) er sat op:</p>
+<pre><code>curl -H "Authorization: Bearer &lt;et-device-token&gt;" https://dit-domæne/api/v1/me
+# → 200 OK med bruger- og enheds-detaljer</code></pre>
+
+        <h2 id="trouble">Fejlfinding</h2>
+
+        <h3>Siden er blank, eller jeg får en "500"-fejl</h3>
+        <p>Næsten altid betyder det at document root peger på den forkerte mappe. Den skal pege på <code>server/public/</code>, ikke <code>server/</code>. Tjek også at dit webhotel faktisk kører PHP 8.2+ på dette domæne.</p>
+
+        <h3>"Could not load bootstrap.php"</h3>
+        <p><code>public/</code>-mappen er blevet adskilt fra resten af <code>server/</code>. Upload igen, så <code>public/</code> ligger <em>inde i</em> <code>server/</code>-mappen, ved siden af <code>src/</code> og <code>bootstrap.php</code>.</p>
+
+        <h3>"Cannot write to .env"</h3>
+        <p>Under opsætningen skal webserveren have lov til at oprette <code>server/.env</code>. Gør <code>server/</code>-mappen skrivbar for din web-bruger (fx <code>chmod 700 server</code> og sørg for at den ejes af din konto), kør guiden, og stram så permissions igen bagefter.</p>
+
+        <h3>Guiden siger "Opsætningen er allerede gennemført"</h3>
+        <p>Det er helt fint — det betyder at der allerede findes et admin-token, så guiden låser sig selv for at undgå dubletter. Slet bare <code>setup.php</code> (trin 9) og gå videre.</p>
+
+        <h3>"Forbindelse fejlede" i Trin 1</h3>
+        <p>Dine database-oplysninger er forkerte, eller databasen kan ikke nås. På delte webhoteller er værten som regel <code>localhost</code>. Dobbelttjek databasenavn, bruger og adgangskode, og at databasen faktisk findes.</p>
+
+        <h3>Login virker lokalt, men tokens afvises</h3>
+        <p>Nogle FastCGI-opsætninger fjerner <code>Authorization</code>-headeren. Den medfølgende <code>.htaccess</code> tilføjer den igen for Apache. Bruger dit webhotel nginx, skal du bruge en tilsvarende rewrite der bevarer <code>Authorization</code> og sender ukendte stier til <code>index.php</code>.</p>
+
+        <h3>"pdo_pgsql" eller "sodium"-udvidelse mangler</h3>
+        <p>Slå PHP-udvidelsen til i dit webhotels kontrolpanel (ofte en afkrydsning under "PHP-indstillinger" / "Extensions"). På en VPS: installér pakken, fx <code>php-pgsql</code> og <code>php-sodium</code>, og genstart PHP.</p>
+
+        <h2>Avanceret: sub-sti eller subdomæne-opsætninger</h2>
+
+        <p>Guiden ovenfor er standard-opsætningen: serveren har et subdomæne for sig selv. Vil du i stedet have API'en til at dele domæne med en hjemmeside (fx hjemmesiden på <code>/</code> og API'en under <code>/sync</code>), eller dele API og hjemmeside på to subdomæner, så dokumenterer projektet tre konkrete recipes:</p>
+
+        <ul>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/deployment.md">docs/deployment.md</a> — Recipe 1 (standard), Recipe 2 (API under en sub-sti), Recipe 3 (separate subdomæner)</li>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/server/README.md">server/README.md</a> — server-overblik og konfiguration</li>
+        </ul>
+
+        <p>Den eneste ændring for en sub-sti er at sætte <em>App-base-path</em> (fx <code>/sync</code>) i Trin 1 i guiden, og at pege hver klients server-URL på <code>https://dit-domæne/sync</code>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privatlivs-først KeePass-sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Hjem</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Kom i gang</a>
+            &nbsp;·&nbsp;
+            <a href="../deploy-server.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

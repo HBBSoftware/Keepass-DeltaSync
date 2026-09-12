@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeltaSync — End-to-end krypteret KeePass sync</title>
+    <meta name="description" content="DeltaSync synkroniserer dine KeePass-databaser mellem enheder med ægte end-to-end-kryptering. Serveren ser kun krypterede blobs — aldrig dine passwords.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="apple-touch-icon" href="../assets/icon-128.png">
+    <link rel="stylesheet" href="../style.css">
+    <meta property="og:title" content="DeltaSync">
+    <meta property="og:description" content="End-to-end krypteret KeePass sync.">
+    <meta property="og:image" content="../assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.bjoerck-braun.dk/da/">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html" class="active">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html">Server-opsætning</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="../index.html" hreflang="en">EN</a>
+                <a href="index.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<section class="hero">
+    <div class="container">
+        <img src="../assets/logo.svg" alt="DeltaSync logo" class="logo-big">
+        <h1>End-to-end krypteret KeePass sync</h1>
+        <p class="tagline">Synkronisér dine KeePass-databaser mellem enheder uden at give serveren adgang til dine passwords. Argon2id + XChaCha20-Poly1305 + KeePassXC's native merge.</p>
+        <div class="actions">
+            <a href="getting-started.html" class="btn btn-primary">Kom i gang</a>
+            <a href="architecture.html" class="btn btn-secondary">Se arkitekturen</a>
+        </div>
+    </div>
+</section>
+
+<main>
+    <div class="container">
+
+        <h2>Hvorfor DeltaSync</h2>
+
+        <p>Eksisterende KeePass-sync-løsninger har næsten alle en vigtig svaghed: enten ser serveren dine entries i klartekst, eller du må deponere hele .kdbx-filen et sted og håbe at konflikt-merge går godt. DeltaSync synker på <strong>entry-niveau</strong> og bruger KeePassXC's egen merge-engine på klienten, så samtidige redigeringer fra flere enheder forenes uden tab.</p>
+
+        <div class="features">
+            <div class="feature">
+                <div class="icon">🔒</div>
+                <h3>Ægte end-to-end</h3>
+                <p>Masterpassword forlader aldrig din enhed. Server ser kun opaque krypterede blobs — kan ikke afsløre titler, brugernavne eller passwords selv hvis kompromitteret.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">⚡</div>
+                <h3>Inkrementel sync</h3>
+                <p>Kun ændrede entries sendes. Versioneret historik (3 niveauer) pr. entry — fortryd uheld med <code>restore</code>.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">👥</div>
+                <h3>Multi-bruger sharing</h3>
+                <p>Del en database med en anden bruger via X25519 sealed-box wrapping. Modtageren får sin egen krypterede kopi som hun selv kontrollerer.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">📁</div>
+                <h3>KeePassXC-kompatibel</h3>
+                <p>Bruger KeePassXC's eksisterende .kdbx-filer og merge-logik. Ingen nye filformater, ingen ekstra installation udover en lille klient.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">🖥️</div>
+                <h3>Et vindue, ikke en terminal</h3>
+                <p>Et skrivebordsprogram til Windows, Linux og macOS fører dig gennem tilmeldingen og viser derefter dine databaser, enheder og aktivitet. På Windows lægger én installer det og kommandolinje-klienten i samme mappe — ingen PATH at sætte op, og ingen administrator nødvendig.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">🦊</div>
+                <h3>Find den i Firefox</h3>
+                <p>Skriv <code>kp</code> i adresselinjen for at søge i dine entries på adresse, titel eller gruppe og lande på den rigtige side. Udvidelsen får kun titler og URL'er at se — selve udfyldningen af login er stadig KeePassXC-Browsers arbejde. <a href="firefox.html">Sådan installerer du den</a>.</p>
+            </div>
+            <div class="feature">
+                <div class="icon">📱</div>
+                <h3>Desktop &amp; Android</h3>
+                <p>En cross-platform desktop-klient (Linux, macOS, Windows) plus en Android-app. Begge deler den samme Go-krypto-kerne, så de producerer byte-identiske krypterede blobs på wiren.</p>
+            </div>
+        </div>
+
+        <h2>Sådan virker det</h2>
+
+        <ol class="steps">
+            <li>
+                <strong>Enroll én gang</strong> pr. enhed med en engangs-token fra din administrator. Hver enhed får sit eget keypair lokalt.
+            </li>
+            <li>
+                <strong>Bind en lokal .kdbx</strong> til serveren med <code>init</code>. Filformatet er præcis som før — du kan stadig åbne den i KeePassXC.
+            </li>
+            <li>
+                <strong>Lad den synke i baggrunden</strong> — på desktop reagerer daemon på dine edits indenfor sekunder (fsnotify) plus periodisk polling; på Android kører WorkManager periodisk sync, med dit masterpassword gemt i Android Keystore bag en biometrisk opt-in.
+            </li>
+            <li>
+                <strong>Del databaser</strong> med andre brugere når du har brug for det — fra desktop-klienten eller Android-app'en. Sharing er asymmetrisk krypteret: kun modtagerens enhed kan unwrappe master_key.
+            </li>
+        </ol>
+
+        <p>På Android er DeltaSync en <strong>sync-tjeneste</strong> — den holder <code>.kdbx</code>-filen opdateret i baggrunden, mens du læser og redigerer entries i din foretrukne Android-KeePass-app (<a href="https://github.com/PhilippC/keepass2android">Keepass2Android</a> eller <a href="https://github.com/Kunzisoft/KeePassDX">KeePassDX</a>).</p>
+
+        <p>Intet af dette kræver en terminal. <strong>Skrivebordsprogrammet</strong> gør de samme fire ting i et vindue: det åbner en guide første gang, spørger om server-adresse og token, lader dig pege på din <code>.kdbx</code>, og kan slå baggrunds-sync ved login til for dig.</p>
+
+        <h2>Hurtig-start</h2>
+
+        <p>Hvis du allerede har en konto og enrollment-token:</p>
+
+        <p><strong>På Windows</strong> henter du installeren fra <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases-siden</a>. Den lægger skrivebordsprogrammet og kommandolinje-klienten i samme mappe og installerer kun for din egen bruger, så den beder aldrig om administrator-rettigheder. Start <em>KeePass Delta-Sync</em>, så tager guiden over.</p>
+
+        <p><strong>På Linux og macOS</strong> henter du en færdigbygget klient-binær fra samme side — eller bygger den selv:</p>
+
+<pre><code># Byg klient
+git clone https://gitlab.com/Star95/keepass-deltasync.git
+cd keepass-deltasync/client
+go build -o keepass-deltasync ./cmd/keepass-deltasync
+
+# Enroll
+./keepass-deltasync enroll --server https://deltasync.bjoerck-braun.dk &lt;din-token&gt;
+
+# Registrér din .kdbx
+./keepass-deltasync init mypasswords ~/keepass/my.kdbx
+
+# Synk
+./keepass-deltasync sync mypasswords</code></pre>
+
+        <p>For mere detaljerede instruktioner — inkl. daemon, Android-app'en, sharing og admin-flow — se <a href="getting-started.html">kom i gang-siden</a>.</p>
+
+        <div class="callout">
+            <strong>Status:</strong> serveren, desktop-klienten (med præ-byggede binærer til Linux, macOS og Windows), skrivebordsprogrammet og multi-bruger sharing er alle i produktion på <code>deltasync.bjoerck-braun.dk</code>. Android-app'en er feature-komplet — baggrunds-sync, biometrisk-beskyttet password-lagring og database-deling virker alt sammen. Den kan installeres i dag via <a href="https://github.com/ImranR98/Obtainium">Obtainium</a> fra <a href="https://github.com/HBBSoftware/Keepass-DeltaSync/releases">GitHub Releases</a>, og F-Droid optog den i deres katalog 10. september 2026, så den kanal er på vej. Firefox-udvidelsen er udgivet på <a href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">addons.mozilla.org</a>, signeret og installérbar som enhver anden tilføjelse.
+        </div>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="architecture.html">Arkitektur</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Kom i gang</a>
+            &nbsp;·&nbsp;
+            <a href="../index.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

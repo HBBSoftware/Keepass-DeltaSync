@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firefox-udvidelsen — DeltaSync</title>
+    <meta name="description" content="Sådan installerer og bruger du DeltaSyncs Firefox-udvidelse — søg i dine KeePass-entries fra adresselinjen og åbn entryens side. Virker både med og uden en DeltaSync-server.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="apple-touch-icon" href="../assets/icon-128.png">
+    <link rel="stylesheet" href="../style.css">
+    <meta property="og:title" content="DeltaSync til Firefox">
+    <meta property="og:description" content="Søg i dine KeePass-entries fra Firefox' adresselinje og lande på den rigtige side.">
+    <meta property="og:image" content="../assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.bjoerck-braun.dk/da/firefox.html">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/firefox.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/firefox.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/firefox.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html">Server-opsætning</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html" class="active">Firefox</a>
+            <span class="lang-switch">
+                <a href="../firefox.html" hreflang="en">EN</a>
+                <a href="firefox.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>DeltaSync til Firefox</h1>
+
+        <p>Skriv <code>kp</code> i adresselinjen, dernæst et par bogstaver af den konto du leder efter, så fører Firefox dig til entryens hjemmeside. Det er hele udvidelsen. Den besvarer dét spørgsmål, en password-manager efterlader dig med — <em>hvilken side lå den konto nu på?</em> — og går så af vejen igen.</p>
+
+        <p><strong>Selve login er ikke dens opgave.</strong> Det er stadig <a href="https://github.com/keepassxreboot/keepassxc-browser">KeePassXC-Browsers</a> arbejde; den udfylder brugernavn og password, men kan ikke hjælpe dig med at finde siden i første omgang. Denne her lukker netop det hul og intet andet — og derfor har den aldrig brug for at se et password.</p>
+
+        <div class="callout">
+            <strong>Hvad den kan se:</strong> titler på entries, deres webadresser og gruppenavne. Intet andet — begrænsningen håndhæves i den anden ende af forbindelsen, i det program der læser din database, så en fejl i udvidelsen ikke kan udvide den. Udvidelsen beder desuden <em>ikke</em> om adgang til nogen websider, så den kan ikke læse de sider du besøger.
+        </div>
+
+        <h2>Du behøver ikke en DeltaSync-server</h2>
+
+        <p>DeltaSync er normalt et sync-system med en server bagved, men en søgning rører aldrig netværket: udvidelsen spørger en lille lokal hjælper, som læser din egen <code>.kdbx</code>-fil og svarer ud fra den alene. Der er derfor to måder at sætte det op på, og den anden har intet med synkronisering at gøre:</p>
+
+        <ul>
+            <li><strong>Du bruger allerede DeltaSync</strong> — din database er registreret hos klienten, og der er ikke mere at konfigurere. Spring til <a href="#host">trin 2</a>.</li>
+            <li><strong>Du vil bare have søgningen</strong> — installér klienten, peg den på din <code>.kdbx</code> med én kommando, og tilmeld dig aldrig nogen server. Det er <a href="#standalone">trin 1</a> herunder.</li>
+        </ul>
+
+        <p>Uanset hvilken vej, kan de to første trin klikkes i stedet for at skrives. Har du installeret skrivebordsprogrammet, så start med <a href="#app">den korte vej</a> — det er det samme arbejde, bare uden terminal.</p>
+
+        <h2>Hvad du skal bruge</h2>
+
+        <ul>
+            <li><a href="https://keepassxc.org/">KeePassXC</a>, for dens <code>keepassxc-cli</code> — det er den der rent faktisk åbner din database</li>
+            <li><code>keepass-deltasync</code>-klienten: en <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">præ-bygget binær</a> til Linux, macOS eller Windows, eller <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">Windows-installeren</a>, som har den med</li>
+            <li>Firefox 142 eller nyere — selve udvidelsen hentes fra <a href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">addons.mozilla.org</a> i trin 3</li>
+        </ul>
+
+        <h2 id="app">Den korte vej — trin 1 og 2 med knapper</h2>
+
+        <p>De to trin herunder er kommandoer, og på Windows ligger klienten ikke engang på din <code>PATH</code>. Skrivebordsprogrammet sparer dig for begge dele: de er to knapper på én skærm, og den skærm kan nås <strong>uden en konto</strong>. Resultatet er det samme, så vil du hellere skrive, kan du springe videre til <a href="#standalone">trin 1</a>.</p>
+
+        <p>Åbn <strong>KeePass Delta-Sync</strong>. Har du aldrig tilmeldt en enhed, åbner den på sin velkomstskærm, og knappen du skal bruge siger det selv:</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="../assets/shot-welcome-da-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="../assets/shot-welcome-da-light.png" width="822" height="592" alt="Programmets velkomstskærm. Under den blå knap 'Start guide' står to grå: 'Avanceret (administrator)' og 'Søg i Firefox — uden konto'.">
+            </picture>
+            <figcaption><strong>Søg i Firefox — uden konto</strong> går uden om tilmeldingen. Synkroniserer du allerede med DeltaSync, lander du på dashboardet i stedet — og den samme skærm er dets <strong>Firefox</strong>-fane.</figcaption>
+        </figure>
+
+        <p>Hele Firefox-opsætningen står på den ene skærm:</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="../assets/shot-firefox-da-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="../assets/shot-firefox-da-light.png" width="822" height="592" loading="lazy" alt="Programmets Firefox-skærm: knapperne 'Registrér database' og 'Registrér i Firefox', en række med 'Vis hvad der ville blive skrevet', 'Fjern registreringen' og 'Opdatér', og en liste med én registreret database.">
+            </picture>
+            <figcaption>De to blå knapper er trin 1 og 2. Rækken under dem er til når noget driller — en prøvekørsel, vejen ud igen, en opdatering. <strong>Program:</strong> nederst svarer på spørgsmålet <em>hvor ligger klienten?</em> — med en kopi-knap til den dag du alligevel vil i terminalen.</figcaption>
+        </figure>
+
+        <h3>Trin 1, med knapper: Registrér database…</h3>
+
+        <p><strong>Registrér database…</strong> er <code>add-local</code> med en filvælger på: giv databasen et kort navn, peg på <code>.kdbx</code>-filen, færdig. Intet uploades, og hverken server, token eller konto er involveret.</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="../assets/shot-register-da-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="../assets/shot-register-da-light.png" width="822" height="592" loading="lazy" alt="Dialogen 'Registrér database til søgning' med felter til navn og .kdbx-fil, et flueben til at gemme masterpasswordet i systemets nøglering, og et felt til masterpasswordet.">
+            </picture>
+            <figcaption>Fluebenet er <code>--save-password</code>. Sætter du det, kontrolleres masterpasswordet ved at åbne databasen, før det overlades til styresystemets nøglering — så popup'en aldrig spørger. Lader du det stå tomt, spørger udvidelsen dig i stedet.</figcaption>
+        </figure>
+
+        <h3>Trin 2, med knapper: Registrér i Firefox</h3>
+
+        <p><strong>Registrér i Firefox</strong> er <code>install-browser-host</code>. Den viser hvad den skrev, og hvilke Firefox-varianter den registrerede sig hos — læs den liste, den er svaret på om den fandt <em>din</em> — og minder dig derefter om at genstarte Firefox, for det er dét, der får registreringen til at virke.</p>
+
+        <p>Listen nederst på skærmen er dét, udvidelsen ville kunne søge i. <strong>Test</strong> på en række kører hele kæden med browseren holdt udenfor: den åbner databasen og udskriver præcis hvad Firefox ville modtage. Virker dét, men udvidelsen stadig ikke, sidder problemet mellem Firefox og klienten — og <a href="#trouble">sidste afsnit</a> tager over derfra.</p>
+
+        <p>Dermed er trin 1 og 2 klaret. Fortsæt ved <a href="#extension">trin 3</a>, selve udvidelsen, som er den samme uanset vejen hertil.</p>
+
+        <h2 id="standalone">Trin 1 — peg klienten på din database</h2>
+
+        <p><strong>Bruger du allerede DeltaSync</strong>, er dette klaret: <code>enroll</code> og <code>init</code> registrerede databasen da du satte klienten op. Gå videre til trin 2.</p>
+
+        <p><strong>Har du ingen server</strong>, skal klienten stadig vide hvilken fil den skal søge i. Én kommando fortæller den det, og intet om den fil forlader din maskine:</p>
+
+<pre><code>keepass-deltasync add-local privat ~/keepass/min.kdbx</code></pre>
+
+        <p><code>privat</code> er blot en etiket — den dukker op i popup'en når mere end én database er låst op. Gentag kommandoen for hver fil du vil kunne søge i. Ingen server, ingen token, ingen konto er involveret.</p>
+
+        <p>Sæt <code>--save-password</code> på, hvis du helst vil slippe for at blive spurgt om masterpasswordet hver gang idle-låsen udløber. Det verificeres ved at åbne databasen, før det gemmes, og det havner i styresystemets nøglering — aldrig i en fil.</p>
+
+        <div class="callout">
+            <strong>Foretrækker du knapper?</strong> Dette trin er <strong>Registrér database…</strong> i skrivebordsprogrammet — se <a href="#app">den korte vej</a> ovenfor. I terminalen har <code>keepass-deltasync tui</code> den samme sektion, og den er der uanset om du har en konto eller ej.
+        </div>
+
+        <h3>Windows: hvor klienten ligger, og hvor kommandoerne skrives</h3>
+
+        <p>Installeren lægger programmet og kommandolinje-klienten i samme mappe, og hvilken mappe afhænger af den installation du valgte:</p>
+
+        <ul>
+            <li><em>Kun for mig</em> — standardvalget, ingen administrator-prompt: <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync\</code></li>
+            <li><em>For alle brugere</em>: <code>C:\Program Files\KeePass Delta-Sync\</code></li>
+        </ul>
+
+        <p><code>keepass-deltasync.exe</code> i den mappe er det program, alle kommandoer på denne side handler om. Den ligger <strong>ikke</strong> på din <code>PATH</code>, så den hurtigste vej til en terminal der kan se den, er at åbne mappen i Stifinder, klikke i adresselinjen, skrive <code>powershell</code> og trykke Enter. Terminalen åbner i mappen, og kommandoerne virker med <code>.\</code> foran:</p>
+
+<pre><code>.\keepass-deltasync.exe add-local privat C:\Users\dig\Dokumenter\min.kdbx</code></pre>
+
+        <p>I tvivl om hvilken installation du har? Indsæt <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync</code> i Stifinders adresselinje; findes mappen ikke, er det den under <code>Program Files</code>. Programmet viser selv stien nederst på sin Firefox-fane.</p>
+
+        <h2 id="host">Trin 2 — lad Firefox tale med klienten</h2>
+
+        <p>Firefox kører ikke et program, den ikke har fået besked om på forhånd. Én kommando klarer det:</p>
+
+<pre><code>keepass-deltasync install-browser-host</code></pre>
+
+        <p>Den skriver et lille manifest ind i dit eget brugerområde — ingen administrator nødvendig — og på Windows desuden en registreringsdatabase-nøgle under <code>HKCU</code>. Sæt <code>--dry-run</code> på først, hvis du vil se præcis hvad den ville skrive. Kør den igen hvis du flytter binæren, for manifestet husker hvor den ligger.</p>
+
+        <p>Læs hvad den skriver: den viser hver Firefox, den har registreret sig hos, og den liste er svaret på om den fandt <em>din</em>. I skrivebordsprogrammet er dette knappen <strong>Registrér i Firefox</strong>, og den viser dig det samme output.</p>
+
+        <h3>Linux: der er mere end én Firefox</h3>
+
+        <p>En pakket Firefox, en snap og en flatpak læser hver sin mappe, og kommandoen klarer alle tre af sig selv. To af dem har en hage:</p>
+
+        <ul>
+            <li><strong>Snap</strong> — standarden på Ubuntu 22.04 og nyere. En indespærret Firefox kan ikke nå punktum-mapper i dit hjem, så hold binæren et almindeligt sted som <code>~/bin</code> frem for <code>~/.local/bin</code>.</li>
+            <li><strong>Flatpak</strong> — sandkassen skal have lov til at nå programmet overhovedet. Kør dette én gang, og genstart så Firefox; en override når ikke ind i et program der allerede kører:
+<pre><code>flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox</code></pre></li>
+        </ul>
+
+        <p>Er du i tvivl om hvilken du har? <code>snap list firefox</code> og <code>flatpak list | grep -i firefox</code> afgør det. Installerer du en anden Firefox senere, skal <code>install-browser-host</code> køres igen.</p>
+
+        <h3>macOS: fjern karantæne-mærket</h3>
+
+        <p>macOS mærker alt hentet med en browser, og Firefox starter hjælperen uden en dialog du kunne godkende — så en mærket binær dør tavst. Fjern mærket én gang:</p>
+
+<pre><code>xattr -d com.apple.quarantine /usr/local/bin/keepass-deltasync</code></pre>
+
+        <h2 id="extension">Trin 3 — installér udvidelsen</h2>
+
+        <p>Den ligger på Mozillas egen udvidelsesside, signeret og gennemgået:</p>
+
+        <p><a class="btn btn-primary" href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">Hent DeltaSync — KeePass search &amp; go</a></p>
+
+        <p>Den beder om to tilladelser: <em>native messaging</em>, som er dens vej til klienten fra trin 2, og <em>storage</em>, som holder søgeindekset så længe Firefox er åben. Den beder om ingen værtstilladelser og kører ingen content scripts — den kan altså ikke se de sider du besøger, og den får aldrig et password.</p>
+
+        <p><strong>Genstart Firefox</strong> efter trin 2, hvis du ikke allerede har gjort det. Det er dét, der får den til at opdage klienten.</p>
+
+        <h3>Fra kildekoden i stedet</h3>
+
+        <p>Udvidelsen er syv almindelige filer uden byggetrin, og den pakke der ligger på <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases-siden</a>, er byte-reproducerbar ud fra sin tag — du kan altså kontrollere, at det du installerer, er det kildekoden siger. Det byg er usigneret, og det afgør hvordan du kan installere det:</p>
+
+        <ul>
+            <li><strong>Enhver Firefox, for én session:</strong> <code>about:debugging#/runtime/this-firefox</code> → <strong>Indlæs midlertidig tilføjelse…</strong> → vælg <code>extension/manifest.json</code> fra en klon. Firefox glemmer den, når den lukkes.</li>
+            <li><strong>Developer Edition, Nightly eller ESR, permanent:</strong> sæt <code>xpinstall.signatures.required</code> til <code>false</code> i <code>about:config</code>, og installér <code>.xpi</code>-filen via <em>about:addons → tandhjulet → Installér tilføjelse fra fil…</em></li>
+        </ul>
+
+        <p>Udvidelsens ID ligger fast uanset vejen, så fjern den ene kopi før du installerer den anden.</p>
+
+        <h2>Sådan bruger du den</h2>
+
+        <ul>
+            <li><strong>Adresselinjen:</strong> skriv <code>kp</code>, et mellemrum, og din søgning. Vælg et forslag og tryk Enter.</li>
+            <li><strong>Popup:</strong> knappen på værktøjslinjen, eller <code>Alt+Shift+K</code>. Piletaster flytter, Enter åbner i den aktuelle fane, Ctrl/Cmd+Enter eller midterklik åbner en ny.</li>
+            <li><strong>Lås:</strong> smider det cachede indeks væk og beder hjælperen slette hvad den måtte ligge inde med.</li>
+        </ul>
+
+        <p>Søgningen matcher på værtsnavn, titel og gruppe, og sætter værtsnavne højest — det er som regel dét man husker. En entry med flere adresser (KeePassXC' <em>Additional URLs</em>) vises som én række med et mærke; vælger du den, foldes hver adresse ud nedenunder med bedste match først, så ingen af dem er uden for rækkevidde.</p>
+
+        <p>Første søgning efter en genstart kræver dit masterpassword. Ligger din database i styresystemets keyring — hvilket er dét <code>--save-password</code> i trin 1 sørger for — henter hjælperen det selv derfra, og det passerer aldrig gennem Firefox. Gør den ikke, spørger popup'en, og hjælperen holder det kun i hukommelsen. Det slettes når idle-låsen udløber, eller når du trykker <em>Lås</em>.</p>
+
+        <h2 id="trouble">Hvis noget ikke virker</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Der sker ingenting når jeg skriver <code>kp</code></summary>
+                <div class="answer">
+                    <p>Firefox læser native messaging-manifester ved opstart, så den skal genstartes efter <code>install-browser-host</code> — et nyt vindue er ikke nok, hele programmet skal lukkes.</p>
+                    <p>Hjælper en genstart ikke, så åbn popup'en: kan den ikke nå hjælperen, siger den det, og tilbyder en knap tilbage til denne side.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Det virkede, og så holdt det op</summary>
+                <div class="answer">
+                    <p>Manifestet husker den fulde sti til klient-binæren. Har du flyttet, omdøbt eller geninstalleret den, så kør <code>keepass-deltasync install-browser-host</code> igen.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Er det Firefox eller er det min opsætning?</summary>
+                <div class="answer">
+                    <p>Du kan afprøve hele kæden uden at involvere browseren. Dette bygger indekset præcis som en søgning ville, og udskriver hvad udvidelsen ville modtage:</p>
+<pre><code>keepass-deltasync browser-host --probe privat
+# No keyring entry for privat — the extension would prompt here.
+# Masterpassword for privat:
+# [ { "title": "Eksempel-konto", "urls": ["https://example.com/login"], … } ]
+# 1 searchable entries indexed from privat.</code></pre>
+                    <p>Virker dét, men udvidelsen ikke, sidder problemet mellem Firefox og hjælperen — start med en genstart. Virker det heller ikke, er det database-bindingen eller <code>keepassxc-cli</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>"keepassxc-cli not found"</summary>
+                <div class="answer">
+                    <p>Hjælperen leder de sædvanlige steder for din platform. Ligger din et usædvanligt sted, så bekræft at det er dét der er galt ved at pege direkte på den:</p>
+<pre><code>keepass-deltasync browser-host --probe privat --keepassxc-cli "/sti/til/keepassxc-cli"</code></pre>
+                    <p>Skal det holde ved, så tilføj samme flag til den launcher, <code>install-browser-host</code> har lavet — den udskriver stien til den, og til manifestet, hver gang du kører den.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Popup'en siger at ingen databaser er registreret</summary>
+                <div class="answer">
+                    <p>Så kører hjælperen og svarer — trin 2 og 3 er i orden — og trin 1 har ikke fundet sted endnu. Tryk <strong>Registrér database…</strong> i skrivebordsprogrammet, kør <code>keepass-deltasync add-local</code>, eller vælg <strong>Firefox-søgning</strong> i <code>keepass-deltasync tui</code>. <code>keepass-deltasync databases</code> viser hvad der er registreret; en søge-kun database er mærket <code>L</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Linux: den siger den installerede, men der sker ingenting</summary>
+                <div class="answer">
+                    <p>Næsten altid Firefox-varianten. <code>install-browser-host</code> udskriver dem, den registrerede sig hos — står din ikke på listen, var den ikke installeret da du kørte kommandoen, og en ny kørsel retter det.</p>
+                    <p>Står den <em>på</em> listen, nægter sandkassen at starte programmet: en flatpak uden <code>flatpak override</code> fra trin 2, eller en snap med binæren i en punktum-mappe. Kør launcheren i hånden for at skille de to ad — den er ukonfineret dér, så virker det, er det indespærringen der stopper den:</p>
+<pre><code>echo | ~/snap/firefox/common/keepass-deltasync/browser-host.sh</code></pre>
+                    <p>En strøm af binær-agtigt output er en succes. <code>Permission denied</code> er ikke.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">Designet og dets sikkerhedsgrænser er beskrevet i <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>. Vil du også have sync-halvdelen af DeltaSync, så start på <a href="getting-started.html">Kom i gang</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Hjem</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Kom i gang</a>
+            &nbsp;·&nbsp;
+            <a href="../firefox.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ — DeltaSync</title>
+    <meta name="description" content="Frequently asked questions about DeltaSync: enrolling new devices, bindings, the stored master password, and seeing connected devices.">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/faq.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/faq.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/faq.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Home</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="getting-started.html">Getting started</a>
+            <a href="deploy-server.html">Deploy server</a>
+            <a href="faq.html" class="active">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="faq.html" class="active" hreflang="en">EN</a>
+                <a href="da/faq.html" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Frequently asked questions</h1>
+
+        <p>These answers use the desktop client commands. On Android the same concepts apply through the app's screens — the Android-specific notes are called out where they differ. If you are new, read the <a href="getting-started.html">getting started guide</a> first.</p>
+
+        <div class="callout">
+            <strong>Three words worth keeping straight:</strong>
+            a <strong>device</strong> is one computer or phone enrolled to your account (it holds its own key);
+            a <strong>database</strong> is a vault on the server (one shared UUID, no matter how many devices use it);
+            a <strong>binding</strong> is the local link on one device between a <code>.kdbx</code> file and a server database. Most questions below are really about one of these three.
+        </div>
+
+        <h2>Devices &amp; tokens</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>How do I get a token for a new device so it joins the others?</summary>
+                <div class="answer">
+                    <p>Each device needs its <em>own</em> one-time enrollment token — tokens are single-use, so you cannot reuse the one from your first device. Ask your administrator to issue a fresh one:</p>
+<pre><code># Administrator runs:
+./keepass-deltasync admin user-enrollment &lt;your-username&gt;
+# → prints a new enrollment token</code></pre>
+                    <p>Then on the new device, enroll with that token:</p>
+<pre><code>./keepass-deltasync enroll --server https://deltasync.bjoerck-braun.dk &lt;new-token&gt;</code></pre>
+                    <p>Enrolling links the <em>device</em> to your account. It does not yet point at any vault — to actually share data with your other devices you then bind the device to the existing database (see <a href="#bind">“How do I bind a device to an existing DeltaSync database?”</a> below). On Android, do the same on the main screen: scan the QR code the admin panel shows, or enter the server URL and the new enrollment token by hand.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>How do I see how many devices are connected to my sync?</summary>
+                <div class="answer">
+                    <p>Run <code>devices</code> — it lists every device enrolled to your account, with the one you are on marked with an asterisk:</p>
+<pre><code>./keepass-deltasync devices
+#    NAME        ID        ENROLLED     LAST SEEN
+# *  laptop      ab12…     2026-05-27   2026-06-09
+#    work-pc     cd34…     2026-05-30   2026-06-08
+#    phone       ef56…     2026-06-01   2026-06-09</code></pre>
+                    <p><code>LAST SEEN</code> tells you when each device last synced — handy for spotting a device you forgot about. Administrators can also see a device count per user with <code>admin user-list</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>How do I remove a device I no longer use?</summary>
+                <div class="answer">
+                    <p>To stop a database from syncing on a device you still control, run <code>forget</code> on that device (see below). To revoke a <em>device</em> entirely — for example a lost or stolen laptop or phone — that is an administrator action; ask your admin to remove it (a full account reset via <code>admin user-delete</code> CASCADE-removes every device, but that also deletes your databases, so it is only for decommissioning the account). If a device may be compromised, also change your KeePass master password afterwards.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Bindings</h2>
+
+        <div class="faq">
+
+            <details id="bind">
+                <summary>How do I bind a device to an existing DeltaSync database?</summary>
+                <div class="answer">
+                    <p>This is the normal “second device” flow: you already sync a vault on one device and want another device to share the same data. First find the database’s UUID:</p>
+<pre><code>./keepass-deltasync databases
+# NAME          ID                                    ...
+# mypasswords   3f2b9c1a-…-…-…-…                      role=owner</code></pre>
+                    <p>Then bind a local <code>.kdbx</code> file on the new device to that UUID instead of creating a brand-new vault:</p>
+<pre><code>./keepass-deltasync init mypasswords ~/keepass/my.kdbx --bind &lt;UUID&gt;
+./keepass-deltasync sync mypasswords</code></pre>
+                    <p>The local file can even be an empty/new <code>.kdbx</code> with the right master password — the first <code>sync</code> pulls the server entries into it. On Android, pick your <code>.kdbx</code> with the file picker and match it to the database shown from the server.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>How do I delete a previous binding?</summary>
+                <div class="answer">
+                    <p>Use <code>forget</code> on the device whose binding you want to drop:</p>
+<pre><code>./keepass-deltasync forget mypasswords</code></pre>
+                    <p>This removes only the <em>local</em> link in that device’s config. <strong>The server database and the <code>.kdbx</code> file are left completely untouched</strong> — your passwords are not deleted, and your other devices keep syncing. It is exactly what you want after an account switch where an old binding went stale, or when you simply want to stop syncing a vault from this one device. List your current bindings any time with <code>databases</code>. To pick the database up again later, just <code>init … --bind &lt;UUID&gt;</code> as above.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>How do I delete a whole database from the server (e.g. a leftover duplicate)?</summary>
+                <div class="answer">
+                    <p>This is different from <code>forget</code>. <code>forget</code> only drops the <em>local</em> binding; the server vault lives on. If <code>databases</code> shows a row marked <code>?</code> / <code>(not bound locally)</code> that you want gone for good — typically a duplicate created by accident — you need to delete the <em>server</em> database itself.</p>
+                    <p>Only the <strong>owner</strong> can do this. Use the <code>delete-database</code> command, which takes either a local name or a raw UUID — pass the UUID for an unbound duplicate that has no local name:</p>
+<pre><code># Look up the UUID first
+./keepass-deltasync databases
+
+# Delete by UUID (or by local name, if it is bound)
+./keepass-deltasync delete-database &lt;UUID&gt;</code></pre>
+                    <p>It shows the database's real server name, asks you to type <code>yes</code> to confirm, then deletes it. Add <code>--yes</code> to skip the prompt. If the database was also bound locally, the binding is removed too (your <code>.kdbx</code> file is left untouched). Re-run <code>databases</code> to confirm.</p>
+                    <div class="callout warn">
+                        <strong>This is permanent.</strong> Deleting a database CASCADE-removes all of its entries and version history on the server. Double-check you are passing the UUID of the unwanted row — the one marked <code>?</code> — and not the <code>*</code> database you actually sync.
+                    </div>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>The stored master password</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>My new password is in the wallet, but I changed the connection — how do I make it work again?</summary>
+                <div class="answer">
+                    <p>The daemon caches your master password in the OS “wallet” (Windows Credential Manager / macOS Keychain / Linux Secret Service) <strong>per database</strong>, keyed by the database UUID. When you change the connection — re-binding to a different vault, or changing the vault’s master password — the wallet can still hold the <em>old</em> entry, so the daemon keeps trying the stale password and sync fails.</p>
+                    <p>The fix is to clear the stale entry and let the daemon store the new one:</p>
+                    <ol class="steps">
+                        <li>Stop the daemon if it is running.</li>
+                        <li>Remove the saved credential from the OS wallet. On Windows: <em>Control Panel → Credential Manager → Windows Credentials</em>, find the entries named <code>keepass-deltasync</code> and remove them. On macOS: open <em>Keychain Access</em>, search <code>keepass-deltasync</code>, delete. On Linux: use <em>Seahorse</em> (“Passwords and Keys”) and delete the <code>keepass-deltasync</code> items.</li>
+                        <li>Re-run the daemon so it prompts once for the new password and saves it again:
+<pre><code>./keepass-deltasync daemon --store-keyring</code></pre></li>
+                    </ol>
+                    <p>If you simply <code>forget</code> and re-<code>init --bind</code> to a new vault, the new database has a new UUID, so the daemon prompts fresh on its own — no manual cleanup needed (the old wallet entry just becomes harmless dead weight you can delete at leisure).</p>
+                    <p><strong>On Android</strong> the master password lives encrypted in the Android Keystore. To refresh it, turn <em>“Auto-sync in the background”</em> off and back on — you confirm with biometrics and re-enter the current master password, which replaces the stored one.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>I changed my KeePass master password — what do I do on my other devices?</summary>
+                <div class="answer">
+                    <p>The master password is never stored on the server, so each device that had it cached needs the new one. On every other device, refresh the wallet entry exactly as in the previous answer (clear the old credential, then <code>daemon --store-keyring</code>), or on Android toggle auto-sync off and on. Until you do, that device will fail to decrypt and sync.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>Sharing &amp; recovery</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>How do I share a database with another user?</summary>
+                <div class="answer">
+                    <p>If you own the database:</p>
+<pre><code>./keepass-deltasync share mypasswords alice    # grant access
+./keepass-deltasync shares mypasswords         # list members
+./keepass-deltasync unshare mypasswords alice  # remove a member</code></pre>
+                    <p>The recipient bootstraps their own local copy with <code>init-shared</code> and chooses their own local password — it need not match yours. Sharing is asymmetrically encrypted: only the recipient’s device can unwrap the key. See the <a href="getting-started.html#android">getting started guide</a> for the Share screen on Android, and the <a href="architecture.html">architecture page</a> for the trust model.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>I deleted an entry by accident — can I get it back?</summary>
+                <div class="answer">
+                    <p>The server keeps up to three previous versions of every entry. List them and roll back:</p>
+<pre><code>./keepass-deltasync versions mypasswords &lt;entry-uuid&gt;
+./keepass-deltasync restore mypasswords &lt;entry-uuid&gt; 1</code></pre>
+                    <p>Find the entry UUID from KeePassXC, or from the <code>versions</code>/log output.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Where is my configuration stored?</summary>
+                <div class="answer">
+                    <p>The client keeps its bindings and device token in <code>config.toml</code>:</p>
+                    <ul>
+                        <li>Windows: <code>%APPDATA%\keepass-deltasync\config.toml</code></li>
+                        <li>macOS: <code>~/Library/Application Support/keepass-deltasync/config.toml</code></li>
+                        <li>Linux: <code>~/.config/keepass-deltasync/config.toml</code></li>
+                    </ul>
+                    <p>Your master password is <em>not</em> in there — it lives only in the OS wallet (if you opted into <code>--store-keyring</code>) or in your head.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <h2>The desktop app &amp; Firefox</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Do I have to use the command line?</summary>
+                <div class="answer">
+                    <p>No. The desktop app covers the everyday work in a window: a wizard for enrollment and your first database, then a dashboard for syncing one database or all of them, seeing your devices and activity, and switching background sync on at login.</p>
+                    <p>It is deliberately a thin shell around the same client — it holds no encryption, no server logic and no configuration of its own, it just runs the client and shows you the output. So the two are interchangeable: enroll in the app and the command line sees it, and the other way round. A handful of things still only exist as commands, notably sharing (<code>share</code>, <code>init-shared</code>) and version history (<code>versions</code>, <code>restore</code>).</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Where do I get the Windows installer, and does it need administrator rights?</summary>
+                <div class="answer">
+                    <p><code>KeePass-Delta-Sync-Setup-&lt;version&gt;.exe</code> is on the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases page</a>. It installs <em>for your user only</em> and never asks for administrator rights — which is consistent with the rest of DeltaSync, since background sync at login is also set up inside your own account.</p>
+                    <p>It contains both the desktop app and the command-line client, and puts them in the same folder on purpose: that is how the app finds the client, with no PATH to configure. There is an optional component with a source archive of both, switched off by default.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Can I use the Firefox extension without running a DeltaSync server?</summary>
+                <div class="answer">
+                    <p>Yes. A search never touches the network — the native messaging host reads your local <code>.kdbx</code> through <code>keepassxc-cli</code> and answers from that alone. If all you want is to find the right page fast, you can ignore the sync half of the project entirely.</p>
+                    <p>Registering the database has its own command for exactly this case — <code>init</code> would require enrollment, this does not:</p>
+<pre><code>keepass-deltasync add-local private ~/keepass/my.kdbx
+keepass-deltasync install-browser-host</code></pre>
+                    <p>Then load the extension, and that is the whole setup. Add <code>--save-password</code> to the first command to keep the master password in your operating system's keyring; without it the popup asks on the first search and the host holds it in memory only, wiping it when the idle lock expires or you press <em>Lock</em>. Step-by-step instructions are <a href="firefox.html#standalone">on the Firefox page</a>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Where do I get the extension?</summary>
+                <div class="answer">
+                    <p>From <a href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">addons.mozilla.org</a>, signed and reviewed like any other add-on. It needs the <code>keepass-deltasync</code> client installed and registered first — the <a href="firefox.html">setup page</a> is three steps.</p>
+                    <p>Two things are worth knowing. The extension requests no host permissions at all, so it cannot read the pages you visit. And it never receives a password: the host hands it titles, addresses and group names, and nothing else — an allow-list enforced on the host's side, so a bug in the extension cannot widen it.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">Didn’t find your answer? The full walkthrough is on the <a href="getting-started.html">getting started page</a>, and the design details are on the <a href="architecture.html">architecture page</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Home</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Getting started</a>
+            &nbsp;·&nbsp;
+            <a href="da/faq.html">Dansk</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

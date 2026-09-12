@@ -1,0 +1,490 @@
+/* ============================================================
+ * DeltaSync website — design tokens + base styles
+ * Palette afledt fra logo: deep blue gradient + guld nøgle + sync-blå
+ * ============================================================ */
+
+:root {
+  /* Brand */
+  --brand-deep:   #0f172a;        /* mørkeblå base */
+  --brand-mid:    #1e3a8a;        /* blå gradient-stop */
+  --brand-accent: #38bdf8;        /* sync-pile blå */
+  --brand-gold:   #f59e0b;        /* nøgle */
+  --brand-gold-light: #fde047;
+
+  /* Light theme (default) */
+  --bg:           #ffffff;
+  --bg-elev:     #f8fafc;
+  --bg-code:     #f1f5f9;
+  --text:        #0f172a;
+  --text-muted:  #475569;
+  --border:      #e2e8f0;
+  --link:        #1e40af;
+  --link-hover:  #1e3a8a;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  --line-tight: 1.3;
+  --line-base: 1.6;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:          #0a0f1c;
+    --bg-elev:    #131b2e;
+    --bg-code:    #1a2540;
+    --text:       #e2e8f0;
+    --text-muted: #94a3b8;
+    --border:     #1e293b;
+    --link:       #60a5fa;
+    --link-hover: #93c5fd;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: var(--line-base);
+  text-rendering: optimizeLegibility;
+}
+
+/* Layout container */
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+/* Header / nav */
+header.site {
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-4) 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+header.site .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  /* Brand plus six links plus the language switcher is wider than the screen
+     somewhere below 860px. Without wrapping, the row does not break: the
+     labels squeeze, then the last links run off the right edge where nothing
+     can reach them. Wrapping costs nothing on a wide screen. */
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--text);
+}
+.brand img { height: 32px; width: 32px; }
+nav.primary {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+nav.primary a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+nav.primary a:hover, nav.primary a.active {
+  color: var(--text);
+}
+
+/* Language switcher */
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--border);
+}
+.lang-switch a {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+.lang-switch a:hover { color: var(--text); }
+.lang-switch a.active {
+  background: var(--brand-accent);
+  color: var(--brand-deep);
+}
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--brand-mid) 0%, var(--brand-deep) 100%);
+  color: #f8fafc;
+  padding: var(--space-24) 0;
+  text-align: center;
+}
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: var(--line-tight);
+  margin: 0 0 var(--space-4);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.hero p.tagline {
+  font-size: 1.2rem;
+  color: #cbd5e1;
+  max-width: 640px;
+  margin: 0 auto var(--space-8);
+}
+.hero .actions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hero img.logo-big {
+  width: 96px;
+  height: 96px;
+  margin-bottom: var(--space-6);
+  filter: drop-shadow(0 8px 32px rgba(56, 189, 248, 0.4));
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+  font-size: 1rem;
+}
+.btn-primary {
+  background: var(--brand-accent);
+  color: var(--brand-deep);
+}
+.btn-primary:hover {
+  background: #7dd3fc;
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background: transparent;
+  color: #f8fafc;
+  border-color: rgba(248, 250, 252, 0.3);
+}
+.btn-secondary:hover {
+  background: rgba(248, 250, 252, 0.08);
+  border-color: rgba(248, 250, 252, 0.6);
+}
+
+/* Main content */
+main {
+  padding: var(--space-16) 0;
+}
+main h1, main h2, main h3 {
+  line-height: var(--line-tight);
+  margin-top: var(--space-12);
+  margin-bottom: var(--space-4);
+}
+main h1 { font-size: 2.2rem; margin-top: 0; }
+main h2 {
+  font-size: 1.6rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+main h3 { font-size: 1.25rem; }
+main h4 { font-size: 1.05rem; margin-top: var(--space-6); margin-bottom: var(--space-2); }
+main p, main ul, main ol { margin-bottom: var(--space-4); }
+main a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+main a:hover { color: var(--link-hover); }
+
+main ul, main ol { padding-left: var(--space-6); }
+main li { margin-bottom: var(--space-2); }
+
+/* Feature grid */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-6);
+  margin: var(--space-12) 0;
+}
+.feature {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.feature .icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-3);
+  color: var(--brand-accent);
+}
+.feature h3 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+.feature p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Code */
+code, pre {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+code {
+  background: var(--bg-code);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+}
+pre {
+  background: var(--bg-code);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Diagrams */
+.diagram {
+  margin: var(--space-8) 0;
+  padding: var(--space-6);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+.diagram .caption {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* Screenshots
+ * Samme ramme som .diagram, men uden polstring: billedet ER kortet, og
+ * skærmbilledet har sin egen vinduesramme med. Lyst og mørkt billede vælges
+ * med <picture media="(prefers-color-scheme: dark)">, så en mørk side ikke
+ * lyser op af et hvidt programvindue.
+ */
+figure.shot {
+  margin: var(--space-8) 0;
+  text-align: center;
+}
+figure.shot img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+figure.shot figcaption {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-6) 0;
+}
+th, td {
+  padding: var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg-elev);
+  font-weight: 600;
+}
+tr:hover td { background: var(--bg-elev); }
+
+/* Steps (numbered) */
+ol.steps {
+  list-style: none;
+  counter-reset: step;
+  padding-left: 0;
+}
+ol.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 3rem;
+  margin-bottom: var(--space-6);
+}
+ol.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  background: var(--brand-accent);
+  color: var(--brand-deep);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* Footer */
+footer.site {
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+  padding: var(--space-8) 0;
+  margin-top: var(--space-24);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+footer.site .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+footer.site a { color: var(--text-muted); }
+footer.site a:hover { color: var(--text); }
+
+/* Callout */
+.callout {
+  border-left: 4px solid var(--brand-accent);
+  background: var(--bg-elev);
+  padding: var(--space-4) var(--space-6);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin: var(--space-6) 0;
+}
+.callout.warn { border-left-color: var(--brand-gold); }
+
+/* FAQ accordion */
+.faq { margin: var(--space-8) 0; }
+.faq details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elev);
+  margin: var(--space-3) 0;
+  overflow: hidden;
+}
+.faq details[open] { background: var(--bg); }
+.faq summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-4) var(--space-6);
+  font-weight: 600;
+  color: var(--text);
+  position: relative;
+  padding-right: var(--space-12);
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+";
+  position: absolute;
+  right: var(--space-6);
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 400;
+  font-size: 1.4rem;
+  color: var(--brand-accent);
+  line-height: 1;
+}
+.faq details[open] summary::after { content: "\2212"; }
+.faq summary:hover { color: var(--link); }
+.faq .answer {
+  padding: 0 var(--space-6) var(--space-4);
+  color: var(--text-muted);
+}
+.faq .answer :first-child { margin-top: 0; }
+.faq .answer pre { margin: var(--space-3) 0; }
+
+/* Mobile */
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .hero { padding: var(--space-16) 0; }
+
+  /* Stack the header on a phone: brand on its own line, the links wrapped and
+     centred underneath. Side by side there is no width left for either. */
+  header.site .container {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  nav.primary {
+    justify-content: center;
+    gap: var(--space-2) var(--space-4);
+  }
+  nav.primary a { font-size: 0.9rem; }
+
+  /* The stacked header runs to three rows of links on a narrow phone. Sticky
+     would spend a third of the screen on navigation for the whole visit, so
+     let it scroll away here. It stays sticky on wider screens. */
+  header.site { position: static; }
+  main h1 { font-size: 1.8rem; }
+  main h2 { font-size: 1.4rem; }
+}

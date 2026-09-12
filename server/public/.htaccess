@@ -20,3 +20,21 @@
 <FilesMatch "(?i)^(bootstrap\.php|composer\.(json|lock))$">
     Require all denied
 </FilesMatch>
+
+# Caching. Uden dette sender serveren kun en ETag, og browseren gætter selv en
+# levetid ud fra hvor længe siden filen sidst blev ændret. Gættet var grunden
+# til at en rettelse i style.css ikke kunne ses på en telefon der havde besøgt
+# siden før — adressen var uændret, så browseren spurgte aldrig igen.
+<IfModule mod_headers.c>
+    # Sider og stilark: spørg altid serveren. Sammen med ETag koster det et
+    # tomt 304-svar når filen er uændret, og en rettelse slår igennem straks.
+    <FilesMatch "\.(html|css|js)$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+
+    # Billeder, ikoner og skrifttyper skifter kun ved at få et nyt filnavn,
+    # så de må gerne blive liggende i browseren en uge.
+    <FilesMatch "\.(png|jpe?g|gif|svg|webp|ico|woff2?)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>

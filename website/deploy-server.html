@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy your own server — DeltaSync</title>
+    <meta name="description" content="Deploy your own DeltaSync server. The easy way with Docker / a NAS (TrueNAS), or the step-by-step guide for classic PHP hosting.">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/deploy-server.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/deploy-server.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/deploy-server.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Home</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="getting-started.html">Getting started</a>
+            <a href="deploy-server.html" class="active">Deploy server</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="deploy-server.html" class="active" hreflang="en">EN</a>
+                <a href="da/deploy-server.html" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Deploy your own server</h1>
+
+        <p>This is the <strong>complete, hold-your-hand guide</strong> to running your own DeltaSync server. No prior server experience is assumed. You will upload some files, open a page in your browser, click through three short steps, and create your first user. Set aside about <strong>30 minutes</strong>.</p>
+
+        <div class="callout">
+            <strong>Good news up front:</strong> there is <strong>nothing to compile</strong> and <strong>no Composer / npm step</strong>. The server is plain PHP — you upload it as-is. And remember: the server only ever stores <em>encrypted</em> blobs. Even you, the administrator, can never read anyone's passwords.
+        </div>
+
+        <div class="callout">
+            <strong>Have Docker or a NAS?</strong> The <a href="#docker">easiest way is Docker</a> — just below. It takes a few minutes and skips the upload and the setup wizard entirely. The long step-by-step guide further down is for <strong>classic PHP hosting without Docker</strong>.
+        </div>
+
+        <h2 id="docker">The easiest way: Docker</h2>
+
+        <p>If you have <strong>Docker</strong> — on a VPS, a home server, or a NAS such as <strong>TrueNAS SCALE</strong>, Unraid or Synology — this is by far the quickest path. You don't upload any code or run the setup wizard: you paste a few lines of YAML, set one password, and start it. PostgreSQL is included, and the database tables are created automatically on first start.</p>
+
+        <p>Use this <code>compose.yml</code>. It pulls a prebuilt, multi-architecture image (works on both x86 and ARM, so Raspberry-Pi-class NAS boxes are fine too):</p>
+
+<pre><code>x-db-password: &amp;db_password "CHANGE_THIS_to_a_long_random_string"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keepass_deltasync
+      POSTGRES_USER: deltasync
+      POSTGRES_PASSWORD: *db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deltasync -d keepass_deltasync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: registry.gitlab.com/star95/keepass-deltasync/server:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      DATABASE_URL: "pgsql:host=db;port=5432;dbname=keepass_deltasync"
+      DATABASE_USER: deltasync
+      DATABASE_PASSWORD: *db_password
+      LOG_LEVEL: INFO
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: "CHANGE_THIS_to_a_long_admin_passphrase"
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: keepass_deltasync
+      PGUSER: deltasync
+      PGPASSWORD: *db_password
+
+volumes:
+  pgdata:</code></pre>
+
+        <ol class="steps">
+            <li>
+                <strong>Change the two secrets.</strong>
+                Replace both lines marked <code>CHANGE_THIS</code>. The first is the database password; a YAML anchor feeds that one value to every service, so you only edit it once. The second is the password you will sign in to the admin panel with — at least 12 characters, stored Argon2id-hashed, never in plaintext.
+            </li>
+            <li>
+                <strong>Start it.</strong>
+                On a server: save the file and run <code>docker compose up -d</code>. On a NAS, paste the YAML into the app UI instead — on <strong>TrueNAS SCALE</strong>: <em>Apps → Discover Apps → Custom App → Install via YAML</em>. TrueNAS is fussier than plain Docker about volumes and about what a password may contain, so paste the <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/compose.truenas.yml">TrueNAS-shaped compose file</a> there instead of the one above.
+            </li>
+            <li>
+                <strong>Sign in to the admin panel.</strong>
+                Open <code>http://&lt;host&gt;:8080/admin.html</code> and sign in with the username and password you set in step 1. Forgotten them later? They are in your compose file.
+            </li>
+            <li>
+                <strong>Create your first user.</strong>
+                Type a username under <em>Users</em> and click <strong>Create</strong>. You get a one-time <strong>enrollment token</strong>, shown as text and as a QR code. On a phone the user scans the QR code; on a desktop they run <code>keepass-deltasync enroll --server https://your-domain &lt;token&gt;</code> and then follow <a href="getting-started.html">Getting started</a>. The panel's <em>Next steps</em> tab spells that out, so the token is not all you hand over.
+            </li>
+        </ol>
+
+        <p>The server now answers on <code>http://&lt;host&gt;:8080</code>. Before exposing it to the internet, put it behind an HTTPS reverse proxy — your NAS's built-in reverse proxy, or Caddy/Traefik/nginx. Updating later is just <code>docker compose pull &amp;&amp; docker compose up -d</code>; schema migrations run automatically.</p>
+
+        <p>The panel has two more tabs: <em>Devices</em> lists the devices that have enrolled and when each one last called the server, and <em>Audit log</em> shows what happened, with a cleanup button for old rows.</p>
+
+        <p>Prefer the command line? The bundled tool does the same work inside the container. <code>docker compose exec app php bin/admin user:create alice</code> creates a user and prints an enrollment token, and <code>docker compose exec app php bin/admin database:create alice Personal</code> creates a database for someone who has no desktop client to create one with.</p>
+
+        <div class="callout">
+            <strong>More detail:</strong> the <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/self-hosting-docker.md">Docker self-hosting guide</a> covers TrueNAS specifics, HTTPS, updating and backups.
+        </div>
+
+        <hr>
+
+        <h2>Without Docker: classic PHP hosting</h2>
+
+        <p>No Docker? The rest of this page is the full, beginner-friendly guide to running the server on ordinary shared PHP hosting.</p>
+
+        <h2>What you need</h2>
+
+        <p>Before you start, make sure you have all five of these. If you are missing one, sort it out first — the guide assumes they are ready.</p>
+
+        <ul>
+            <li><strong>Web hosting with PHP 8.2 or newer.</strong> Almost any shared hosting works (Hetzner, one.com, Simply.com, your own VPS…). It must have these PHP extensions enabled: <code>pdo_pgsql</code>, <code>sodium</code>, and <code>json</code>. The first two are the ones to double-check — ask your host or look in your control panel's PHP settings if unsure.</li>
+            <li><strong>An empty PostgreSQL 14+ database</strong> plus a database user that can write to it. Many hosts let you create this in their control panel with a couple of clicks. You do <em>not</em> create any tables yourself — the wizard does that.</li>
+            <li><strong>A domain or sub-domain</strong> for the server, e.g. <code>deltasync.example.com</code>, where you can decide which folder it serves files from (the "document root" / "web root").</li>
+            <li><strong>HTTPS</strong> on that domain. Almost every host offers a free certificate (Let's Encrypt) with one click. DeltaSync sends authentication tokens, so plain <code>http://</code> is not acceptable in real use.</li>
+            <li><strong>A way to upload files</strong> to your host: a graphical FTP/SFTP program such as <a href="https://filezilla-project.org/">FileZilla</a>, your host's web-based file manager, or <code>scp</code>/<code>rsync</code> if you are comfortable with a terminal. Any of them is fine.</li>
+        </ul>
+
+        <h2>The big picture</h2>
+
+        <p>You will do three things, in order:</p>
+
+        <ol>
+            <li><strong>Put the code on your host</strong> and point your domain at the right folder.</li>
+            <li><strong>Run the setup wizard</strong> in your browser — it asks for your database details, builds all the tables, and gives you an admin token.</li>
+            <li><strong>Create your first user</strong> and hand them an invitation (an "enrollment token").</li>
+        </ol>
+
+        <h2>Step by step</h2>
+
+        <ol class="steps">
+            <li>
+                <strong>Download the server code.</strong>
+                Get the project from GitLab. If you have <code>git</code>:
+<pre><code>git clone https://gitlab.com/Star95/keepass-deltasync.git</code></pre>
+                Or download it as a ZIP from the <a href="https://gitlab.com/Star95/keepass-deltasync">project page</a> ("Code" → "Download source code") and unzip it. Everything you need is in the <code>server/</code> sub-folder — you can ignore the rest for now.
+            </li>
+
+            <li>
+                <strong>Create an empty PostgreSQL database.</strong>
+                In your host's control panel, create a new PostgreSQL database (for example named <code>keepass_deltasync</code>) and a database user with a strong password and full access to it. Write down these four things — you will type them into the wizard in a minute:
+                <ul>
+                    <li>the <strong>host</strong> (often <code>localhost</code> on shared hosting)</li>
+                    <li>the <strong>port</strong> (PostgreSQL's default is <code>5432</code>)</li>
+                    <li>the <strong>database name</strong></li>
+                    <li>the <strong>user</strong> and its <strong>password</strong></li>
+                </ul>
+                Leave the database completely empty — no tables. That is the wizard's job.
+            </li>
+
+            <li>
+                <strong>Upload the <code>server/</code> folder to your host.</strong>
+                Using FileZilla, your file manager, or <code>scp</code>/<code>rsync</code>, copy the entire <code>server/</code> folder up to your account — for example to <code>~/deltasync/server/</code>. Upload all of it: <code>public/</code>, <code>src/</code>, <code>schema/</code>, <code>bootstrap.php</code>, and so on.
+                <div class="callout">
+                    <strong>The single most important thing in this whole guide:</strong> your domain's document root must point at the <code>server/public/</code> folder — <em>not</em> at <code>server/</code> itself. Everything outside <code>public/</code> (your database password, the source code) must stay <em>above</em> the web root so it can never be downloaded.
+                </div>
+            </li>
+
+            <li>
+                <strong>Point your domain at <code>server/public/</code>.</strong>
+                In your host's control panel, set the document root (sometimes called "web root" or "directory") for your domain to the <code>public/</code> folder you just uploaded — e.g. <code>~/deltasync/server/public</code>. Make sure HTTPS is turned on for the domain. On Apache hosting (the most common kind), the included <code>.htaccess</code> file handles the rest automatically; you don't need to touch it.
+            </li>
+
+            <li>
+                <strong>Open the setup wizard in your browser.</strong>
+                Go to:
+<pre><code>https://your-domain/setup.php</code></pre>
+                You should see a page titled <em>"DeltaSync — First-time setup"</em>. Prefer Danish? Click <em>Dansk</em> in the corner, or add <code>?lang=da</code> to the address. If you instead get an error or a blank page, jump to <a href="#trouble">Troubleshooting</a> below.
+            </li>
+
+            <li>
+                <strong>Wizard — Step 1: Database connection.</strong>
+                Fill in the form with the database details from step 2. The "DSN" field is just a single line describing where the database is; use this shape (swap in your own host, port and database name):
+<pre><code>pgsql:host=localhost;port=5432;dbname=keepass_deltasync</code></pre>
+                Then enter the database <strong>user</strong> and <strong>password</strong>. You can leave <em>Log level</em> on <code>INFO</code>, <em>Audit retention</em> on <code>30</code>, and <em>Enrollment token TTL</em> on <code>24</code>. Leave <em>App base path</em> <strong>empty</strong> (you only need it for the advanced sub-path setup at the bottom of this page). Click <strong>"Test connection and save .env"</strong>. The wizard tests the connection and, if it works, writes the settings into <code>server/.env</code> for you. If it reports a connection error, your database details are off — re-check the host, port, name, user and password.
+            </li>
+
+            <li>
+                <strong>Wizard — Step 2: Run the migrations.</strong>
+                The wizard now lists the SQL files that build the tables. Just click <strong>"Run all migrations"</strong>. This creates everything the server needs (users, devices, entries, audit log, …). It is safe to run; if the tables already existed it would simply stop and tell you.
+            </li>
+
+            <li>
+                <strong>Wizard — Step 3: Generate your admin token.</strong>
+                Click <strong>"Generate admin token"</strong>. The wizard shows you a long secret string.
+                <div class="callout warn">
+                    <strong>Copy this token now and keep it somewhere safe</strong> (your own password manager is ideal). It is shown <strong>only once</strong> and cannot be retrieved later. This token is what lets you create users.
+                </div>
+            </li>
+
+            <li>
+                <strong>Delete <code>setup.php</code>.</strong>
+                Back in FileZilla / your file manager, delete the file <code>setup.php</code> from the <code>public/</code> folder on your host. The wizard refuses to run a second time once a token exists, but the file is unnecessary and removing it keeps your server clean. <em>Your server is now live.</em>
+            </li>
+
+            <li>
+                <strong>Create your first user.</strong>
+                Users (and you) are managed with the small command-line client. Download the pre-built <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">client binary</a> for your computer (Windows / macOS / Linux). Then, in a terminal:
+<pre><code># 1. Tell the client your admin token (PowerShell on Windows):
+$env:KEEPASS_DELTASYNC_ADMIN_TOKEN = "&lt;the-token-from-step-8&gt;"
+#    …or on macOS/Linux:
+export KEEPASS_DELTASYNC_ADMIN_TOKEN="&lt;the-token-from-step-8&gt;"
+
+# 2. Create the first user:
+keepass-deltasync admin user-create alice --display-name "Alice"</code></pre>
+                <div class="callout">
+                    <strong>One-time bootstrap:</strong> the very first time, the client doesn't yet know your server's address, so the command above may say <em>"server URL not configured"</em>. Fix it by creating a tiny config file with just your server URL, then run the command again:
+                    <ul>
+                        <li>Windows: <code>%APPDATA%\keepass-deltasync\config.toml</code></li>
+                        <li>macOS: <code>~/Library/Application Support/keepass-deltasync/config.toml</code></li>
+                        <li>Linux: <code>~/.config/keepass-deltasync/config.toml</code></li>
+                    </ul>
+                    with these two lines:
+<pre><code>[server]
+url = "https://your-domain"</code></pre>
+                </div>
+            </li>
+
+            <li>
+                <strong>Send the invitation to the user.</strong>
+                The command prints an <strong>enrollment token</strong> for Alice. Send it to her over a secure channel (a private message, not email if you can avoid it). She uses it once:
+<pre><code>keepass-deltasync enroll --server https://your-domain &lt;her-enrollment-token&gt;</code></pre>
+                From here she follows the ordinary <a href="getting-started.html">Getting started</a> steps to bind and sync her database. Repeat steps 10–11 for every additional user (your config already knows the server URL now, so no more bootstrap needed).
+            </li>
+        </ol>
+
+        <h2>Verify it works</h2>
+
+        <p>The simplest proof is that step 11 succeeded — a user could enroll. If you want to check the API directly, this returns your own account info when the admin (or any enrolled user) is set up:</p>
+<pre><code>curl -H "Authorization: Bearer &lt;a-device-token&gt;" https://your-domain/api/v1/me
+# → 200 OK with user + device details</code></pre>
+
+        <h2 id="trouble">Troubleshooting</h2>
+
+        <h3>The page is blank, or I get a "500" error</h3>
+        <p>Almost always this means the document root is pointing at the wrong folder. It must point at <code>server/public/</code>, not <code>server/</code>. Also confirm your host actually runs PHP 8.2+ on this domain.</p>
+
+        <h3>"Could not load bootstrap.php"</h3>
+        <p>The <code>public/</code> folder got separated from the rest of <code>server/</code>. Re-upload so that <code>public/</code> sits <em>inside</em> the <code>server/</code> folder, next to <code>src/</code> and <code>bootstrap.php</code>.</p>
+
+        <h3>"Cannot write to .env"</h3>
+        <p>During setup, the web server needs permission to create <code>server/.env</code>. Make the <code>server/</code> folder writable by your web user (e.g. <code>chmod 700 server</code> and ensure it is owned by your account), run the wizard, then you can tighten permissions again afterwards.</p>
+
+        <h3>The wizard says "Setup already complete"</h3>
+        <p>That's fine — it means an admin token already exists, so the wizard locks itself to avoid creating duplicates. Just delete <code>setup.php</code> (step 9) and carry on.</p>
+
+        <h3>"Connection failed" in Step 1</h3>
+        <p>Your database details are wrong, or the database isn't reachable. On shared hosting the host is usually <code>localhost</code>. Double-check the database name, user, and password, and that the database actually exists.</p>
+
+        <h3>Login works locally but tokens are rejected</h3>
+        <p>Some FastCGI setups strip the <code>Authorization</code> header. The included <code>.htaccess</code> re-adds it for Apache. If your host uses nginx, you'll need an equivalent rewrite that preserves <code>Authorization</code> and routes unknown paths to <code>index.php</code>.</p>
+
+        <h3>"pdo_pgsql" or "sodium" extension missing</h3>
+        <p>Enable the PHP extension in your host's control panel (often a checkbox under "PHP settings" / "Extensions"). On a VPS: install the package, e.g. <code>php-pgsql</code> and <code>php-sodium</code>, then restart PHP.</p>
+
+        <h2>Advanced: sub-path or sub-domain layouts</h2>
+
+        <p>The guide above is the standard layout: the server has a sub-domain to itself. If instead you want the API to share a domain with a website (e.g. the website on <code>/</code> and the API under <code>/sync</code>), or to split API and website onto two sub-domains, the repository documents three concrete recipes:</p>
+
+        <ul>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/deployment.md">docs/deployment.md</a> — Recipe 1 (standard), Recipe 2 (API under a sub-path), Recipe 3 (separate sub-domains)</li>
+            <li><a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/server/README.md">server/README.md</a> — server overview and configuration</li>
+        </ul>
+
+        <p>The only change for a sub-path is to set <em>App base path</em> (e.g. <code>/sync</code>) in Step 1 of the wizard, and to point each client's server URL at <code>https://your-domain/sync</code>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Home</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Getting started</a>
+            &nbsp;·&nbsp;
+            <a href="da/deploy-server.html">Dansk</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

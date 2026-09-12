@@ -10,3 +10,12 @@ docker-entrypoint.sh text eol=lf
 # differs from CI's by one byte per line — which is exactly the check anyone
 # verifying the package against the tag would run.
 extension/* text eol=lf
+
+# Hjemmesiden redigeres også fra Windows-maskinen. Uden dette ville
+# core.autocrlf gøre hver linje om til CRLF, og næste upload ville se hver
+# eneste fil som ændret — 33 filer i stedet for den ene der faktisk blev rettet.
+website/**/*.html text eol=lf
+website/**/*.css text eol=lf
+website/**/*.svg text eol=lf
+website/**/*.md text eol=lf
+website/assets/*.png binary

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firefox extension — DeltaSync</title>
+    <meta name="description" content="How to install and use the DeltaSync Firefox extension — search your KeePass entries from the address bar and open the entry's site. Works with or without a DeltaSync server.">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="apple-touch-icon" href="assets/icon-128.png">
+    <link rel="stylesheet" href="style.css">
+    <meta property="og:title" content="DeltaSync for Firefox">
+    <meta property="og:description" content="Search your KeePass entries from Firefox' address bar and open the right page.">
+    <meta property="og:image" content="assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.bjoerck-braun.dk/firefox.html">
+    <link rel="alternate" hreflang="en" href="https://deltasync.bjoerck-braun.dk/firefox.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.bjoerck-braun.dk/da/firefox.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.bjoerck-braun.dk/firefox.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Home</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="getting-started.html">Getting started</a>
+            <a href="deploy-server.html">Deploy server</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html" class="active">Firefox</a>
+            <span class="lang-switch">
+                <a href="firefox.html" class="active" hreflang="en">EN</a>
+                <a href="da/firefox.html" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>DeltaSync for Firefox</h1>
+
+        <p>Type <code>kp</code> in the address bar, then a few letters of the account you are looking for, and Firefox takes you to that entry's website. That is the whole extension. It answers the question a password manager leaves you with — <em>which site was that account on again?</em> — and then gets out of the way.</p>
+
+        <p><strong>Logging in is not its job.</strong> That stays with <a href="https://github.com/keepassxreboot/keepassxc-browser">KeePassXC-Browser</a>, which fills credentials but cannot help you find the page in the first place. This closes that gap and nothing else, which is why it never needs to see a password.</p>
+
+        <div class="callout">
+            <strong>What it can see:</strong> entry titles, their web addresses, and group names. Nothing else — the list is enforced on the other side of the connection, in the program that reads your database, so a bug in the extension cannot widen it. The extension also requests <em>no</em> host permissions, so it cannot read the pages you visit.
+        </div>
+
+        <h2>You do not need a DeltaSync server</h2>
+
+        <p>DeltaSync is normally a sync system with a server behind it, but a search never touches the network: the extension asks a small local helper, which reads your own <code>.kdbx</code> file and answers from that alone. So there are two ways to set this up, and the second one has nothing to do with syncing:</p>
+
+        <ul>
+            <li><strong>You already use DeltaSync</strong> — your database is registered with the client, and there is nothing extra to configure. Skip to <a href="#host">step 2</a>.</li>
+            <li><strong>You just want the search</strong> — install the client, point it at your <code>.kdbx</code> with one command, and never enroll against a server at all. That is <a href="#standalone">step 1</a> below.</li>
+        </ul>
+
+        <p>Either way, the first two steps can be clicked instead of typed. If you installed the desktop app, start with <a href="#app">the short way</a> — it is the same work, without a terminal.</p>
+
+        <h2>What you need</h2>
+
+        <ul>
+            <li><a href="https://keepassxc.org/">KeePassXC</a>, for its <code>keepassxc-cli</code> — that is what actually opens your database</li>
+            <li>The <code>keepass-deltasync</code> client: a <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">pre-built binary</a> for Linux, macOS or Windows, or the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">Windows installer</a>, which brings it along</li>
+            <li>Firefox 142 or newer — the extension itself comes from <a href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">addons.mozilla.org</a> in step 3</li>
+        </ul>
+
+        <h2 id="app">The short way — steps 1 and 2 with buttons</h2>
+
+        <p>The two steps below are commands, and on Windows the client is not even on your <code>PATH</code>. The desktop app spares you both: they are two buttons on one screen, and that screen is reachable <strong>without an account</strong>. The result is identical, so if you would rather type, skip ahead to <a href="#standalone">step 1</a>.</p>
+
+        <p>Open <strong>KeePass Delta-Sync</strong>. If you have never enrolled a device it opens on its welcome screen, and the button you want says so:</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="assets/shot-welcome-en-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shot-welcome-en-light.png" width="822" height="592" alt="The app's welcome screen. Below the blue 'Start guide' button are two grey ones: 'Advanced (administrator)' and 'Search from Firefox — no account'.">
+            </picture>
+            <figcaption><strong>Search from Firefox — no account</strong> goes straight past enrollment. If you already sync with DeltaSync you land on the dashboard instead — the same screen is its <strong>Firefox</strong> tab.</figcaption>
+        </figure>
+
+        <p>That is the whole Firefox setup on one screen:</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="assets/shot-firefox-en-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shot-firefox-en-light.png" width="822" height="592" loading="lazy" alt="The app's Firefox screen: the buttons 'Register database' and 'Register with Firefox', a second row with 'Show what would be written', 'Remove the registration' and 'Refresh', and a list showing one registered database.">
+            </picture>
+            <figcaption>The two blue buttons are steps 1 and 2. The row beneath them is for when something is off — a dry run, the way back out, a refresh. <strong>Program:</strong> at the bottom answers <em>where is the client?</em> — with a copy button for the day you do want the terminal.</figcaption>
+        </figure>
+
+        <h3>Step 1, with buttons: Register database…</h3>
+
+        <p><strong>Register database…</strong> is <code>add-local</code> with a file picker on it: give the database a short name, point at the <code>.kdbx</code>, done. Nothing is uploaded, and no server, token or account is involved.</p>
+
+        <figure class="shot">
+            <picture>
+                <source srcset="assets/shot-register-en-dark.png" media="(prefers-color-scheme: dark)">
+                <img src="assets/shot-register-en-light.png" width="822" height="592" loading="lazy" alt="The 'Register a database for search' dialog, with fields for name and .kdbx file, a checkbox for storing the masterpassword in the OS keyring, and a master password field.">
+            </picture>
+            <figcaption>The checkbox is <code>--save-password</code>. Tick it and the masterpassword is checked by opening the database before it is handed to your operating system's keyring — so the popup never asks. Leave it clear and the extension asks you instead.</figcaption>
+        </figure>
+
+        <h3>Step 2, with buttons: Register with Firefox</h3>
+
+        <p><strong>Register with Firefox</strong> is <code>install-browser-host</code>. It shows what it wrote and which Firefox variants it registered with — read that list, it is the answer to whether it found <em>yours</em> — and then reminds you to restart Firefox, which is what makes the registration take effect.</p>
+
+        <p>The list at the bottom of the screen is what the extension would be able to search. <strong>Test</strong> on a row runs the whole chain with the browser left out: it opens the database and prints exactly what Firefox would receive. If that works and the extension still does not, the problem sits between Firefox and the client — and the <a href="#trouble">last section</a> takes it from there.</p>
+
+        <p>That is steps 1 and 2 done. Carry on at <a href="#extension">step 3</a>, the extension itself, which is the same either way.</p>
+
+        <h2 id="standalone">Step 1 — point the client at your database</h2>
+
+        <p><strong>If you already sync with DeltaSync</strong>, this is done: <code>enroll</code> and <code>init</code> registered the database when you set the client up. Move on to step 2.</p>
+
+        <p><strong>If you have no server</strong>, the client still needs to know which file to search. One command tells it, and nothing about that file goes anywhere:</p>
+
+<pre><code>keepass-deltasync add-local private ~/keepass/my.kdbx</code></pre>
+
+        <p><code>private</code> is only a label — it appears in the popup when more than one database is unlocked. Repeat the command for each file you want searchable. No server, no token, no account is involved.</p>
+
+        <p>Add <code>--save-password</code> if you would rather not be asked for the master password every time the idle lock expires. It is verified by opening the database before it is kept, and it goes into your operating system's keyring — never into a file.</p>
+
+        <div class="callout">
+            <strong>Prefer buttons?</strong> This step is <strong>Register database…</strong> in the desktop app — see <a href="#app">the short way</a> above. In the terminal, <code>keepass-deltasync tui</code> has the same section, and it is there whether or not you have an account.
+        </div>
+
+        <h3>Windows: where the client is, and where to type</h3>
+
+        <p>The installer puts the app and the command-line client in the same folder, and which folder depends on the install you chose:</p>
+
+        <ul>
+            <li><em>Just for me</em> — the default, no administrator prompt: <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync\</code></li>
+            <li><em>For all users</em>: <code>C:\Program Files\KeePass Delta-Sync\</code></li>
+        </ul>
+
+        <p><code>keepass-deltasync.exe</code> in that folder is what every command on this page means. It is <strong>not</strong> on your <code>PATH</code>, so the quickest way to a terminal that can see it is to open the folder in Explorer, click the address bar, type <code>powershell</code> and press Enter. The terminal opens in that folder, and the commands work with <code>.\</code> in front:</p>
+
+<pre><code>.\keepass-deltasync.exe add-local private C:\Users\you\Documents\my.kdbx</code></pre>
+
+        <p>Not sure which install you have? Paste <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync</code> into Explorer's address bar; if that folder does not exist, it is the <code>Program Files</code> one. The app itself shows the path at the bottom of its Firefox tab.</p>
+
+        <h2 id="host">Step 2 — let Firefox talk to the client</h2>
+
+        <p>Firefox will not run a program unless it has been told about it first. One command does that:</p>
+
+<pre><code>keepass-deltasync install-browser-host</code></pre>
+
+        <p>It writes a small manifest into your own user profile — no administrator needed — and on Windows a registry key under <code>HKCU</code>. Add <code>--dry-run</code> first if you would like to see exactly what it would write. Run it again if you ever move the binary, since the manifest records where it lives.</p>
+
+        <p>Read what it prints: it lists every Firefox it registered with, and that list is the answer to whether it found <em>yours</em>. In the desktop app this is the <strong>Register with Firefox</strong> button, and it shows you the same output.</p>
+
+        <h3>Linux: there is more than one Firefox</h3>
+
+        <p>A packaged Firefox, a snap and a flatpak each read a different directory, and the command handles all three by itself. Two of them come with a catch:</p>
+
+        <ul>
+            <li><strong>Snap</strong> — the default on Ubuntu 22.04 and newer. A confined Firefox cannot reach dot-directories in your home, so keep the binary somewhere plain such as <code>~/bin</code> rather than <code>~/.local/bin</code>.</li>
+            <li><strong>Flatpak</strong> — the sandbox has to be allowed to reach the program at all. Run this once, then restart Firefox; an override does not reach an application that is already running:
+<pre><code>flatpak override --user --talk-name=org.freedesktop.Flatpak org.mozilla.firefox</code></pre></li>
+        </ul>
+
+        <p>Not sure which one you have? <code>snap list firefox</code> and <code>flatpak list | grep -i firefox</code> settle it. Installing a different Firefox later means running <code>install-browser-host</code> again.</p>
+
+        <h3>macOS: clear the quarantine flag</h3>
+
+        <p>macOS marks anything downloaded with a browser, and Firefox starts the helper without a dialog you could approve — so a marked binary dies silently. Clear it once:</p>
+
+<pre><code>xattr -d com.apple.quarantine /usr/local/bin/keepass-deltasync</code></pre>
+
+        <h2 id="extension">Step 3 — install the extension</h2>
+
+        <p>It is on Mozilla's own add-on site, signed and reviewed:</p>
+
+        <p><a class="btn btn-primary" href="https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/">Get DeltaSync — KeePass search &amp; go</a></p>
+
+        <p>It asks for two permissions: <em>native messaging</em>, which is how it reaches the client from step 2, and <em>storage</em>, which holds the search index for as long as Firefox is open. It requests no host permissions and runs no content scripts, so it cannot see the pages you visit — and it never receives a password.</p>
+
+        <p><strong>Restart Firefox</strong> after step 2 if you have not already. That is what makes it notice the client.</p>
+
+        <h3>From source instead</h3>
+
+        <p>The add-on is seven plain files with no build step, and the package published on the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases page</a> is byte-reproducible from its tag — so you can check that what you install is what the source says. That build is unsigned, which decides how you can install it:</p>
+
+        <ul>
+            <li><strong>Any Firefox, for a session:</strong> <code>about:debugging#/runtime/this-firefox</code> → <strong>Load Temporary Add-on…</strong> → pick <code>extension/manifest.json</code> from a clone. Firefox forgets it when it closes.</li>
+            <li><strong>Developer Edition, Nightly or ESR, permanently:</strong> set <code>xpinstall.signatures.required</code> to <code>false</code> in <code>about:config</code>, then install the <code>.xpi</code> from <em>about:addons → the gear icon → Install Add-on From File…</em></li>
+        </ul>
+
+        <p>The add-on ID is fixed either way, so remove one copy before installing the other.</p>
+
+        <h2>Using it</h2>
+
+        <ul>
+            <li><strong>Address bar:</strong> type <code>kp</code>, a space, then your search. Pick a suggestion and press Enter.</li>
+            <li><strong>Popup:</strong> the toolbar button, or <code>Alt+Shift+K</code>. Arrow keys move, Enter opens in the current tab, Ctrl/Cmd+Enter or middle-click opens a new one.</li>
+            <li><strong>Lock:</strong> drops the cached index and tells the helper to wipe anything it is holding.</li>
+        </ul>
+
+        <p>Searching matches on host name, title and group, and ranks host names highest — that is usually what you remember. An entry with several addresses (KeePassXC' <em>Additional URLs</em>) shows as one row with a badge; select it and every address unfolds beneath, best match first, so none of them is out of reach.</p>
+
+        <p>The first search after a restart needs your master password. If your database is in the OS keyring — which is what <code>--save-password</code> in step 1 arranges — the helper takes it from there itself, and it never passes through Firefox. If it is not, the popup asks, and the helper keeps it in memory only, wiping it when the idle lock expires or when you press <em>Lock</em>.</p>
+
+        <h2 id="trouble">If something does not work</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Nothing happens when I type <code>kp</code></summary>
+                <div class="answer">
+                    <p>Firefox reads native messaging manifests at startup, so it has to be restarted after <code>install-browser-host</code> — a new window is not enough, the whole application must close.</p>
+                    <p>If a restart does not do it, open the popup: when it cannot reach the helper it says so, and offers a button back to this page.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>It worked, then stopped</summary>
+                <div class="answer">
+                    <p>The manifest records the full path to the client binary. If you moved, renamed or reinstalled it, run <code>keepass-deltasync install-browser-host</code> again.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Is it Firefox or is it my setup?</summary>
+                <div class="answer">
+                    <p>You can exercise the whole chain without the browser involved. This builds the index exactly as a search would and prints what the extension would receive:</p>
+<pre><code>keepass-deltasync browser-host --probe private
+# No keyring entry for private — the extension would prompt here.
+# Masterpassword for private:
+# [ { "title": "Example account", "urls": ["https://example.com/login"], … } ]
+# 1 searchable entries indexed from private.</code></pre>
+                    <p>If that works and the extension does not, the problem is between Firefox and the helper — start with a restart. If it does not work either, the problem is the database binding or <code>keepassxc-cli</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>“keepassxc-cli not found”</summary>
+                <div class="answer">
+                    <p>The helper looks in the usual places for your platform. If yours lives somewhere unusual, confirm that is the problem by pointing at it directly:</p>
+<pre><code>keepass-deltasync browser-host --probe private --keepassxc-cli "/path/to/keepassxc-cli"</code></pre>
+                    <p>To make it stick, add the same flag to the launcher that <code>install-browser-host</code> created — it prints the path to it, and to the manifest, every time you run it.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>The popup says no databases are registered</summary>
+                <div class="answer">
+                    <p>Then the helper is running and answering — steps 2 and 3 are fine — and step 1 has not happened yet. Press <strong>Register database…</strong> in the desktop app, run <code>keepass-deltasync add-local</code>, or pick <strong>Firefox search</strong> in <code>keepass-deltasync tui</code>. <code>keepass-deltasync databases</code> lists what is registered; a search-only database is marked <code>L</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Linux: it says it installed, but nothing happens</summary>
+                <div class="answer">
+                    <p>Almost always the Firefox variant. <code>install-browser-host</code> prints the ones it registered with — if yours is not on that list, it was not installed when you ran the command, and running it again fixes that.</p>
+                    <p>If it <em>is</em> on the list, the sandbox is refusing to start the program: a flatpak without the <code>flatpak override</code> from step 2, or a snap with the binary in a dot-directory. Run the launcher by hand to tell the two apart — it is unconfined there, so if that works, the confinement is what is stopping it:</p>
+<pre><code>echo | ~/snap/firefox/common/keepass-deltasync/browser-host.sh</code></pre>
+                    <p>A stream of binary-looking output is success. <code>Permission denied</code> is not.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">The design and its security boundaries are written up in <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>. If you also want the syncing half of DeltaSync, start on the <a href="getting-started.html">getting started page</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Home</a>
+            &nbsp;·&nbsp;
+            <a href="getting-started.html">Getting started</a>
+            &nbsp;·&nbsp;
+            <a href="da/firefox.html">Dansk</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

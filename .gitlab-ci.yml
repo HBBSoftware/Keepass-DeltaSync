@@ -750,6 +750,38 @@ publish:server-image:
       fi
 
 # ----------------------------------------------------------------------
+# Publish the website
+# ----------------------------------------------------------------------
+#
+# website/ and server/public/ are deployed to the SAME directory on the host:
+# the pages land beside admin.html and index.php. deploy.py therefore only
+# writes the files it is handed and never mirrors — a mirror would delete the
+# API. Set these as masked CI/CD variables before this job can run:
+#
+#   DEPLOY_SFTP_USER      the SFTP account
+#   DEPLOY_SFTP_PASSWORD  its password  (masked, protected)
+#
+# Host and remote path have working defaults in deploy.py, and the host key is
+# pinned there, so a redirected DNS name cannot collect the password.
+
+publish:website:
+  stage: publish
+  image: python:3.13-alpine
+  rules:
+    # Without this the pipeline would go red on every website commit until the
+    # credentials are configured. Absent variables mean "not set up yet", not
+    # "broken".
+    - if: $DEPLOY_SFTP_PASSWORD == null
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - website/**/*
+  before_script:
+    - pip install --quiet --no-cache-dir paramiko
+  script:
+    - python3 website/deploy.py
+
+# ----------------------------------------------------------------------
 # Publish GitLab Release
 # ----------------------------------------------------------------------
 
