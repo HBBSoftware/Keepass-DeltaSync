@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package dk.bjoerckbraun.deltasync
 
+import android.text.format.DateUtils
 import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.content.Intent
 import android.os.Bundle
@@ -31,6 +32,7 @@ import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
+import dk.bjoerckbraun.deltasync.persistence.LastSyncStore
 import dk.bjoerckbraun.deltasync.persistence.SyncProbeStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import dk.bjoerckbraun.deltasync.worker.SyncProbe
@@ -58,11 +60,13 @@ class MainActivity : FragmentActivity() {
     private lateinit var passphraseStore: EncryptedPassphraseStore
     private lateinit var autoSyncSettings: AutoSyncSettingsStore
     private lateinit var probeStore: SyncProbeStore
+    private lateinit var lastSyncStore: LastSyncStore
 
     /** Sikrer at foreground-sync ved app-åbning kun trigges én gang pr. instans. */
     private var foregroundSyncTriggered = false
 
     private lateinit var statusText: TextView
+    private lateinit var lastSyncText: TextView
     private lateinit var versionText: TextView
     private lateinit var enrollButton: MaterialButton
     private lateinit var setupButton: MaterialButton
@@ -94,8 +98,10 @@ class MainActivity : FragmentActivity() {
         passphraseStore = EncryptedPassphraseStore(applicationContext)
         autoSyncSettings = AutoSyncSettingsStore(applicationContext)
         probeStore = SyncProbeStore(applicationContext)
+        lastSyncStore = LastSyncStore(applicationContext)
 
         statusText = findViewById(R.id.statusText)
+        lastSyncText = findViewById(R.id.lastSyncText)
         versionText = findViewById(R.id.versionText)
         enrollButton = findViewById(R.id.enrollButton)
         setupButton = findViewById(R.id.setupButton)
@@ -133,6 +139,7 @@ class MainActivity : FragmentActivity() {
             configStore.clear()
             passphraseStore.clear()
             probeStore.clear()
+            lastSyncStore.clear()
             SyncWorker.cancelPeriodic(applicationContext)
             refreshStatus()
         }
@@ -158,6 +165,7 @@ class MainActivity : FragmentActivity() {
         when {
             credentials == null -> {
                 statusText.text = getString(R.string.status_not_enrolled)
+                lastSyncText.visibility = View.GONE
                 enrollButton.visibility = View.VISIBLE
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.GONE
@@ -173,6 +181,7 @@ class MainActivity : FragmentActivity() {
                     credentials.serverUrl,
                     credentials.deviceId.take(8),
                 )
+                lastSyncText.visibility = View.GONE
                 enrollButton.visibility = View.GONE
                 setupButton.visibility = View.VISIBLE
                 syncNowButton.visibility = View.GONE
@@ -190,6 +199,7 @@ class MainActivity : FragmentActivity() {
                     config.kdbxName,
                     config.databaseId.take(8),
                 )
+                renderLastSync(config.databaseId)
                 enrollButton.visibility = View.GONE
                 setupButton.visibility = View.GONE
                 syncNowButton.visibility = View.VISIBLE
@@ -201,6 +211,31 @@ class MainActivity : FragmentActivity() {
                 updateAutoSyncUi(config.databaseId)
                 maybeForegroundSync(config)
             }
+        }
+    }
+
+    /**
+     * Viser hvornår denne enhed sidst synkroniserede. Formateres med
+     * [DateUtils.getRelativeDateTimeString], som selv vælger "I dag 09.14",
+     * "I går 22.03" eller en fuld dato efter alder, på enhedens eget sprog og
+     * i dens eget klokkeslætsformat — det er ikke noget vi skal bygge selv.
+     */
+    private fun renderLastSync(databaseId: String) {
+        val at = lastSyncStore.load(databaseId)
+        lastSyncText.visibility = View.VISIBLE
+        lastSyncText.text = if (at == null) {
+            getString(R.string.last_sync_never)
+        } else {
+            getString(
+                R.string.last_sync_format,
+                DateUtils.getRelativeDateTimeString(
+                    this,
+                    at,
+                    DateUtils.MINUTE_IN_MILLIS,
+                    DateUtils.WEEK_IN_MILLIS,
+                    0,
+                ),
+            )
         }
     }
 
@@ -233,7 +268,14 @@ class MainActivity : FragmentActivity() {
                     // Probe-fejl (fx netværk) → vær stille; skip (true).
                 }.getOrDefault(true)
             }
-            if (!skip) runSync(passphrase, persistOnSuccess = false, showResultDialog = false)
+            if (skip) {
+                // Samme regel som i SyncWorker: et tjek uden ændringer tæller
+                // som en kørsel, ellers ser et roligt døgn ud som en fejl.
+                lastSyncStore.save(config.databaseId)
+                refreshStatus()
+            } else {
+                runSync(passphrase, persistOnSuccess = false, showResultDialog = false)
+            }
         }
     }
 
@@ -470,6 +512,7 @@ class MainActivity : FragmentActivity() {
                     // baggrunds-workerens næste tick kan kortslutte.
                     SafKdbxFile(applicationContext, config.uri).fingerprint()
                         ?.let { probeStore.save(config.databaseId, it) }
+                    lastSyncStore.save(config.databaseId)
                     if (showResultDialog) {
                         MaterialAlertDialogBuilder(this@MainActivity)
                             .setTitle(R.string.sync_result_ok_title)

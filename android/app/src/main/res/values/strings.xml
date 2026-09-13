@@ -105,4 +105,6 @@
     <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>
     <string name="setup_error_no_databases">No databases on the server. Create one via the desktop client first.</string>
     <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
+    <string name="last_sync_format">Last sync: %1$s</string>
+    <string name="last_sync_never">Not synced yet on this device.</string>
 </resources>

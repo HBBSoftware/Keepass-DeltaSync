@@ -54,6 +54,20 @@
             tools:text="Not enrolled. Tap Enroll to bind this device to a server."
             xmlns:tools="http://schemas.android.com/tools" />
 
+        <!-- Sidste sync. Skjult indtil der har været en, så en frisk
+             installation ikke viser et tomt felt der ligner en fejl. -->
+        <TextView
+            android:id="@+id/lastSyncText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:visibility="gone"
+            tools:text="Last sync: Today 09:14"
+            tools:visibility="visible"
+            xmlns:tools="http://schemas.android.com/tools" />
+
         <ProgressBar
             android:id="@+id/syncProgressBar"
             style="?android:attr/progressBarStyleHorizontal"

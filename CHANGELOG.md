@@ -152,6 +152,38 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [android/v0.4.3] — 2026-09-13
+
+### Fixed
+
+- **The app had no launcher icon outside Android 8+ (Android)** — it shipped
+  `mipmap-anydpi-v26/ic_launcher.xml` and nothing else, so the only devices
+  that could draw it were the ones that understand adaptive icons. Everything
+  else found no matching resource: F-Droid's listing fell back to its default
+  robot, and phones on Android 6 and 7 — inside our own `minSdk 23` — had no
+  icon at all. Ordinary rasters are back in every density bucket, next to the
+  adaptive XML, so new devices are unchanged and old ones stop guessing.
+
+  The listing needed a second thing the APK cannot supply: F-Droid reads
+  `fastlane/metadata/.../images/`, and that directory held only changelogs. It
+  now carries `icon.png` and a `featureGraphic.png`, which is the grey band
+  above the app name on the store page.
+
+### Added
+
+- **The main screen shows when this device last synced (Android)** —
+  background sync is invisible on purpose, which means an app that is working
+  and an app that quietly stopped a week ago looked exactly alike. The time is
+  formatted with `DateUtils.getRelativeDateTimeString`, so it says "Today
+  09:14" or "Yesterday 22:03" in the device's own language and clock format.
+
+  A check that finds nothing to do counts as a run. The probe shortcut skips
+  the expensive decode when neither the file nor the server has changed, and
+  that is by far the common outcome; counting only real transfers would leave
+  the timestamp standing still for days on a quiet database and look exactly
+  like the failure the field exists to rule out. What is stored is therefore
+  "last completed without error", not "last moved data".
+
 ## [android/v0.4.2] — 2026-09-09
 
 ### Added

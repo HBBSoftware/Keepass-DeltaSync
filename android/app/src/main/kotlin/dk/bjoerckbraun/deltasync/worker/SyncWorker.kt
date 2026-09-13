@@ -19,6 +19,7 @@ import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
+import dk.bjoerckbraun.deltasync.persistence.LastSyncStore
 import dk.bjoerckbraun.deltasync.persistence.SyncProbeStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import dk.bjoerckbraun.deltasync.sync.Synchronizer
@@ -81,6 +82,7 @@ class SyncWorker(
         val safFile = SafKdbxFile(applicationContext, config.uri)
         val persistence = DataStoreSyncStatePersistence(applicationContext)
         val probeStore = SyncProbeStore(applicationContext)
+        val lastSyncStore = LastSyncStore(applicationContext)
 
         // Billig probe FØR vi dekoder filen: er den lokale fil uændret siden
         // sidste sync OG serveren uden nye changes, er der intet at gøre — og
@@ -108,6 +110,9 @@ class SyncWorker(
         }
         if (skip) {
             Log.i(TAG, "no changes (seq=$lastSeq, file unchanged) — skipping decode")
+            // Tæller som en kørsel: intet at gøre er også et resultat, og det
+            // er langt det almindeligste. Se LastSyncStore for hvorfor.
+            lastSyncStore.save(config.databaseId)
             return Result.success()
         }
 
@@ -130,6 +135,7 @@ class SyncWorker(
             // Gem nyt fil-fingeraftryk (efter en evt. gen-skrivning) så næste
             // tick kan kortslutte hvis intet ændrer sig.
             safFile.fingerprint()?.let { probeStore.save(config.databaseId, it) }
+            lastSyncStore.save(config.databaseId)
             Result.success()
         } catch (e: IOException) {
             // Netværk nede / server midlertidigt utilgængelig — prøv igen.

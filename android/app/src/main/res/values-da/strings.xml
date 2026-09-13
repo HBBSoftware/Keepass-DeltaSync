@@ -104,4 +104,6 @@
     <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>
     <string name="setup_error_no_databases">Ingen databases på serveren. Opret én via desktop-klienten først.</string>
     <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
+    <string name="last_sync_format">Sidst synkroniseret: %1$s</string>
+    <string name="last_sync_never">Ikke synkroniseret endnu på denne enhed.</string>
 </resources>
