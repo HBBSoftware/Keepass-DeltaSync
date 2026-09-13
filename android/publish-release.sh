@@ -58,7 +58,16 @@ if [ -z "${JAVA_HOME:-}" ]; then
     done
 fi
 
-SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${LOCALAPPDATA:-$HOME}/Android/Sdk}}"
+# local.properties is what Gradle itself reads, it sits next to this script,
+# and it is already correct on any machine that can build the app — so it is a
+# better guess than Android Studio's default path, which is only right when the
+# SDK was installed where the installer wanted it. It is gitignored, hence the
+# fallbacks behind it.
+SDK_FROM_PROPS=""
+if [ -f local.properties ]; then
+    SDK_FROM_PROPS=$(sed -n 's/^[[:space:]]*sdk\.dir[[:space:]]*=[[:space:]]*//p' local.properties | tail -1)
+fi
+SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${SDK_FROM_PROPS:-${LOCALAPPDATA:-$HOME}/Android/Sdk}}}"
 APKSIGNER=""
 AAPT2=""
 # Glob order is lexical, so the last match is the newest build-tools release.
