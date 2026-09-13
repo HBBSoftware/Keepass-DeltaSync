@@ -107,4 +107,8 @@
     <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
     <string name="last_sync_format">Last sync: %1$s</string>
     <string name="last_sync_never">Not synced yet on this device.</string>
+    <string name="last_sync_just_now">just now</string>
+    <string name="unenroll_confirm_title">Forget device credentials?</string>
+    <string name="unenroll_confirm_message">This device stops syncing and loses its identity on the server. Getting it back needs a new one-time enrollment token from whoever administers the server — the phone cannot undo this on its own.\n\nYour local .kdbx file is left untouched.</string>
+    <string name="unenroll_confirm_action">Forget</string>
 </resources>

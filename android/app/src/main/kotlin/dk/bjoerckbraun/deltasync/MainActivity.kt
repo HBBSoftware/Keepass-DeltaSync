@@ -134,14 +134,17 @@ class MainActivity : FragmentActivity() {
             startActivity(Intent(this, ShareActivity::class.java))
         }
 
+        // Bekræftelse først: knappen sidder under de daglige handlinger, og et
+        // fejlramt tryk kaster enhedens token væk. Det kan ikke fortrydes fra
+        // telefonen — der skal et nyt enrollment-token til fra serverens
+        // administrator, før enheden kan komme med igen.
         unenrollButton.setOnClickListener {
-            tokenStore.clear()
-            configStore.clear()
-            passphraseStore.clear()
-            probeStore.clear()
-            lastSyncStore.clear()
-            SyncWorker.cancelPeriodic(applicationContext)
-            refreshStatus()
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.unenroll_confirm_title)
+                .setMessage(R.string.unenroll_confirm_message)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.unenroll_confirm_action) { _, _ -> unenroll() }
+                .show()
         }
 
         // Klik (ikke checked-change) så programmatiske opdateringer i
@@ -223,10 +226,20 @@ class MainActivity : FragmentActivity() {
     private fun renderLastSync(databaseId: String) {
         val at = lastSyncStore.load(databaseId)
         lastSyncText.visibility = View.VISIBLE
-        lastSyncText.text = if (at == null) {
-            getString(R.string.last_sync_never)
-        } else {
-            getString(
+        lastSyncText.text = when {
+            at == null -> getString(R.string.last_sync_never)
+
+            // Under et minut siger getRelativeDateTimeString "for 0 minutter
+            // siden", som læser forkert netop når svaret er bedst muligt. Den
+            // laveste opløsning den tilbyder er minuttet, så tilfældet skal
+            // fanges her.
+            System.currentTimeMillis() - at < DateUtils.MINUTE_IN_MILLIS ->
+                getString(
+                    R.string.last_sync_format,
+                    getString(R.string.last_sync_just_now),
+                )
+
+            else -> getString(
                 R.string.last_sync_format,
                 DateUtils.getRelativeDateTimeString(
                     this,
@@ -318,6 +331,22 @@ class MainActivity : FragmentActivity() {
                 refreshStatus()
             },
         )
+    }
+
+    /**
+     * Kaster alt hvad der binder telefonen til serveren væk: enheds-token,
+     * databasevalg, husket password, probe-fingeraftryk og synk-tidspunkt.
+     * Den lokale .kdbx-fil røres ikke — den ligger i brugerens eget drev og
+     * er ikke vores at slette.
+     */
+    private fun unenroll() {
+        tokenStore.clear()
+        configStore.clear()
+        passphraseStore.clear()
+        probeStore.clear()
+        lastSyncStore.clear()
+        SyncWorker.cancelPeriodic(applicationContext)
+        refreshStatus()
     }
 
     /** Bruger slog auto-sync fra: ryd det gemte password og stop worker'en. */

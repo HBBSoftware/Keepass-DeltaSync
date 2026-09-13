@@ -106,4 +106,8 @@
     <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
     <string name="last_sync_format">Sidst synkroniseret: %1$s</string>
     <string name="last_sync_never">Ikke synkroniseret endnu på denne enhed.</string>
+    <string name="last_sync_just_now">lige nu</string>
+    <string name="unenroll_confirm_title">Glem enhedens credentials?</string>
+    <string name="unenroll_confirm_message">Enheden holder op med at synkronisere og mister sin identitet på serveren. For at få den tilbage skal du bruge et nyt engangs-enrollment-token fra den der administrerer serveren — telefonen kan ikke fortryde det selv.\n\nDin lokale .kdbx-fil røres ikke.</string>
+    <string name="unenroll_confirm_action">Glem</string>
 </resources>

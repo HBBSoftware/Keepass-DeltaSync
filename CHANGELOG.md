@@ -171,11 +171,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Forgetting the device credentials asks first (Android)** — the button sits
+  below the everyday actions, and one mistaken tap threw the device token
+  away. Nothing on the phone can undo that: the device has lost its identity
+  on the server, and getting it back takes a fresh one-time enrollment token
+  from whoever administers it. The dialog says so, and says that the local
+  .kdbx file is not touched.
+
 - **The main screen shows when this device last synced (Android)** —
   background sync is invisible on purpose, which means an app that is working
   and an app that quietly stopped a week ago looked exactly alike. The time is
   formatted with `DateUtils.getRelativeDateTimeString`, so it says "Today
   09:14" or "Yesterday 22:03" in the device's own language and clock format.
+
+  Under a minute it says "just now": the lowest resolution
+  `getRelativeDateTimeString` offers is the minute, so a sync seconds old came
+  out as "0 minutes ago" — reading like a fault exactly when the answer is as
+  good as it gets.
 
   A check that finds nothing to do counts as a run. The probe shortcut skips
   the expensive decode when neither the file nor the server has changed, and

@@ -2,3 +2,4 @@ The app has an icon again, and it tells you when it last synced.
 
 • The launcher icon is back. The app shipped only an adaptive icon, which Android 8 and newer can draw but nothing else can: F-Droid's listing fell back to its placeholder robot, and phones on Android 6 and 7 had no icon at all. Ordinary icons are included again alongside the adaptive one.
 • The main screen shows when this device last synced. Background sync is invisible by design, so an app that is working and one that stopped a week ago looked exactly alike. A check that finds nothing to do counts as a run — that is the common case, and only counting transfers would leave the time standing still on a quiet database.
+• Forgetting this device's credentials asks for confirmation first. One mistaken tap used to throw the device token away, and nothing on the phone can undo that — it takes a new enrollment token from whoever runs the server.
