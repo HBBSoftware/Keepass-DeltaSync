@@ -184,44 +184,45 @@ other non-http schemes) are filtered out before that call.
 
 ## Notes to certification
 
+Edge puts this on the final *Submit* page, under a 2,000-character limit that
+counts line breaks, and the page has no save button: the text is only kept
+when you press Publish. Paste it from here. Say **Yes** to "does a tester need
+credentials or other info" — not credentials, but the client.
+
+The client named in step 2 must already be released, and must carry this
+store's ID. Otherwise the reviewer gets "cannot reach the host" and rejects it.
+
 ```
 WHAT IT DOES
+A search box over the titles and URLs in the user's own local KeePass database, with navigation to the entry's website. The Chromium build of "DeltaSync — KeePass search & go" on addons.mozilla.org; same source files.
 
-A search box over the titles and URLs in the reviewer's own KeePass database,
-with navigation to the entry's site. It is the Chromium build of an add-on
-that has been on addons.mozilla.org since August 2026 as "DeltaSync — KeePass
-search & go"; the sources are shared, and this package differs only in a
-service worker entry point, raster icons, and a small shim that builds the
-`browser` namespace out of `chrome`.
+NO ACCOUNT OR SERVER NEEDED
+No test credentials exist. The extension talks only to a separately installed local program over native messaging. No account, server or network.
 
-TESTING IT WITHOUT A SERVER OR AN ACCOUNT
+HOW TO TEST (Windows, about 5 minutes)
+1. Install KeePassXC: https://keepassxc.org/download/
+2. Download keepass-deltasync 1.9.0 or newer (Windows binary): https://gitlab.com/Star95/keepass-deltasync/-/releases
+3. In PowerShell, in the folder with the binary, create a demo database and register it. Pick any password when asked, and reuse it:
+& "C:\Program Files\KeePassXC\keepassxc-cli.exe" db-create -p demo.kdbx
+& "C:\Program Files\KeePassXC\keepassxc-cli.exe" add -u alice --url https://example.org -g -L 16 demo.kdbx "Example site"
+.\keepass-deltasync.exe add-local demo .\demo.kdbx --save-password
+4. Register the native messaging host (the client already knows this extension's ID):
+.\keepass-deltasync.exe install-browser-host
+5. Fully close and restart Edge.
+6. Open the popup (toolbar button or Alt+Shift+K), type "exa", press Enter: example.org opens. Or type "kp exa" in the address bar.
 
-Neither is needed. The extension is useless without the native host, so
-testing it end to end means installing the client first:
+WITHOUT THE CLIENT
+The popup says it cannot reach the host and links to https://deltasync.org/chrome.html. That is intended.
 
-  1. Take keepass-deltasync from
-     https://gitlab.com/Star95/keepass-deltasync/-/releases
-  2. keepassxc-cli db-create -p demo.kdbx
-     keepassxc-cli add -u alice --url https://example.org -g -L 16 demo.kdbx "Example site"
-  3. keepass-deltasync add-local demo ./demo.kdbx --save-password
-  4. keepass-deltasync install-browser-host --extension-id <this extension's ID>
-  5. Open the popup, type "exa", press Enter.
+CHECK WITHOUT A BROWSER
+.\keepass-deltasync.exe browser-host --probe demo
+prints exactly what the extension receives: uuid, title, URLs, group path. Never passwords or usernames.
 
-Step 4 needs the ID because a Chromium native messaging manifest names the
-callers it will accept. Without it the popup reports that it cannot reach the
-host, and offers a link to the setup page — which is the intended behaviour
-when the client is absent, and what a user without the client will see.
+PERMISSIONS
+nativeMessaging: the only channel, to the local program. storage: session storage for the entry index, cleared when the browser closes. No host permissions, content scripts or remote code.
 
-  keepass-deltasync browser-host --probe demo
-
-prints exactly what the extension would receive, with no browser involved.
-
-SOURCE
-
-No build step and no minification: the package is the sources, and
-package.sh produces it byte-for-byte reproducibly from a git tag.
+Source (GPL-3.0): https://gitlab.com/Star95/keepass-deltasync
 ```
-
 ---
 
 ## Where each store asks for what
