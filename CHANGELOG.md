@@ -181,6 +181,49 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [client/v1.9.0] — 2026-09-14
+
+The browser host now serves Chrome and Edge as well as Firefox, and the client
+trusts the Edge Add-ons build of the extension without being told its ID. This
+is the release the Edge listing points reviewers and users at; older clients
+register with Firefox only.
+
+### Added
+
+- **`install-browser-host` registers with Chromium browsers.** Chrome,
+  Chromium and Edge each get their own manifest next to Firefox's, with the
+  caller named in `allowed_origins` rather than Firefox's
+  `allowed_extensions` — the wrong form means the host never starts, and says
+  nothing. Brave, Vivaldi and Opera are covered from each vendor's
+  documentation and are untested; Opera has no branch of its own on Windows
+  and macOS and is served by Chrome's.
+
+  The Edge Add-ons ID, `dpmaneajjlanhipmbgdpdnfljiigdnjo`, is built in. Any
+  other build — the Chrome Web Store's once it exists, or one loaded unpacked
+  — comes in with `--extension-id`, which may be repeated. A Chromium browser
+  with no ID to allow is skipped rather than given an empty allow-list. Setup
+  is written up at <https://deltasync.org/chrome.html>.
+
+### Changed
+
+- **The help texts no longer say Firefox where they mean any browser** —
+  `browser-host`, `install-browser-host` and `add-local`.
+
+### Fixed
+
+- **Deleting a folder left its entries alive on every other device.** KeePass
+  moves a deleted group into the recycle bin with its contents, so the entries
+  sit in a subgroup of the bin. Only the bin's direct children were treated as
+  deleted, so those entries were pushed as live, under a group the same sync
+  was tombstoning — and resurfaced in the root elsewhere. The recycle-bin
+  marker now carries down the whole subtree.
+- **A large folder deletion was refused as if it were corruption.** The
+  mass-deletion guard counted groups sitting in the recycle bin as missing, so
+  one folder with five or more subfolders could trip it and sync nothing. Only
+  groups that vanished without a trace count now. A group tombstone pulled
+  from the server is also dropped from the known groups, so the next sync does
+  not send the deletion again and feed the guard false suspicion.
+
 ## [android/v0.4.3] — 2026-09-13
 
 ### Fixed

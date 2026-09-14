@@ -37,7 +37,7 @@ func runAddLocal(args []string) error {
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync add-local <name> <local.kdbx> [--save-password]")
 		fmt.Fprintln(fs.Output(), "\nRegisters a .kdbx for local search only — no server, no enrollment, no sync.")
-		fmt.Fprintln(fs.Output(), "This is what the Firefox extension needs in order to see the database.")
+		fmt.Fprintln(fs.Output(), "This is what the browser extension needs in order to see the database.")
 		fs.PrintDefaults()
 	}
 	// `add-local mydb ~/db.kdbx --save-password` er den rækkefølge folk
@@ -133,7 +133,7 @@ func runAddLocal(args []string) error {
 		fmt.Printf("  Masterpassword: not stored — the extension will ask for it\n")
 	}
 	fmt.Printf("\nThis database is NOT synced. Run `keepass-deltasync install-browser-host`\n")
-	fmt.Printf("and restart Firefox if you have not already done so.\n")
+	fmt.Printf("and restart the browser if you have not already done so.\n")
 	return nil
 }
 

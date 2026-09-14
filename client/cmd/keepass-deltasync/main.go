@@ -40,8 +40,8 @@ Commands:
   devices remove <id>         Revoke an enrolled device (its token becomes invalid)
   databases                   List registered databases (local + server)
   log                         Show this user's recent audit-log activity
-  browser-host                Native messaging host for the Firefox extension (search + open URL)
-  install-browser-host        Register the browser host with Firefox
+  browser-host                Native messaging host for the browser extension (search + open URL)
+  install-browser-host        Register the browser host with Firefox, Chrome and Edge
   uninstall-browser-host      Remove the browser host registration
   tui                         Interactive full-screen menu for the commands above
   admin <subcommand>          Admin commands (token-sql, user-create, user-list, ...)

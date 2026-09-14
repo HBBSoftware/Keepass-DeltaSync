@@ -126,8 +126,8 @@ func runBrowserHost(args []string) error {
 	pwStdin := fs.Bool("password-stdin", false, "with --probe: read masterpassword from stdin instead of prompting")
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync browser-host [--probe NAME] [--idle-lock DURATION] [--keepassxc-cli PATH]")
-		fmt.Fprintln(fs.Output(), "\nSpeaks Firefox' native messaging protocol on stdin/stdout. Normally launched")
-		fmt.Fprintln(fs.Output(), "by Firefox itself — see `keepass-deltasync install-browser-host`.")
+		fmt.Fprintln(fs.Output(), "\nSpeaks the browser's native messaging protocol on stdin/stdout. Normally launched")
+		fmt.Fprintln(fs.Output(), "by the browser itself — see `keepass-deltasync install-browser-host`.")
 		fs.PrintDefaults()
 	}
 	// Firefox starter hosten med manifest-stien som argument. Den er
