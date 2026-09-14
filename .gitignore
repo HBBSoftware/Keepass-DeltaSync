@@ -20,3 +20,7 @@ desktop.ini
 dist/
 
 # Build / language-specifikt sniges ind via komponent-mappers egne .gitignore
+
+# Chrome/Edge-pakkens bygge-output. build/unpacked/ er samlet af extension/
+# og extension-chromium/ og indeholder derfor kun kopier.
+extension-chromium/build/

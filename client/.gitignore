@@ -3,3 +3,10 @@
 /keepass-deltasync.exe
 /cmd/keepass-deltasync/keepass-deltasync
 /cmd/keepass-deltasync/keepass-deltasync.exe
+
+# Windows only: when the target .exe is locked — the binary is running, or a
+# virus scanner still holds it — the Go linker cannot overwrite it, so it
+# renames the old one out of the way with a trailing tilde and writes a fresh
+# .exe. The leftover is a full 13 MB binary that the rules above do not match.
+/keepass-deltasync.exe~
+/cmd/keepass-deltasync/keepass-deltasync.exe~

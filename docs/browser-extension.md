@@ -20,7 +20,7 @@ og URL, aldrig hemmeligheder.** Det gør trusselsmodellen billig og tillader et
 manifest uden en eneste host permission.
 
 Ikke-mål i denne omgang: autofill, TOTP, oprettelse/redigering af entries,
-visning af passwords, Chrome-support, Firefox for Android.
+visning af passwords, Firefox for Android.
 
 ## Grundlag der genbruges
 
@@ -251,7 +251,7 @@ adaptive-icon gør.
 6. ✅ Signering og distribution: udvidelsen er listet på AMO som
    [DeltaSync — KeePass search & go](https://addons.mozilla.org/firefox/addon/deltasync-keepass-search-go/).
    0.1.1 blev godkendt 2026-08-23, 0.2.0 den 2026-08-24. Udestår:
-   Chromium-manifest og Firefox for Android.
+   Firefox for Android.
 
 Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
 
@@ -299,6 +299,33 @@ Efterfølgende tilføjet, som svar på at onboardingen ikke hang sammen:
     op igen efter et `lock`: fil-watchen bliver stående, og udvidelsen
     genindekserede på et hvilket som helst event. Nu genindekseres kun en
     database der allerede HAR et indeks.
+11. **Chrome og Edge** — `extension-chromium/` bygger samme udvidelse til de
+    to Chromium-browsere ud af den delte kode i `extension/`. Se
+    [`extension-chromium/README.md`](../extension-chromium/README.md).
+
+    Tre ting skiller de to familier ad, og de er alle tre værd at kende:
+
+    - **Svarmodellen.** Firefox lader en `onMessage`-lytter svare ved at
+      returnere et løfte. Chromium kræver `sendResponse` plus `return
+      true`. Uden broen i `compat.js` — som er hele grunden til at filen
+      findes — ville hver eneste popup stå tom.
+    - **Manifestets form.** Firefox lister udvidelses-id'er i
+      `allowed_extensions`, Chromium hele oprindelser i `allowed_origins`.
+      `install-browser-host` skriver derfor ét manifest per browser, og
+      målene bærer et flag der afgør formen. Får en browser den anden
+      forms felt, starter hosten aldrig, og hverken browseren eller hosten
+      siger hvorfor.
+    - **Id'et.** I Firefox vælger vi det selv og skriver det to steder —
+      manifestet og `browserExtensionID`. I Chromium udleder browseren det
+      af butikkens signeringsnøgle, så det findes ikke før udvidelsen er
+      uploadet, og Chrome Web Store og Edge Add-ons giver hver sit. Indtil
+      da kommer det ind med `--extension-id`.
+
+    Og én forskel i drift: Chromium lukker sin service worker ned når den
+    har været inaktiv, hvilket lukker porten og afslutter hosten — med
+    dens idle-unlock. Indekset ligger i session storage og overlever, så
+    en søgning svarer stadig; regningen kommer først ved en
+    genopfriskning, som låser op igen fra keyringen.
 
 Alt er bygget, og 0.2.0 ligger signeret på AMO. Live-testen er kørt
 2026-08-24 i en ren Windows Sandbox: installer → `add-local` →
