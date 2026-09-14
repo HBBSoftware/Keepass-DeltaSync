@@ -47,11 +47,12 @@ type nativeManifest struct {
 // ikke før udvidelsen er uploadet, og Chrome Web Store og Edge Add-ons giver
 // hver sit.
 //
-// Derfor er listen tom her og fyldes med --extension-id indtil de to butikker
-// har svaret. Et id under udvikling står på chrome://extensions når pakken er
-// indlæst med "Load unpacked"; det ændrer sig ikke så længe mappen ligger det
-// samme sted.
-var chromiumExtensionIDs = []string{}
+// Et id der mangler her, gives med --extension-id. Et id under udvikling står
+// på chrome://extensions når pakken er indlæst med "Load unpacked"; det ændrer
+// sig ikke så længe mappen ligger det samme sted.
+var chromiumExtensionIDs = []string{
+	"dpmaneajjlanhipmbgdpdnfljiigdnjo", // Edge Add-ons
+}
 
 // stringList samler et flag der må gentages. flag-pakken kan ikke selv, og
 // --extension-id skal kunne nævnes én gang per browser.

@@ -96,13 +96,14 @@ SUBSTITUTIONS = {
         ),
     ],
     "popup.js": [
-        # Kun værten skifter. chrome.html bærer med vilje de samme to ankre
+        # Kun adressen skifter. chrome.html bærer med vilje de samme to ankre
         # som firefox.html, så de to linjer der udleder #host og #standalone
         # kan blive stående — og skrives de om i Firefox-udgaven, følger
-        # begge udgaver med på én gang.
+        # begge udgaver med på én gang. Domænet er det kanoniske, ikke det
+        # Firefox-udgaven stadig bærer.
         (
             'const SETUP_URL = "https://deltasync.bjoerck-braun.dk/firefox.html";',
-            'const SETUP_URL = "https://deltasync.bjoerck-braun.dk/chrome.html";',
+            'const SETUP_URL = "https://deltasync.org/chrome.html";',
         ),
         (
             '      "Firefox cannot reach the keepass-deltasync host. It has to be installed and registered once, outside the browser.",',

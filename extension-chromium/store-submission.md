@@ -34,8 +34,9 @@ Everything here is **English**. Neither listing has another locale.
   markdown file.
 
 - **The website page must be live.** The popup's two dead ends link to
-  `https://deltasync.bjoerck-braun.dk/chrome.html`. A package uploaded before
-  that page is uploaded ships a link to a 404.
+  `https://deltasync.org/chrome.html`. A package uploaded before that page is
+  uploaded ships a link to a 404. Edge Add-ons also checks every URL in the
+  description when the listing is saved, and refuses one that does not answer.
 
 - **Screenshots must not show real entries.** The popup lists titles and
   addresses from whatever database is unlocked. Make a throwaway database for
@@ -49,10 +50,13 @@ Everything here is **English**. Neither listing has another locale.
 
 - **Do not publish yet.** Create the submission, note the extension's ID, and
   put it into `chromiumExtensionIDs` in
-  `client/cmd/keepass-deltasync/browser_install.go` first. A published
-  extension that the client refuses to talk to is a bad first impression, and
-  it is the same trap the Firefox extension fell into in August when it shipped
-  ahead of the client command it told people to run.
+  `client/cmd/keepass-deltasync/browser_install.go` first — and release that
+  client. A published extension that the client refuses to talk to is a bad
+  first impression, and it is the same trap the Firefox extension fell into in
+  August when it shipped ahead of the client command it told people to run.
+
+  Recorded so far: **Edge Add-ons** `dpmaneajjlanhipmbgdpdnfljiigdnjo`
+  (Store ID `0RDCKFJ7FBFG`). Chrome Web Store: not submitted.
 
 ## Assets
 
@@ -112,7 +116,7 @@ account and no server are involved in searching — that is the optional, other
 half of DeltaSync.
 
 Setup takes two commands and is written up here:
-https://deltasync.bjoerck-braun.dk/chrome.html
+https://deltasync.org/chrome.html
 
 HOW IT SEARCHES
 
@@ -152,7 +156,7 @@ Answer: the extension collects nothing.
 - **Where does what it reads live?** In `storage.session`, which is memory
   only and is dropped when the browser closes.
 - **Privacy policy URL:**
-  `https://deltasync.bjoerck-braun.dk/privacy.html`
+  `https://deltasync.org/privacy.html`
 
 ## Permission justification
 
