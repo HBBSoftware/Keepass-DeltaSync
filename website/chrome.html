@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome and Edge extension — DeltaSync</title>
+    <meta name="description" content="How to install and use the DeltaSync extension in Microsoft Edge and Chrome — search your KeePass entries from the address bar and open the entry's site. Works with or without a DeltaSync server.">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="apple-touch-icon" href="assets/icon-128.png">
+    <link rel="stylesheet" href="style.css">
+    <meta property="og:title" content="DeltaSync for Edge and Chrome">
+    <meta property="og:description" content="Search your KeePass entries from the address bar and open the right page.">
+    <meta property="og:image" content="assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.org/chrome.html">
+    <link rel="alternate" hreflang="en" href="https://deltasync.org/chrome.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.org/da/chrome.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.org/chrome.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Home</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="getting-started.html">Getting started</a>
+            <a href="deploy-server.html">Deploy server</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="chrome.html" class="active" hreflang="en">EN</a>
+                <a href="da/chrome.html" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>DeltaSync for Edge and Chrome</h1>
+
+        <p>Type <code>kp</code> in the address bar, a space, then a few letters of the account you are looking for, and the browser takes you to that entry's website. That is the whole extension. It answers the question a password manager leaves you with — <em>which site was that account on again?</em> — and then gets out of the way.</p>
+
+        <p><strong>Logging in is not its job.</strong> That stays with <a href="https://github.com/keepassxreboot/keepassxc-browser">KeePassXC-Browser</a>, which fills credentials but cannot help you find the page in the first place. This closes that gap and nothing else, which is why it never needs to see a password.</p>
+
+        <div class="callout">
+            <strong>What it can see:</strong> entry titles, their web addresses, and group names. Nothing else — the list is enforced on the other side of the connection, in the program that reads your database, so a bug in the extension cannot widen it. The extension also requests <em>no</em> host permissions, so it cannot read the pages you visit. The <a href="privacy.html">privacy page</a> has the details.
+        </div>
+
+        <p>It is the same extension as <a href="firefox.html">the Firefox one</a>, built from the same source files. Only the packaging differs.</p>
+
+        <h2>You do not need a DeltaSync server</h2>
+
+        <p>DeltaSync is normally a sync system with a server behind it, but a search never touches the network: the extension asks a small local helper, which reads your own <code>.kdbx</code> file and answers from that alone. So there are two ways to set this up, and the second one has nothing to do with syncing:</p>
+
+        <ul>
+            <li><strong>You already use DeltaSync</strong> — your database is registered with the client, and there is nothing extra to configure. Skip to <a href="#host">step 2</a>.</li>
+            <li><strong>You just want the search</strong> — install the client, point it at your <code>.kdbx</code> with one command, and never enroll against a server at all. That is <a href="#standalone">step 1</a> below.</li>
+        </ul>
+
+        <h2>What you need</h2>
+
+        <ul>
+            <li><a href="https://keepassxc.org/">KeePassXC</a>, for its <code>keepassxc-cli</code> — that is what actually opens your database</li>
+            <li>The <code>keepass-deltasync</code> client, <strong>version 1.9.0 or newer</strong>: a <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">pre-built binary</a> for Linux, macOS or Windows, or the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">Windows installer</a>, which brings it along. Older clients only know Firefox.</li>
+            <li>Microsoft Edge or Google Chrome, version 116 or newer</li>
+        </ul>
+
+        <h2 id="standalone">Step 1 — point the client at your database</h2>
+
+        <p><strong>If you already sync with DeltaSync</strong>, this is done: <code>enroll</code> and <code>init</code> registered the database when you set the client up. Move on to step 2.</p>
+
+        <p><strong>If you have no server</strong>, the client still needs to know which file to search. One command tells it, and nothing about that file goes anywhere:</p>
+
+<pre><code>keepass-deltasync add-local private ~/keepass/my.kdbx --save-password</code></pre>
+
+        <p><code>private</code> is only a label — it appears in the popup when more than one database is unlocked. Repeat the command for each file you want searchable. No server, no token, no account is involved.</p>
+
+        <p><code>--save-password</code> is optional, but in Edge and Chrome it is worth having. The master password is verified by opening the database before it is kept, and it goes into your operating system's keyring — never into a file. Without it you are asked more often than in Firefox, for a reason explained <a href="#unlock">under Using it</a>.</p>
+
+        <h3>Windows: where the client is, and where to type</h3>
+
+        <p>The installer puts the app and the command-line client in the same folder, and which folder depends on the install you chose:</p>
+
+        <ul>
+            <li><em>Just for me</em> — the default, no administrator prompt: <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync\</code></li>
+            <li><em>For all users</em>: <code>C:\Program Files\KeePass Delta-Sync\</code></li>
+        </ul>
+
+        <p><code>keepass-deltasync.exe</code> in that folder is what every command on this page means. It is <strong>not</strong> on your <code>PATH</code>, so the quickest way to a terminal that can see it is to open the folder in Explorer, click the address bar, type <code>powershell</code> and press Enter. The terminal opens in that folder, and the commands work with <code>.\</code> in front:</p>
+
+<pre><code>.\keepass-deltasync.exe add-local private C:\Users\you\Documents\my.kdbx --save-password</code></pre>
+
+        <h2 id="host">Step 2 — let the browser talk to the client</h2>
+
+        <p>A browser will not run a program unless it has been told about it first. One command does that:</p>
+
+<pre><code>keepass-deltasync install-browser-host</code></pre>
+
+        <p>It writes a small manifest for every browser it finds — Edge, Chrome and Firefox alike — into your own user profile, and on Windows a registry key under <code>HKCU</code>. No administrator is needed. Add <code>--dry-run</code> first if you would like to see exactly what it would write. Run it again if you ever move the binary, since the manifest records where it lives.</p>
+
+        <p>Read what it prints: it lists every browser it registered with, and that list is the answer to whether it found <em>yours</em>. In the desktop app, the <strong>Register with Firefox</strong> button runs this same command, so it registers Edge and Chrome too.</p>
+
+        <p>The manifest names the extensions allowed to connect, and the client already knows the one from Edge Add-ons. Nothing to copy, no ID to look up.</p>
+
+        <h3>macOS: clear the quarantine flag</h3>
+
+        <p>macOS marks anything downloaded with a browser, and the browser starts the helper without a dialog you could approve — so a marked binary dies silently. Clear it once:</p>
+
+<pre><code>xattr -d com.apple.quarantine /usr/local/bin/keepass-deltasync</code></pre>
+
+        <h3>Linux: snap and flatpak browsers are not covered</h3>
+
+        <p>A Chromium or Chrome installed as a snap or a flatpak runs in a sandbox that needs special handling, and none of it has been tried. A browser from your distribution's packages or from the vendor's own <code>.deb</code> or <code>.rpm</code> works.</p>
+
+        <h2 id="extension">Step 3 — install the extension</h2>
+
+        <h3>Microsoft Edge</h3>
+
+        <p>It is on Microsoft's own add-on store, signed and reviewed:</p>
+
+        <p><a class="btn btn-primary" href="https://microsoftedge.microsoft.com/addons/detail/dpmaneajjlanhipmbgdpdnfljiigdnjo">Get DeltaSync — KeePass search &amp; go</a></p>
+
+        <p>It asks for two permissions: <em>native messaging</em>, which is how it reaches the client from step 2, and <em>storage</em>, which holds the search index for as long as the browser is open. It requests no host permissions and runs no content scripts, so it cannot see the pages you visit — and it never receives a password from your database.</p>
+
+        <p><strong>Restart Edge</strong> after step 2 if you have not already, and make sure it really closes. Edge's <em>Startup boost</em> keeps it running in the background after the last window is gone; turn it off under <code>edge://settings/system</code> if a restart does not seem to take.</p>
+
+        <h3>Chrome, Brave, Vivaldi and Opera</h3>
+
+        <p>The extension is not in the Chrome Web Store yet. Until it is, install it from source, as below. The client registers itself with all four browsers, but only Chrome and Edge have actually been tested.</p>
+
+        <h3 id="source">From source</h3>
+
+        <p>The package is plain files with no build step, and the zip published on the <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases page</a> is byte-reproducible from its tag — so you can check that what you install is what the source says. To load it:</p>
+
+        <ol>
+            <li>From a clone, run <code>./package.sh --dev</code> in <code>extension-chromium/</code>. It builds the extension into <code>extension-chromium/build/unpacked/</code>.</li>
+            <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) and turn on <strong>Developer mode</strong>.</li>
+            <li><strong>Load unpacked</strong>, and pick the <code>build/unpacked</code> folder.</li>
+            <li>Tell the client about this copy — it carries a different ID from the store version, and the client does not trust it on its own:
+<pre><code>keepass-deltasync install-browser-host --extension-id iocbdcgjepgmakdgfnhlanbncnfmgeof</code></pre></li>
+            <li>Restart the browser.</li>
+        </ol>
+
+        <p>The store version and a source build have different IDs, so both can be installed at once.</p>
+
+        <h2>Using it</h2>
+
+        <ul>
+            <li><strong>Address bar:</strong> type <code>kp</code>, a space, then your search. Pick a suggestion and press Enter.</li>
+            <li><strong>Popup:</strong> the toolbar button, or <code>Alt+Shift+K</code>. Arrow keys move, Enter opens in the current tab, Ctrl/Cmd+Enter or middle-click opens a new one. New extensions start hidden under the puzzle-piece icon; pin it there to keep the button in view.</li>
+            <li><strong>Lock:</strong> drops the cached index and tells the helper to wipe anything it is holding.</li>
+        </ul>
+
+        <p>Searching matches on host name, title and group, and ranks host names highest — that is usually what you remember. An entry with several addresses (KeePassXC's <em>Additional URLs</em>) shows as one row with a badge; select it and every address unfolds beneath, best match first, so none of them is out of reach.</p>
+
+        <p id="unlock">The first search after a restart needs your master password. If your database is in the OS keyring — which is what <code>--save-password</code> in step 1 arranges — the helper takes it from there itself, and it never passes through the browser. If it is not, the popup asks, and the helper keeps it in memory only.</p>
+
+        <p>This is where Edge and Chrome differ from Firefox. They shut an extension's background worker down when it has been idle for a little while, and the helper ends with it, taking a typed password along. The search index survives, so searching still answers at once — but the next time the index is refreshed, the database has to be opened again. From the keyring that takes a few seconds and asks nothing. Without it, the popup asks again.</p>
+
+        <h2 id="trouble">If something does not work</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>The popup says it cannot reach the host</summary>
+                <div class="answer">
+                    <p>The browser reads native messaging manifests at startup, so it has to be restarted after <code>install-browser-host</code> — a new window is not enough, the whole application must close. On Windows that includes Edge's <em>Startup boost</em> and Chrome's <em>Continue running background apps</em>: with either on, closing every window leaves the browser running.</p>
+                    <p>If a restart does not do it, check the client's version with <code>keepass-deltasync version</code>. Anything older than 1.9.0 does not know Edge or Chrome, and registers only Firefox.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>It worked, then stopped</summary>
+                <div class="answer">
+                    <p>The manifest records the full path to the client binary. If you moved, renamed or reinstalled it, run <code>keepass-deltasync install-browser-host</code> again.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>The version from source cannot connect, but the store version can</summary>
+                <div class="answer">
+                    <p>The client trusts the store's ID by itself, and a source build's only when asked. Run <code>install-browser-host</code> with <code>--extension-id</code> as in <a href="#source">From source</a>. If you loaded the folder without <code>--dev</code>, the browser made up an ID of its own; it is shown on the extension's card in <code>chrome://extensions</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Is it the browser or is it my setup?</summary>
+                <div class="answer">
+                    <p>You can exercise the whole chain without the browser involved. This builds the index exactly as a search would and prints what the extension would receive:</p>
+<pre><code>keepass-deltasync browser-host --probe private
+# No keyring entry for private — the extension would prompt here.
+# Masterpassword for private:
+# [ { "title": "Example account", "urls": ["https://example.com/login"], … } ]
+# 1 searchable entries indexed from private.</code></pre>
+                    <p>If that works and the extension does not, the problem is between the browser and the helper — start with a restart. If it does not work either, the problem is the database binding or <code>keepassxc-cli</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>“keepassxc-cli not found”</summary>
+                <div class="answer">
+                    <p>The helper looks in the usual places for your platform. If yours lives somewhere unusual, confirm that is the problem by pointing at it directly:</p>
+<pre><code>keepass-deltasync browser-host --probe private --keepassxc-cli "/path/to/keepassxc-cli"</code></pre>
+                    <p>To make it stick, add the same flag to the launcher that <code>install-browser-host</code> created — it prints the path to it, and to the manifest, every time you run it.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>The popup says no databases are registered</summary>
+                <div class="answer">
+                    <p>Then the helper is running and answering — steps 2 and 3 are fine — and step 1 has not happened yet. Run <code>keepass-deltasync add-local</code>, or press <strong>Register database…</strong> in the desktop app. <code>keepass-deltasync databases</code> lists what is registered; a search-only database is marked <code>L</code>.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">The design and its security boundaries are written up in <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>. If you also want the syncing half of DeltaSync, start on the <a href="getting-started.html">getting started page</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Home</a>
+            &nbsp;·&nbsp;
+            <a href="privacy.html">Privacy</a>
+            &nbsp;·&nbsp;
+            <a href="da/chrome.html">Dansk</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

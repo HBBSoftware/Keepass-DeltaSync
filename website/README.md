@@ -13,9 +13,11 @@ Live at <https://deltasync.org/>.
 - `deploy-server.html` — beginner-friendly, step-by-step server deployment guide (upload, setup.php, first user)
 - `faq.html` — questions that come up in practice (devices, bindings, the stored master password, sharing, the desktop app, the Firefox extension)
 - `firefox.html` — install page for the Firefox extension, written to be the add-on listing's homepage: it covers both the DeltaSync-server route and the standalone one, and assumes nothing about the reader having a server
+- `chrome.html` — the same for Edge and Chrome. The popup's setup buttons link here with `#host` and `#standalone`, so those two anchors must stay
+- `privacy.html` — privacy policy for the browser extension, linked from the store listings
 
 **Dansk (under `/da/`):**
-- `da/index.html` · `da/architecture.html` · `da/getting-started.html` · `da/deploy-server.html` · `da/faq.html` · `da/firefox.html` — danske oversættelser
+- `da/index.html` · `da/architecture.html` · `da/getting-started.html` · `da/deploy-server.html` · `da/faq.html` · `da/firefox.html` · `da/chrome.html` · `da/privacy.html` — danske oversættelser
 
 **Shared:**
 - `style.css` — design tokens + base styles (light + dark via `prefers-color-scheme`)

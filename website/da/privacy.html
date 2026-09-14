@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privatliv — DeltaSync</title>
+    <meta name="description" content="Hvad DeltaSyncs browserudvidelse kan læse, hvor den gemmer det, og hvad den sender: intet forlader din computer.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="apple-touch-icon" href="../assets/icon-128.png">
+    <link rel="stylesheet" href="../style.css">
+    <meta property="og:title" content="DeltaSync — privatliv">
+    <meta property="og:description" content="Hvad DeltaSyncs browserudvidelse kan læse, og hvorfor intet af det forlader din computer.">
+    <meta property="og:image" content="../assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.org/da/privacy.html">
+    <link rel="alternate" hreflang="en" href="https://deltasync.org/privacy.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.org/da/privacy.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.org/privacy.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html">Server-opsætning</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="../privacy.html" hreflang="en">EN</a>
+                <a href="privacy.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>Privatliv</h1>
+
+        <p>Denne side gælder browserudvidelsen <strong>DeltaSync — KeePass search &amp; go</strong> i alle de browsere, den er udgivet til: Firefox, Microsoft Edge og Chrome. Kort sagt indsamler den intet og sender intet nogen steder hen.</p>
+
+        <p>Den engelske udgave er den, butikkerne linker til. Står der noget forskelligt, er det den, der gælder.</p>
+
+        <h2>Hvad udvidelsen kan læse</h2>
+
+        <p>Udvidelsen kan ikke selv åbne en KeePass-database. Den spørger programmet <code>keepass-deltasync</code> på din egen computer, som åbner din <code>.kdbx</code>-fil og for hver entry sender dette tilbage:</p>
+
+        <ul>
+            <li>titlen</li>
+            <li>webadresserne</li>
+            <li>navnet på den gruppe, den ligger i</li>
+            <li>et internt ID, så popup'en kan skelne mellem to entries med samme titel</li>
+        </ul>
+
+        <p>Den liste ligger fast i programmet, ikke i udvidelsen, så en fejl i udvidelsen ikke kan udvide den. Passwords, brugernavne, noter og vedhæftede filer bliver aldrig sendt.</p>
+
+        <p>Udvidelsen beder ikke om adgang til nogen websider og kører ingen kode i de sider, du besøger. Den kan ikke se, hvad du browser.</p>
+
+        <h2>Dit masterpassword</h2>
+
+        <p>Har du gemt masterpasswordet i styresystemets keyring, henter programmet det derfra, og det passerer slet ikke gennem browseren.</p>
+
+        <p>Har du ikke, spørger popup'en efter det og sender det direkte videre til programmet på din computer. Udvidelsen gemmer det ikke. Programmet holder det kun i hukommelsen og sletter det, når det har været uvirksomt et stykke tid, når du trykker <em>Lås</em>, eller når browseren lukkes.</p>
+
+        <h2>Hvor det opbevares</h2>
+
+        <p>Listen ovenfor ligger i browserens <em>session storage</em>, mens browseren er åben, så en søgning ikke skal åbne databasen ved hvert tastetryk. Session storage ligger i hukommelsen og forsvinder, når browseren lukkes. <em>Lås</em> tømmer den med det samme. Udvidelsen skriver intet til disken.</p>
+
+        <h2>Hvad den sender</h2>
+
+        <p>Intet. Udvidelsens eneste forbindelse er til programmet <code>keepass-deltasync</code> på samme computer, gennem browserens native messaging. Den laver ingen netværkskald, indeholder ingen analyse eller sporing og har ingen server at rapportere til. Søgning virker uden internetforbindelse og uden en DeltaSync-konto.</p>
+
+        <p>Når du åbner en entrys hjemmeside, er det et helt almindeligt besøg på den side, præcis som hvis du selv havde skrevet adressen.</p>
+
+        <h2>Intet sælges eller deles</h2>
+
+        <p>Der indsamles ingen data, så der er intet at sælge, dele eller bruge til andre formål.</p>
+
+        <h2>Dette website</h2>
+
+        <p>deltasync.org sætter ingen cookies og henter ingen scripts, skrifttyper eller andet fra tredjeparter. Som enhver webserver kan værten føre almindelige adgangslogs.</p>
+
+        <h2>Kontrollér det selv</h2>
+
+        <p>Udvidelsen og programmet er open source under GPL-3.0, og de udgivne pakker kan genskabes ud fra <a href="https://gitlab.com/Star95/keepass-deltasync">kildekoden</a>. Designet og dets sikkerhedsgrænser er beskrevet i <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>.</p>
+
+        <h2>Kontakt</h2>
+
+        <p>Spørgsmål om privatliv hører til i projektets <a href="https://gitlab.com/Star95/keepass-deltasync/-/issues">issue tracker</a>. Er det noget, du hellere vil tage uden for offentligheden, så se <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+
+        <p><em>Senest opdateret 14. september 2026.</em></p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Hjem</a>
+            &nbsp;·&nbsp;
+            <a href="chrome.html">Edge &amp; Chrome</a>
+            &nbsp;·&nbsp;
+            <a href="../privacy.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

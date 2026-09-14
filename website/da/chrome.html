@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Udvidelsen til Chrome og Edge — DeltaSync</title>
+    <meta name="description" content="Sådan installerer og bruger du DeltaSyncs udvidelse i Microsoft Edge og Chrome — søg i dine KeePass-entries fra adresselinjen og åbn entryens side. Virker både med og uden en DeltaSync-server.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
+    <link rel="apple-touch-icon" href="../assets/icon-128.png">
+    <link rel="stylesheet" href="../style.css">
+    <meta property="og:title" content="DeltaSync til Edge og Chrome">
+    <meta property="og:description" content="Søg i dine KeePass-entries fra adresselinjen og land på den rigtige side.">
+    <meta property="og:image" content="../assets/icon-1024.png">
+    <meta property="og:url" content="https://deltasync.org/da/chrome.html">
+    <link rel="alternate" hreflang="en" href="https://deltasync.org/chrome.html">
+    <link rel="alternate" hreflang="da" href="https://deltasync.org/da/chrome.html">
+    <link rel="alternate" hreflang="x-default" href="https://deltasync.org/chrome.html">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+
+<header class="site">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <img src="../assets/logo.svg" alt="">
+            DeltaSync
+        </a>
+        <nav class="primary">
+            <a href="index.html">Hjem</a>
+            <a href="architecture.html">Arkitektur</a>
+            <a href="getting-started.html">Kom i gang</a>
+            <a href="deploy-server.html">Server-opsætning</a>
+            <a href="faq.html">FAQ</a>
+            <a href="firefox.html">Firefox</a>
+            <span class="lang-switch">
+                <a href="../chrome.html" hreflang="en">EN</a>
+                <a href="chrome.html" class="active" hreflang="da">DA</a>
+            </span>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <h1>DeltaSync til Edge og Chrome</h1>
+
+        <p>Skriv <code>kp</code> i adresselinjen, et mellemrum, og dernæst et par bogstaver af den konto du leder efter, så fører browseren dig til entryens hjemmeside. Det er hele udvidelsen. Den besvarer dét spørgsmål, en password-manager efterlader dig med — <em>hvilken side lå den konto nu på?</em> — og går så af vejen igen.</p>
+
+        <p><strong>Selve login er ikke dens opgave.</strong> Det er stadig <a href="https://github.com/keepassxreboot/keepassxc-browser">KeePassXC-Browsers</a> arbejde; den udfylder brugernavn og password, men kan ikke hjælpe dig med at finde siden i første omgang. Denne her lukker netop det hul og intet andet — og derfor har den aldrig brug for at se et password.</p>
+
+        <div class="callout">
+            <strong>Hvad den kan se:</strong> titler på entries, deres webadresser og gruppenavne. Intet andet — begrænsningen håndhæves i den anden ende af forbindelsen, i det program der læser din database, så en fejl i udvidelsen ikke kan udvide den. Udvidelsen beder desuden <em>ikke</em> om adgang til nogen websider, så den kan ikke læse de sider du besøger. <a href="privacy.html">Privatlivssiden</a> har detaljerne.
+        </div>
+
+        <p>Det er den samme udvidelse som <a href="firefox.html">den til Firefox</a>, bygget af de samme kildefiler. Kun indpakningen er anderledes.</p>
+
+        <h2>Du behøver ikke en DeltaSync-server</h2>
+
+        <p>DeltaSync er normalt et sync-system med en server bagved, men en søgning rører aldrig netværket: udvidelsen spørger en lille lokal hjælper, som læser din egen <code>.kdbx</code>-fil og svarer ud fra den alene. Der er derfor to måder at sætte det op på, og den anden har intet med synkronisering at gøre:</p>
+
+        <ul>
+            <li><strong>Du bruger allerede DeltaSync</strong> — din database er registreret hos klienten, og der er ikke mere at konfigurere. Spring til <a href="#host">trin 2</a>.</li>
+            <li><strong>Du vil bare have søgningen</strong> — installér klienten, peg den på din <code>.kdbx</code> med én kommando, og tilmeld dig aldrig nogen server. Det er <a href="#standalone">trin 1</a> herunder.</li>
+        </ul>
+
+        <h2>Hvad du skal bruge</h2>
+
+        <ul>
+            <li><a href="https://keepassxc.org/">KeePassXC</a>, for dens <code>keepassxc-cli</code> — det er den, der faktisk åbner din database</li>
+            <li><code>keepass-deltasync</code>-klienten, <strong>version 1.9.0 eller nyere</strong>: en <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">færdigbygget binær</a> til Linux, macOS eller Windows, eller <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">Windows-installeren</a>, som har den med. Ældre klienter kender kun Firefox.</li>
+            <li>Microsoft Edge eller Google Chrome, version 116 eller nyere</li>
+        </ul>
+
+        <h2 id="standalone">Trin 1 — peg klienten på din database</h2>
+
+        <p><strong>Synkroniserer du allerede med DeltaSync</strong>, er dette gjort: <code>enroll</code> og <code>init</code> registrerede databasen, da du satte klienten op. Gå videre til trin 2.</p>
+
+        <p><strong>Har du ingen server</strong>, skal klienten stadig vide, hvilken fil den skal søge i. Én kommando fortæller den det, og intet om filen sendes nogen steder hen:</p>
+
+<pre><code>keepass-deltasync add-local privat ~/keepass/min.kdbx --save-password</code></pre>
+
+        <p><code>privat</code> er bare en etiket — den vises i popup'en, når mere end én database er låst op. Gentag kommandoen for hver fil, du vil kunne søge i. Ingen server, intet token, ingen konto.</p>
+
+        <p><code>--save-password</code> er valgfri, men i Edge og Chrome er den værd at have. Masterpasswordet kontrolleres ved at åbne databasen, før det gemmes, og det lægges i styresystemets keyring — aldrig i en fil. Uden den bliver du spurgt oftere end i Firefox, af en grund der er forklaret <a href="#unlock">under Sådan bruger du den</a>.</p>
+
+        <h3>Windows: hvor klienten ligger, og hvor du skriver</h3>
+
+        <p>Installeren lægger programmet og kommandolinje-klienten i samme mappe, og hvilken mappe afhænger af den installation du valgte:</p>
+
+        <ul>
+            <li><em>Kun for mig</em> — standarden, uden administrator-prompt: <code>%LOCALAPPDATA%\Programs\KeePass Delta-Sync\</code></li>
+            <li><em>For alle brugere</em>: <code>C:\Program Files\KeePass Delta-Sync\</code></li>
+        </ul>
+
+        <p><code>keepass-deltasync.exe</code> i den mappe er det, hver kommando på denne side mener. Den ligger <strong>ikke</strong> på din <code>PATH</code>, så den hurtigste vej til en terminal der kan se den, er at åbne mappen i Stifinder, klikke i adresselinjen, skrive <code>powershell</code> og trykke Enter. Terminalen åbner i den mappe, og kommandoerne virker med <code>.\</code> foran:</p>
+
+<pre><code>.\keepass-deltasync.exe add-local privat C:\Users\dig\Documents\min.kdbx --save-password</code></pre>
+
+        <h2 id="host">Trin 2 — lad browseren tale med klienten</h2>
+
+        <p>En browser kører ikke et program, den ikke har fået besked om på forhånd. Én kommando klarer det:</p>
+
+<pre><code>keepass-deltasync install-browser-host</code></pre>
+
+        <p>Den skriver et lille manifest for hver browser den finder — Edge, Chrome og Firefox ens — ind i dit eget brugerområde, og på Windows desuden en registreringsdatabase-nøgle under <code>HKCU</code>. Ingen administrator nødvendig. Sæt <code>--dry-run</code> på først, hvis du vil se præcis hvad den ville skrive. Kør den igen hvis du flytter binæren, for manifestet husker hvor den ligger.</p>
+
+        <p>Læs hvad den skriver: den viser hver browser, den har registreret sig hos, og den liste er svaret på om den fandt <em>din</em>. I skrivebordsprogrammet kører knappen <strong>Registrér i Firefox</strong> præcis den samme kommando, så den registrerer også Edge og Chrome.</p>
+
+        <p>Manifestet nævner de udvidelser, der må forbinde, og klienten kender allerede den fra Edge Add-ons. Intet at kopiere, intet ID at slå op.</p>
+
+        <h3>macOS: fjern karantæne-mærket</h3>
+
+        <p>macOS mærker alt hentet med en browser, og browseren starter hjælperen uden en dialog du kunne godkende — så en mærket binær dør tavst. Fjern mærket én gang:</p>
+
+<pre><code>xattr -d com.apple.quarantine /usr/local/bin/keepass-deltasync</code></pre>
+
+        <h3>Linux: snap- og flatpak-browsere er ikke dækket</h3>
+
+        <p>En Chromium eller Chrome installeret som snap eller flatpak kører i en sandkasse, der kræver særbehandling, og intet af det er afprøvet. En browser fra din distributions pakker eller fra producentens egen <code>.deb</code> eller <code>.rpm</code> virker.</p>
+
+        <h2 id="extension">Trin 3 — installér udvidelsen</h2>
+
+        <h3>Microsoft Edge</h3>
+
+        <p>Den ligger i Microsofts egen udvidelsesbutik, signeret og gennemgået:</p>
+
+        <p><a class="btn btn-primary" href="https://microsoftedge.microsoft.com/addons/detail/dpmaneajjlanhipmbgdpdnfljiigdnjo">Hent DeltaSync — KeePass search &amp; go</a></p>
+
+        <p>Den beder om to tilladelser: <em>native messaging</em>, som er dens vej til klienten fra trin 2, og <em>storage</em>, som holder søgeindekset så længe browseren er åben. Den beder om ingen værtstilladelser og kører ingen content scripts — den kan altså ikke se de sider du besøger, og den får aldrig et password fra din database.</p>
+
+        <p><strong>Genstart Edge</strong> efter trin 2, hvis du ikke allerede har gjort det, og sørg for at den faktisk lukker. Edges <em>Startboost</em> holder den kørende i baggrunden, når sidste vindue er lukket; slå det fra under <code>edge://settings/system</code>, hvis en genstart ikke ser ud til at bide.</p>
+
+        <h3>Chrome, Brave, Vivaldi og Opera</h3>
+
+        <p>Udvidelsen er ikke i Chrome Web Store endnu. Indtil den er, installerer du den fra kildekoden som herunder. Klienten registrerer sig hos alle fire browsere, men kun Chrome og Edge er faktisk afprøvet.</p>
+
+        <h3 id="source">Fra kildekoden</h3>
+
+        <p>Pakken er almindelige filer uden byggetrin, og den zip der ligger på <a href="https://gitlab.com/Star95/keepass-deltasync/-/releases">releases-siden</a>, er byte-reproducerbar ud fra sin tag — du kan altså kontrollere, at det du installerer, er det kildekoden siger. Sådan indlæser du den:</p>
+
+        <ol>
+            <li>Kør <code>./package.sh --dev</code> i <code>extension-chromium/</code> i en klon. Den bygger udvidelsen ind i <code>extension-chromium/build/unpacked/</code>.</li>
+            <li>Åbn <code>chrome://extensions</code> (eller <code>edge://extensions</code>) og slå <strong>Udviklertilstand</strong> til.</li>
+            <li><strong>Indlæs udpakket</strong>, og vælg mappen <code>build/unpacked</code>.</li>
+            <li>Fortæl klienten om denne kopi — den har et andet ID end butiksudgaven, og klienten stoler ikke på den af sig selv:
+<pre><code>keepass-deltasync install-browser-host --extension-id iocbdcgjepgmakdgfnhlanbncnfmgeof</code></pre></li>
+            <li>Genstart browseren.</li>
+        </ol>
+
+        <p>Butiksudgaven og en udgave fra kildekoden har forskellige ID'er, så begge kan være installeret på samme tid.</p>
+
+        <h2>Sådan bruger du den</h2>
+
+        <ul>
+            <li><strong>Adresselinjen:</strong> skriv <code>kp</code>, et mellemrum, og din søgning. Vælg et forslag og tryk Enter.</li>
+            <li><strong>Popup:</strong> knappen på værktøjslinjen, eller <code>Alt+Shift+K</code>. Piletaster flytter, Enter åbner i den aktuelle fane, Ctrl/Cmd+Enter eller midterklik åbner en ny. Nye udvidelser starter skjult under puslespilsikonet; fastgør den dér, så knappen bliver synlig.</li>
+            <li><strong>Lås:</strong> smider det cachede indeks væk og beder hjælperen slette hvad den måtte ligge inde med.</li>
+        </ul>
+
+        <p>Søgningen matcher på værtsnavn, titel og gruppe, og sætter værtsnavne højest — det er som regel dét man husker. En entry med flere adresser (KeePassXC's <em>Additional URLs</em>) vises som én række med et mærke; vælger du den, foldes hver adresse ud nedenunder med bedste match først, så ingen af dem er uden for rækkevidde.</p>
+
+        <p id="unlock">Første søgning efter en genstart kræver dit masterpassword. Ligger din database i styresystemets keyring — hvilket er dét <code>--save-password</code> i trin 1 sørger for — henter hjælperen det selv derfra, og det passerer aldrig gennem browseren. Gør den ikke, spørger popup'en, og hjælperen holder det kun i hukommelsen.</p>
+
+        <p>Her adskiller Edge og Chrome sig fra Firefox. De lukker en udvidelses baggrundsproces, når den har været uvirksom et stykke tid, og hjælperen lukker med, og tager et indtastet password med sig. Søgeindekset overlever, så søgningen svarer stadig med det samme — men næste gang indekset opdateres, skal databasen åbnes igen. Fra keyringen tager det et par sekunder og spørger om intet. Uden den spørger popup'en igen.</p>
+
+        <h2 id="trouble">Hvis noget ikke virker</h2>
+
+        <div class="faq">
+
+            <details>
+                <summary>Popup'en siger, at den ikke kan nå hosten</summary>
+                <div class="answer">
+                    <p>Browseren læser native messaging-manifester ved opstart, så den skal genstartes efter <code>install-browser-host</code> — et nyt vindue er ikke nok, hele programmet skal lukkes. På Windows gælder det også Edges <em>Startboost</em> og Chromes <em>Fortsæt med at køre baggrundsapps</em>: er en af dem slået til, kører browseren videre, selv når alle vinduer er lukket.</p>
+                    <p>Hjælper en genstart ikke, så tjek klientens version med <code>keepass-deltasync version</code>. Alt ældre end 1.9.0 kender ikke Edge eller Chrome og registrerer sig kun hos Firefox.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Det virkede, og så holdt det op</summary>
+                <div class="answer">
+                    <p>Manifestet husker den fulde sti til klient-binæren. Har du flyttet, omdøbt eller geninstalleret den, så kør <code>keepass-deltasync install-browser-host</code> igen.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Udgaven fra kildekoden kan ikke forbinde, men butiksudgaven kan</summary>
+                <div class="answer">
+                    <p>Klienten stoler selv på butikkens ID, og kun på en udgave fra kildekoden, når du beder om det. Kør <code>install-browser-host</code> med <code>--extension-id</code> som under <a href="#source">Fra kildekoden</a>. Indlæste du mappen uden <code>--dev</code>, har browseren selv fundet på et ID; det står på udvidelsens kort i <code>chrome://extensions</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Er det browseren eller er det min opsætning?</summary>
+                <div class="answer">
+                    <p>Du kan afprøve hele kæden uden at involvere browseren. Dette bygger indekset præcis som en søgning ville, og udskriver hvad udvidelsen ville modtage:</p>
+<pre><code>keepass-deltasync browser-host --probe privat
+# No keyring entry for privat — the extension would prompt here.
+# Masterpassword for privat:
+# [ { "title": "Eksempel-konto", "urls": ["https://example.com/login"], … } ]
+# 1 searchable entries indexed from privat.</code></pre>
+                    <p>Virker dét, men udvidelsen ikke, sidder problemet mellem browseren og hjælperen — start med en genstart. Virker det heller ikke, er det database-bindingen eller <code>keepassxc-cli</code>.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>"keepassxc-cli not found"</summary>
+                <div class="answer">
+                    <p>Hjælperen leder de sædvanlige steder for din platform. Ligger din et usædvanligt sted, så bekræft at det er dét der er galt ved at pege direkte på den:</p>
+<pre><code>keepass-deltasync browser-host --probe privat --keepassxc-cli "/sti/til/keepassxc-cli"</code></pre>
+                    <p>Skal det holde ved, så tilføj samme flag til den launcher, <code>install-browser-host</code> har lavet — den udskriver stien til den, og til manifestet, hver gang du kører den.</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>Popup'en siger at ingen databaser er registreret</summary>
+                <div class="answer">
+                    <p>Så kører hjælperen og svarer — trin 2 og 3 er i orden — og trin 1 har ikke fundet sted endnu. Kør <code>keepass-deltasync add-local</code>, eller tryk <strong>Registrér database…</strong> i skrivebordsprogrammet. <code>keepass-deltasync databases</code> viser hvad der er registreret; en søge-kun database er mærket <code>L</code>.</p>
+                </div>
+            </details>
+
+        </div>
+
+        <p style="margin-top: var(--space-8);">Designet og dets sikkerhedsgrænser er beskrevet i <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>. Vil du også have sync-halvdelen af DeltaSync, så start på <a href="getting-started.html">Kom i gang</a>.</p>
+
+    </div>
+</main>
+
+<footer class="site">
+    <div class="container">
+        <div>
+            <strong>DeltaSync</strong> — privacy-first KeePass sync
+        </div>
+        <div>
+            <a href="https://gitlab.com/Star95/keepass-deltasync">GitLab</a>
+            &nbsp;·&nbsp;
+            <a href="index.html">Hjem</a>
+            &nbsp;·&nbsp;
+            <a href="privacy.html">Privatliv</a>
+            &nbsp;·&nbsp;
+            <a href="../chrome.html">English</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
