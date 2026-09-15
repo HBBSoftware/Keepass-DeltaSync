@@ -38,14 +38,30 @@ final class SessionController
     {
         $ip = $req->clientIp($this->config->trustedProxies);
 
+        $envUser      = $this->config->adminUsername;
+        $envPassword  = $this->config->adminPassword;
+        $envConfigured = $envUser !== '' && $envPassword !== '';
+
         if (!AdminAccount::exists($this->pdo)) {
-            // Ingen konto konfigureret. Sig det ligeud: det er en
-            // opsætningsfejl, ikke et forkert kodeord, og at skjule det ville
-            // kun sende folk på jagt efter en adgangskode der ikke findes.
-            return new JsonResponse(503, [
-                'error'   => 'admin_account_not_configured',
-                'message' => 'no admin account exists — set ADMIN_USERNAME and ADMIN_PASSWORD, '
-                    . 'or run: php bin/admin admin:set-password',
+            // Første login på en vært uden shell. I containeren har
+            // docker-entrypoint.sh allerede kaldt admin:ensure, men en
+            // filbaseret vært har ingen opstart at hænge det på, og ingen vej
+            // til bin/admin. Uden dette var eneste udvej en INSERT i hånden
+            // med en Argon2id-hash — og fejlbeskeden nedenfor lovede i
+            // forvejen at de to variabler virkede.
+            if (!$envConfigured) {
+                // Sig det ligeud: det er en opsætningsfejl, ikke et forkert
+                // kodeord, og at skjule det ville kun sende folk på jagt efter
+                // en adgangskode der ikke findes.
+                return new JsonResponse(503, [
+                    'error'   => 'admin_account_not_configured',
+                    'message' => 'no admin account exists — set ADMIN_USERNAME and ADMIN_PASSWORD '
+                        . 'in the environment (or .env), or run: php bin/admin admin:set-password',
+                ]);
+            }
+            AdminAccount::set($this->pdo, $envUser, $envPassword, $this->config);
+            $log->info(EventType::AdminAction, [
+                'details' => ['action' => 'admin_account_bootstrapped_from_env', 'username' => $envUser],
             ]);
         }
 
@@ -75,15 +91,36 @@ final class SessionController
         }
 
         if (!AdminAccount::verify($this->pdo, $username, $password, $this->config)) {
-            \KeePassDeltaSync\Auth\RateLimiter::record($this->pdo, $ip);
-            $log->info(EventType::AuthFailure, [
-                'details' => ['route' => '/api/v1/admin/session', 'reason' => 'bad_credentials'],
-                'success' => false,
-            ]);
-            // Samme svar uanset om det var brugernavnet eller kodeordet.
-            return new JsonResponse(401, [
-                'error'   => 'unauthorized',
-                'message' => 'invalid username or password',
+            // Rotation: environment er kilden. Passer det indtastede på det
+            // .env siger, men ikke på det databasen har, så er adgangskoden
+            // skiftet i filen siden kontoen blev oprettet — og uden shell
+            // findes der ingen anden vej til at skifte den.
+            //
+            // Det koster intet i det normale tilfælde: grenen nås kun når et
+            // login allerede er slået fejl, og prøven er to
+            // strengsammenligninger, ikke en Argon2-beregning. En angriber
+            // vinder heller intet, for at nå hertil skal man i forvejen kende
+            // adgangskoden fra .env.
+            $matchesEnv = $envConfigured
+                && hash_equals($envUser, $username)
+                && hash_equals($envPassword, $password);
+
+            if (!$matchesEnv) {
+                \KeePassDeltaSync\Auth\RateLimiter::record($this->pdo, $ip);
+                $log->info(EventType::AuthFailure, [
+                    'details' => ['route' => '/api/v1/admin/session', 'reason' => 'bad_credentials'],
+                    'success' => false,
+                ]);
+                // Samme svar uanset om det var brugernavnet eller kodeordet.
+                return new JsonResponse(401, [
+                    'error'   => 'unauthorized',
+                    'message' => 'invalid username or password',
+                ]);
+            }
+
+            AdminAccount::set($this->pdo, $envUser, $envPassword, $this->config);
+            $log->info(EventType::AdminAction, [
+                'details' => ['action' => 'admin_account_updated_from_env', 'username' => $envUser],
             ]);
         }
 

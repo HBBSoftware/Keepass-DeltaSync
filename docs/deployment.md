@@ -120,7 +120,21 @@ kan oprette ekstra vhosts/subdomæner hos din hoster.
    - Kører alle schema-migrationer (`schema/*.sql`)
    - Genererer det første admin-token (vises ÉN gang — gem det med det samme)
    - UI på engelsk default, dansk via `?lang=da`
-4. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2)
+4. **Sæt `ADMIN_USERNAME` og `ADMIN_PASSWORD` i `.env`.** Det er login til
+   browser-panelet på `/admin.html`, og det er noget andet end admin-tokenet
+   ovenfor: tokenet er til CLI og API, kontoen er til panelet. Findes der
+   ingen konto i databasen, oprettes den ud fra de to variabler ved første
+   login-forsøg — også på en vært uden shell, hvor hverken entrypointet eller
+   `php bin/admin` kan køre.
+
+   Det er også sådan adgangskoden skiftes senere. Panelet har ingen knap til
+   det. Ret værdien i `.env` og log ind med den nye, så bringes kontoen i
+   overensstemmelse. Environment er kilden, ikke databasen.
+
+   Bemærk at `setup.php` **ikke** kender til den konto. Wizard'en er ældre end
+   panel-loginet og opretter kun et admin-token.
+
+5. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2)
    så det ikke kan misbruges. Wizard'en blokerer auto-genkørsel når
    admin_tokens har rækker, men filen er stadig unødvendig angrebs-flade.
 

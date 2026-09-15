@@ -21,6 +21,15 @@ final class Config
         public readonly int    $enrollmentTokenTtlHours,
         public readonly string $basePath,
         public readonly int    $adminSessionTtlHours,
+        /**
+         * Admin-kontoen fra environment. Tom string = ikke sat.
+         *
+         * I containeren bruger docker-entrypoint.sh dem ved opstart. På en
+         * filbaseret vært er der ingen opstart at hænge det på, så
+         * SessionController bruger dem ved login — se dér for reglerne.
+         */
+        public readonly string $adminUsername,
+        public readonly string $adminPassword,
         public readonly int    $rateLimitAuthPerMinute,
         public readonly int    $argon2MemoryCost,
         public readonly int    $argon2TimeCost,
@@ -42,6 +51,8 @@ final class Config
             enrollmentTokenTtlHours: (int) self::env('ENROLLMENT_TOKEN_TTL_HOURS', '24'),
             basePath:                self::normalizeBasePath(self::env('APP_BASE_PATH', '')),
             adminSessionTtlHours:    (int) self::env('ADMIN_SESSION_TTL_HOURS', '8'),
+            adminUsername:           trim(self::env('ADMIN_USERNAME', '')),
+            adminPassword:           self::env('ADMIN_PASSWORD', ''),
             rateLimitAuthPerMinute:  (int) self::env('RATE_LIMIT_AUTH_PER_MINUTE', '10'),
             argon2MemoryCost:        (int) self::env('ARGON2_MEMORY_COST', '65536'),
             argon2TimeCost:          (int) self::env('ARGON2_TIME_COST', '4'),

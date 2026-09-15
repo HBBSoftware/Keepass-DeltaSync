@@ -6,6 +6,31 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The admin panel can be reached on a host with no shell (server)** — the
+  login route answered `admin_account_not_configured` and told you to set
+  `ADMIN_USERNAME` and `ADMIN_PASSWORD`, which was untrue anywhere outside the
+  container: only `docker-entrypoint.sh` and `bin/admin` ever read them, and a
+  file-based host runs neither. `setup.php` is no help either, since it
+  predates the panel login and only ever creates an admin *token*. The real
+  instruction was an `INSERT` with a hand-made Argon2id hash, which is not
+  something a self-hoster should have to do.
+
+  The request path already loads `.env` on every request, and
+  `AdminAccount::set()` was already idempotent, so the fix is to use them: if
+  no account exists and both variables are set, the first login attempt
+  creates it. The message now describes something that works.
+
+  The same rule doubles as password rotation, which the panel otherwise has no
+  route for at all. Credentials that match `.env` but not the stored hash mean
+  the file was changed after the account was made, so the account is brought
+  into line and the login proceeds. Environment is the authority, not the
+  database. It costs nothing in the normal case: the branch is reached only
+  after a login has already failed, and the test is two string comparisons
+  rather than an Argon2 computation. An attacker gains nothing by reaching it,
+  since doing so requires already knowing the password in `.env`.
+
 ### Added
 
 - **Chrome and Edge extension** (`extension-chromium/`) — the same search &
