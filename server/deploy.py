@@ -8,8 +8,11 @@ takes care of do not happen here:
   * schema/*.sql is NOT applied. The files land on disk; applying them is a
     separate, deliberate step. Run any new migration BEFORE uploading the code
     that needs it, or the app will answer 500 for the gap in between.
-  * ADMIN_USERNAME / ADMIN_PASSWORD are read only by the entrypoint, so they
-    do nothing here.
+  * ADMIN_USERNAME / ADMIN_PASSWORD belong in the host's own .env, which this
+    script never touches. The request path reads them: with no account in the
+    database, the first login attempt creates it from those two, and changing
+    the password there is what rotates it. The entrypoint's admin:ensure is
+    the container's equivalent and does not run here.
 
 The web root is shared with the marketing site, which is deployed separately
 from website/. That is why this script never mirrors and never deletes: a
@@ -63,8 +66,13 @@ LOCAL_ROOT = pathlib.Path(__file__).resolve().parent
 # .env belongs to the host and carries its database password — never send ours.
 # The container files describe a deployment this host is not. tests/ is not
 # something a web root should be able to serve.
+# setup.php is the first-run wizard, and the app's own page tells you to delete
+# it once setup is done. An update must therefore not put it back: doing so
+# would silently restore attack surface on every deploy, and the wizard is
+# older than the panel login anyway — it creates an admin token, never the
+# admin account. A genuinely new install uploads it by hand, once.
 EXCLUDE_NAMES = {".env", ".gitignore", ".dockerignore", "Dockerfile",
-                 "docker-entrypoint.sh", "deploy.py"}
+                 "docker-entrypoint.sh", "deploy.py", "setup.php"}
 EXCLUDE_DIRS = {"tests", "vendor"}
 
 
