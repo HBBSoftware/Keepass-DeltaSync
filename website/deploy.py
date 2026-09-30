@@ -43,7 +43,10 @@ EXPECTED_HOSTKEY = os.environ.get(
 LOCAL_ROOT = pathlib.Path(__file__).resolve().parent
 
 # Tooling, not content. deploy.py would be served at /deploy.py otherwise.
-EXCLUDE = {"deploy.py", ".gitignore"}
+# collect_stats.py writes the dashboard it builds INTO this directory, so it has
+# to be kept out of the upload for the same reason — the page it generates is
+# content, the generator is not.
+EXCLUDE = {"deploy.py", "collect_stats.py", ".gitignore"}
 
 
 def fingerprint(key) -> str:
@@ -53,6 +56,11 @@ def fingerprint(key) -> str:
 def local_files():
     for path in sorted(LOCAL_ROOT.rglob("*")):
         if path.is_dir() or path.name in EXCLUDE:
+            continue
+        # This walks the filesystem, not git, so .gitignore does not protect the
+        # webroot. Running collect_stats.py locally can leave a __pycache__ here,
+        # and .pyc files have no business on a public server.
+        if "__pycache__" in path.parts:
             continue
         yield path, path.relative_to(LOCAL_ROOT).as_posix()
 

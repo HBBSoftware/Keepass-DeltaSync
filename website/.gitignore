@@ -1,0 +1,5 @@
+# collect_stats.py generates its dashboard into website/<STATS_PATH>/ at CI time.
+# The directory name is the only thing making the page private, and this repo is
+# public — so neither the directory nor its name belongs in git.
+stats-*/
+__pycache__/

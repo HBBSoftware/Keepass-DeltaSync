@@ -1070,3 +1070,40 @@ release:client-github:
           --data-binary @"$f" >/dev/null
         echo "    uploaded: $name"
       done
+
+# ----------------------------------------------------------------------
+# Download counters → private dashboard on deltasync.org
+# ----------------------------------------------------------------------
+#
+# Runs only from a pipeline schedule (Build → Pipeline schedules, daily). It
+# collects the counters, appends one row to the series it fetches back from the
+# live site, and uploads the result with the ordinary website deploy.
+#
+# Needs two variables beyond the SFTP pair publish:website already uses:
+#
+#   STATS_PATH   the directory the dashboard lives in, e.g. stats-<random>.
+#                Mark it masked. This repo is PUBLIC, so the path must not be
+#                committed — its unguessability is the only thing keeping the
+#                page private.
+#
+# History lives in the uploaded stats.json and nowhere else: the job reads the
+# published file back each run. Change STATS_PATH and the series starts over.
+
+stats:collect:
+  stage: publish
+  image: python:3.13-alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: never
+    # Same reasoning as publish:website — an unconfigured deploy is "not set up
+    # yet", not a broken pipeline.
+    - if: $DEPLOY_SFTP_PASSWORD == null
+      when: never
+    - if: $STATS_PATH == null
+      when: never
+    - when: on_success
+  before_script:
+    - pip install --quiet --no-cache-dir paramiko
+  script:
+    - python3 website/collect_stats.py
+    - python3 website/deploy.py
