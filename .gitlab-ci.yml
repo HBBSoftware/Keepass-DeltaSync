@@ -830,6 +830,11 @@ publish:website:
   stage: publish
   image: python:3.13-alpine
   rules:
+    # A scheduled pipeline has no diff to compare against, so GitLab treats
+    # `changes:` below as matched and this job would redeploy the whole site
+    # every night beside stats:collect. The schedule exists for the counters.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     # Without this the pipeline would go red on every website commit until the
     # credentials are configured. Absent variables mean "not set up yet", not
     # "broken".
