@@ -8,6 +8,7 @@
  "09b6d716bd": "Deploy server",
  "dbc468a14b": "FAQ",
  "2f26233595": "Firefox",
+ "4070a5fcf4": "Edge &amp; Chrome",
  "bdc201b321": "DeltaSync is built around the principle that",
  "be438e967a": "the server should not be able to access your passwords",
  "2922054c6d": "— even if it is compromised. We achieve this by doing all encryption on the client and only storing opaque blobs on the server. Here is how it fits together.",
@@ -1036,6 +1037,8 @@
  "a302968d57": "Find it in Firefox",
  "91a4655702": "in the address bar to search your entries by site, title or group and land on the right page. The extension only ever receives titles and URLs — filling in credentials stays with KeePassXC-Browser.",
  "d2dceaa0ad": "How to install it",
+ "bf0c20c9df": "Also in Edge and Chrome",
+ "f5ed2f4131": "The same extension, built from the same source files. It is on Microsoft's add-on store for Edge; in Chrome it installs from source until it reaches the Web Store.",
  "851c6152be": "Desktop &amp; Android",
  "c4730dbbbb": "A cross-platform desktop client (Linux, macOS, Windows) plus an Android app. Both share the same Go crypto core, so they produce byte-identical encrypted blobs on the wire.",
  "9c870aa6e5": "How it works",
@@ -1113,6 +1116,5 @@
  "cdb56ba0af": "issue tracker",
  "e148640323": ". For anything you would rather not raise in public, see",
  "f6ed156e4b": "SECURITY.md",
- "10f9c37db6": "Last updated 14 September 2026.",
- "4070a5fcf4": "Edge &amp; Chrome"
+ "10f9c37db6": "Last updated 14 September 2026."
 }
