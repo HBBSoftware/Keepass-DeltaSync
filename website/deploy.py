@@ -43,10 +43,15 @@ EXPECTED_HOSTKEY = os.environ.get(
 LOCAL_ROOT = pathlib.Path(__file__).resolve().parent
 
 # Tooling, not content. deploy.py would be served at /deploy.py otherwise.
-# collect_stats.py writes the dashboard it builds INTO this directory, so it has
-# to be kept out of the upload for the same reason — the page it generates is
-# content, the generator is not.
-EXCLUDE = {"deploy.py", "collect_stats.py", ".gitignore"}
+# collect_stats.py and i18n.py write what they build INTO this directory, so
+# they are kept out for the same reason — the pages they generate are content,
+# the generators are not.
+EXCLUDE = {"deploy.py", "collect_stats.py", "i18n.py", ".gitignore"}
+
+# Whole directories that are inputs rather than output: i18n/ holds the
+# translation tables i18n.py reads to build de/, fr/ and es/. The built pages
+# belong on the server; the tables that produced them do not.
+EXCLUDE_DIRS = {"i18n", "__pycache__"}
 
 
 def fingerprint(key) -> str:
@@ -58,9 +63,9 @@ def local_files():
         if path.is_dir() or path.name in EXCLUDE:
             continue
         # This walks the filesystem, not git, so .gitignore does not protect the
-        # webroot. Running collect_stats.py locally can leave a __pycache__ here,
-        # and .pyc files have no business on a public server.
-        if "__pycache__" in path.parts:
+        # webroot: a local __pycache__ or the translation tables would otherwise
+        # be served from a public server.
+        if EXCLUDE_DIRS & set(path.parts):
             continue
         yield path, path.relative_to(LOCAL_ROOT).as_posix()
 

@@ -2,4 +2,13 @@
 # The directory name is the only thing making the page private, and this repo is
 # public — so neither the directory nor its name belongs in git.
 stats-*/
+
+# de/, fr/ and es/ are generated from the English pages by i18n.py, and rebuilt
+# in CI before every deploy. Committing them would let a generated copy drift
+# from its source — the exact failure this setup exists to prevent. The
+# translations themselves live in i18n/*.json, which IS tracked.
+/de/
+/fr/
+/es/
+
 __pycache__/

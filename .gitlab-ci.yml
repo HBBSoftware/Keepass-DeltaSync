@@ -846,6 +846,10 @@ publish:website:
   before_script:
     - pip install --quiet --no-cache-dir paramiko
   script:
+    # German, French and Spanish are generated from the English pages, so they
+    # are built here rather than committed. That is what makes it impossible for
+    # a translation to drift structurally from its source.
+    - python3 website/i18n.py build de fr es
     - python3 website/deploy.py
 
 # ----------------------------------------------------------------------
