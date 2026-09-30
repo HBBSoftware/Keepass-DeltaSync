@@ -40,12 +40,42 @@ I18N = ROOT / "i18n"
 
 # dir is the URL segment; name is what the language calls itself.
 LANGS = {
-    "en": {"dir": "", "label": "EN", "name": "English"},
-    "da": {"dir": "da", "label": "DA", "name": "Dansk"},
-    "de": {"dir": "de", "label": "DE", "name": "Deutsch"},
-    "fr": {"dir": "fr", "label": "FR", "name": "Français"},
-    "es": {"dir": "es", "label": "ES", "name": "Español"},
+    "en": {"dir": "", "label": "EN", "name": "English", "picker": "Language"},
+    "da": {"dir": "da", "label": "DA", "name": "Dansk", "picker": "Sprog"},
+    "de": {"dir": "de", "label": "DE", "name": "Deutsch", "picker": "Sprache"},
+    "fr": {"dir": "fr", "label": "FR", "name": "Français", "picker": "Langue"},
+    "es": {"dir": "es", "label": "ES", "name": "Español", "picker": "Idioma"},
 }
+
+# Flags are inlined rather than referenced from a <symbol> sprite: a <use> that
+# points inside a collapsed <details> has been unreliable across browsers, and
+# six small shapes cost about 1.5 kB a page. Emoji flags were not an option —
+# Windows ships no flag glyphs and would render them as bare letter pairs.
+#
+# A flag is a country and a language is not, so each one is paired with its code
+# and its own name; the flag is decoration, the text is the label.
+FLAGS = {
+    "en": '<rect width="21" height="15" fill="#012169"/>'
+          '<path d="M0 0l21 15M21 0L0 15" stroke="#fff" stroke-width="3"/>'
+          '<path d="M0 0l21 15M21 0L0 15" stroke="#C8102E" stroke-width="1.6"/>'
+          '<path d="M10.5 0v15M0 7.5h21" stroke="#fff" stroke-width="5"/>'
+          '<path d="M10.5 0v15M0 7.5h21" stroke="#C8102E" stroke-width="3"/>',
+    "da": '<rect width="21" height="15" fill="#C8102E"/>'
+          '<path d="M0 6.5h21v2H0zM6.5 0h2v15h-2z" fill="#fff"/>',
+    "de": '<rect width="21" height="5" fill="#000"/>'
+          '<rect y="5" width="21" height="5" fill="#D00"/>'
+          '<rect y="10" width="21" height="5" fill="#FFCE00"/>',
+    "fr": '<rect width="7" height="15" fill="#002395"/>'
+          '<rect x="7" width="7" height="15" fill="#fff"/>'
+          '<rect x="14" width="7" height="15" fill="#ED2939"/>',
+    "es": '<rect width="21" height="15" fill="#AA151B"/>'
+          '<rect y="3.75" width="21" height="7.5" fill="#F1BF00"/>',
+}
+
+
+def flag(code):
+    return (f'<svg class="flag" viewBox="0 0 21 15" aria-hidden="true">'
+            f'{FLAGS[code]}</svg>')
 SOURCE = "en"
 SITE = "https://deltasync.org"
 
@@ -268,17 +298,29 @@ def rewrite_structure(text, page, lang, paths=True):
         r'(?:[ \t]*<link rel="alternate" hreflang="[^"]*" href="[^"]*">\n)*',
         alts + "\n", text, count=1)
 
-    # 4. The switcher, page-aware: every language points at this same page.
+    # 4. The picker, page-aware: every language points at this same page. It is
+    #    a <details> disclosure so it needs no JavaScript — the site ships none,
+    #    and faq.html already uses the same element for its accordion.
     def switch(m):
-        pad = m.group(1)
-        inner = "".join(
-            f'\n{pad}{ind}<a href="{link_to(page, lang, c)}"'
-            f'{" class=\"active\"" if c == lang else ""} hreflang="{c}">{LANGS[c]["label"]}</a>'
+        pad = m.group(1) if m.group(1) is not None else m.group(2)
+        rows = "".join(
+            f'\n{pad}{ind}{ind}<a href="{link_to(page, lang, c)}" hreflang="{c}"'
+            f'{" aria-current=\"true\"" if c == lang else ""}>'
+            f'{flag(c)}<span class="code">{LANGS[c]["label"]}</span>'
+            f'<span class="name">{LANGS[c]["name"]}</span></a>'
             for c in LANGS)
-        return f'{pad}<span class="lang-switch">{inner}\n{pad}</span>'
+        return (f'{pad}<details class="lang-switch">'
+                f'\n{pad}{ind}<summary aria-label="{LANGS[lang]["picker"]}">'
+                f'{flag(lang)}<span class="code">{LANGS[lang]["label"]}</span></summary>'
+                f'\n{pad}{ind}<div class="lang-menu">{rows}'
+                f'\n{pad}{ind}</div>'
+                f'\n{pad}</details>')
 
-    text = re.sub(r'([ \t]*)<span class="lang-switch">.*?</span>', switch, text,
-                  count=1, flags=re.S)
+    # Matches the old <span> form on the first pass and the <details> form on
+    # every pass after, so re-running is safe.
+    text = re.sub(r'([ \t]*)<span class="lang-switch">.*?</span>'
+                  r'|([ \t]*)<details class="lang-switch">.*?</details>',
+                  switch, text, count=1, flags=re.S)
 
     # 5. The footer lists every other language by its own name. In the English
     #    source that is the single "Dansk" link.
