@@ -42,9 +42,12 @@ I18N = ROOT / "i18n"
 LANGS = {
     "en": {"dir": "", "label": "EN", "name": "English", "picker": "Language"},
     "da": {"dir": "da", "label": "DA", "name": "Dansk", "picker": "Sprog"},
-    "de": {"dir": "de", "label": "DE", "name": "Deutsch", "picker": "Sprache"},
-    "fr": {"dir": "fr", "label": "FR", "name": "Français", "picker": "Langue"},
-    "es": {"dir": "es", "label": "ES", "name": "Español", "picker": "Idioma"},
+    "de": {"dir": "de", "label": "DE", "name": "Deutsch", "picker": "Sprache",
+           "note": "Diese Seite ist aus dem Englischen übersetzt. Die englische Fassung ist die, auf die die Stores verlinken; weicht etwas ab, gilt sie."},
+    "fr": {"dir": "fr", "label": "FR", "name": "Français", "picker": "Langue",
+           "note": "Cette page est traduite de l’anglais. La version anglaise est celle vers laquelle pointent les magasins ; en cas de divergence, c’est elle qui fait foi."},
+    "es": {"dir": "es", "label": "ES", "name": "Español", "picker": "Idioma",
+           "note": "Esta página es una traducción del inglés. La versión inglesa es la que enlazan las tiendas; si algo difiere, prevalece esa."},
 }
 
 # Flags are inlined rather than referenced from a <symbol> sprite: a <use> that
@@ -200,7 +203,13 @@ def pages():
 
 # The switcher labels and the footer's language names are rebuilt structurally,
 # so they must not also appear as prose for someone to translate.
-STRUCTURAL = {l["label"] for l in LANGS.values()} | {l["name"] for l in LANGS.values()}
+# Everything the picker is built from: codes, native names and the word on its
+# aria-label. rewrite_structure writes all of them in the target language, so
+# they must not also be offered as prose for someone to translate — and the
+# "still English" count must not flag them as gaps.
+STRUCTURAL = ({l["label"] for l in LANGS.values()}
+              | {l["name"] for l in LANGS.values()}
+              | {l["picker"] for l in LANGS.values()})
 
 
 def translatable(text):
@@ -340,6 +349,21 @@ def rewrite_structure(text, page, lang, paths=True):
     return text
 
 
+def insert_note(text, lang):
+    """Swap the marker in privacy.html for this language's authority note.
+
+    Only a translation needs a line saying which version governs, so it cannot
+    sit in the English source as content. It sits there as an HTML comment
+    instead: the English page renders nothing, `check` sees no new span, and
+    `nav` — which rewrites the English file in place — leaves it alone.
+    """
+    note = LANGS[lang].get("note")
+    if not note:
+        return text
+    return re.sub(r"([ \t]*)<!-- x-translated-note -->",
+                  lambda m: f"{m.group(1)}<p>{note}</p>", text, count=1)
+
+
 def cmd_extract():
     I18N.mkdir(exist_ok=True)
     segments, per_page = {}, {}
@@ -388,7 +412,7 @@ def cmd_build(langs):
         for name in pages():
             raw = (ROOT / name).read_text(encoding="utf-8")
             text, missing = apply_text(raw, spans_of(raw), table, page=name)
-            text = rewrite_structure(text, name, lang)
+            text = insert_note(rewrite_structure(text, name, lang), lang)
             (out_dir / name).write_text(text, encoding="utf-8")
             gaps += missing
         note = f", {gaps} spans still English" if gaps else ""
