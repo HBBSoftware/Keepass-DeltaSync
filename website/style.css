@@ -92,7 +92,12 @@ header.site {
   position: sticky;
   top: 0;
   z-index: 10;
-  backdrop-filter: blur(8px);
+  /* No backdrop-filter here. It made the header a compositing root, and the
+     hero logo's own drop-shadow filter then painted ON TOP of the language
+     menu hanging below the header — on a phone it hid two of the five flags.
+     Raising z-index did not help; only removing one of the two filters did.
+     And it was never visible anyway: --bg-elev is fully opaque, so there is no
+     backdrop to blur. */
 }
 header.site .container {
   display: flex;
