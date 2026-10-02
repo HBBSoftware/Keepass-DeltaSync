@@ -39,6 +39,15 @@ DOCKERHUB = "https://hub.docker.com/v2/repositories/hbbsoftware/deltasync-server
 GITHUB_RELEASES = "https://api.github.com/repos/HBBSoftware/Keepass-DeltaSync/releases?per_page=100"
 GHCR_PAGE = "https://github.com/orgs/HBBSoftware/packages/container/package/deltasync-server"
 
+# The two numbers that count people rather than fetches. A registry pull is a
+# machine asking for bytes; these are stores reporting an extension that is
+# still installed. Added 3 Oct 2026, after three days of data showed ghcr
+# climbing at a flat ~3.2/hour around the clock while Docker Hub — the same
+# image, mirrored — moved by exactly zero. That is automation, not users.
+AMO = "https://addons.mozilla.org/api/v5/addons/addon/deltasync-keepass-search-go/"
+EDGE = ("https://microsoftedge.microsoft.com/addons/getproductdetailsbycrxid/"
+        "dpmaneajjlanhipmbgdpdnfljiigdnjo")
+
 SITE = os.environ.get("STATS_SITE", "https://deltasync.org")
 STATS_PATH = os.environ.get("STATS_PATH", "")
 
@@ -94,6 +103,23 @@ def ghcr_downloads():
     return (int(total.group(1).replace(",", "")) if total else None), per
 
 
+def amo_stats():
+    """Firefox add-on: (average_daily_users, weekly_downloads).
+
+    average_daily_users comes from telemetry and rounds down, so a handful of
+    users can still read 0 — it is a floor, not a count.
+    """
+    d = json.loads(fetch(AMO, "application/json"))
+    if "detail" in d:
+        raise ValueError(d["detail"])
+    return d.get("average_daily_users"), d.get("weekly_downloads")
+
+
+def edge_installs():
+    """Edge add-on: activeInstallCount — installs still present, not downloads."""
+    return json.loads(fetch(EDGE, "application/json")).get("activeInstallCount")
+
+
 def previous_history():
     """Read the series already published. A missing file is a fresh start."""
     url = f"{SITE}/{STATS_PATH}/stats.json"
@@ -120,7 +146,9 @@ def main() -> int:
 
     # One dead source must not cost us the whole day's sample, so each is tried
     # on its own and a failure is recorded as null rather than raised.
-    for name, fn in (("dockerhub", dockerhub_pulls), ("github_releases", github_release_downloads)):
+    for name, fn in (("dockerhub", dockerhub_pulls),
+                     ("github_releases", github_release_downloads),
+                     ("edge_installs", edge_installs)):
         try:
             row[name] = fn()
             print(f"  {name}: {row[name]}")
@@ -137,6 +165,13 @@ def main() -> int:
         row["ghcr"] = None
         row["ghcr_versions"] = {}
         print(f"  ghcr: FAILED ({e})")
+
+    try:
+        row["amo_users"], row["amo_weekly"] = amo_stats()
+        print(f"  amo: {row['amo_users']} daily users, {row['amo_weekly']} weekly downloads")
+    except Exception as e:
+        row["amo_users"] = row["amo_weekly"] = None
+        print(f"  amo: FAILED ({e})")
 
     samples = [s for s in previous_history() if s.get("date") != today]
     samples.append(row)
@@ -161,29 +196,43 @@ PAGE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<title>DeltaSync — hentningstal</title>
+<title>DeltaSync — udbredelse</title>
 <link rel="stylesheet" href="../style.css">
 <style>
-  /* Series identity. Both steps validated against the site's light (#ffffff)
-     and dark (#0a0f1c) surfaces: lightness band, chroma, CVD separation and
-     3:1 contrast all pass in both, so one palette serves both themes. */
-  :root { --s-ghcr: #0284c7; --s-hub: #b45309; --s-rel: #7c3aed; }
+  /* Kategoriske trin 1-5, i fast raekkefoelge. Lyse og moerke trin er valgt
+     hver for sig og begge koert gennem validatoren: lysheds-baand, farvestyrke,
+     farveblindheds-adskillelse og kontrast. Lys tema advarer om kontrast under
+     3:1 for tre af dem — derfor baerer hver serie baade en farveprik OG sit navn
+     i tekst, har sin vaerdi skrevet ved kurvens ende, og findes i tabellen.
+     Identitet hviler aldrig paa farve alene. */
+  :root { --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; }
+  }
 
   .wrap { max-width: 60rem; margin: 0 auto; padding: var(--space-8) var(--space-4); }
-  .lede { color: var(--text-muted); max-width: 42rem; }
+  .lede { color: var(--text-muted); max-width: 44rem; }
 
-  .tiles { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-           margin: var(--space-8) 0; }
+  h2.group { font-size: 1.1rem; margin: var(--space-12) 0 var(--space-2); }
+  p.group-note { margin: 0 0 var(--space-6); color: var(--text-muted);
+                 max-width: 44rem; font-size: 0.9rem; }
+
+  .tiles { display: grid; gap: var(--space-4);
+           grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+           margin: 0 0 var(--space-8); }
   .tile { background: var(--bg-elev); border: 1px solid var(--border);
           border-radius: var(--radius-md); padding: var(--space-4); }
-  .tile h2 { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; margin: 0 0 var(--space-2);
-             color: var(--text-muted); display: flex; align-items: center; gap: var(--space-2); }
+  .tile h3 { font-size: 0.8rem; font-weight: 600; margin: 0 0 var(--space-2);
+             color: var(--text-muted); display: flex; align-items: center;
+             gap: var(--space-2); line-height: 1.3; }
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .big { font-size: 2rem; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .delta { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .big { font-size: 2rem; font-weight: 650; line-height: 1.1;
+         font-variant-numeric: tabular-nums; }
+  .delta { font-size: 0.8rem; color: var(--text-muted);
+           font-variant-numeric: tabular-nums; }
 
-  .panel { margin: var(--space-8) 0; }
-  .panel h2 { font-size: 1rem; margin: 0 0 var(--space-1);
+  .panel { margin: 0 0 var(--space-8); }
+  .panel h3 { font-size: 0.95rem; margin: 0 0 var(--space-1);
               display: flex; align-items: center; gap: var(--space-2); }
   .panel p { margin: 0 0 var(--space-3); font-size: 0.85rem; color: var(--text-muted); }
   .chart { position: relative; }
@@ -192,56 +241,77 @@ PAGE = """<!DOCTYPE html>
   .axis { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .end { stroke: var(--bg); stroke-width: 2; }
-  .lbl { fill: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .lbl { fill: var(--text); font-size: 11px; font-weight: 600;
+         font-variant-numeric: tabular-nums; }
   .hair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
   .hit { fill: transparent; }
-  .tip { position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -125%);
-         background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm);
-         padding: var(--space-2) var(--space-3); font-size: 0.8rem; white-space: nowrap;
-         box-shadow: var(--shadow-md); font-variant-numeric: tabular-nums; }
+  .tip { position: absolute; pointer-events: none; opacity: 0;
+         transform: translate(-50%, -125%); background: var(--bg-elev);
+         border: 1px solid var(--border); border-radius: var(--radius-sm);
+         padding: var(--space-2) var(--space-3); font-size: 0.8rem;
+         white-space: nowrap; box-shadow: var(--shadow-md);
+         font-variant-numeric: tabular-nums; }
   .empty { color: var(--text-muted); font-style: italic; }
 
-  table { border-collapse: collapse; width: 100%; font-size: 0.85rem;
+  table { border-collapse: collapse; width: 100%; font-size: 0.8rem;
           font-variant-numeric: tabular-nums; }
-  th, td { text-align: right; padding: var(--space-2) var(--space-3);
-           border-bottom: 1px solid var(--border); }
+  th, td { text-align: right; padding: var(--space-2); border-bottom: 1px solid var(--border); }
   th:first-child, td:first-child { text-align: left; }
   details { margin: var(--space-8) 0; }
   summary { cursor: pointer; color: var(--link); font-size: 0.9rem; }
-  .note { font-size: 0.85rem; color: var(--text-muted); border-left: 3px solid var(--border);
-          padding-left: var(--space-4); margin: var(--space-8) 0 0; }
+  .note { font-size: 0.85rem; color: var(--text-muted);
+          border-left: 3px solid var(--border); padding-left: var(--space-4);
+          margin: var(--space-8) 0 0; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Hentningstal</h1>
+  <h1>Udbredelse</h1>
   <p class="lede">Privat side — ikke linket fra deltasync.org og udelukket fra s&oslash;gemaskiner.
      Opdateres dagligt af et planlagt CI-job. <span id="gen"></span></p>
 
-  <div class="tiles" id="tiles"></div>
-  <div id="panels"></div>
+  <h2 class="group">Installationer</h2>
+  <p class="group-note">De eneste tal der t&aelig;ller <em>mennesker</em>. En butik rapporterer
+     en udvidelse der stadig er installeret; et registry rapporterer en maskine der bad om bytes.</p>
+  <div class="tiles" id="tiles-people"></div>
+  <div id="panels-people"></div>
+
+  <h2 class="group">Hentninger fra registries</h2>
+  <p class="group-note">Overvejende maskiner. M&aring;lt 30. sep &ndash; 2. okt 2026 voksede ghcr
+     med 75 og 76 om dagen &mdash; og en m&aring;ling midt imellem viste <em>samme</em> takt om natten
+     som midt p&aring; dagen. Mennesker har en d&oslash;gnrytme. Samtidig stod Docker Hub, som er
+     n&oslash;jagtig samme image spejlet, helt stille. Forskellen er at TrueNAS-kataloget peger
+     p&aring; ghcr, s&aring; alt der genneml&oslash;ber katalogets apps rammer kun den ene.</p>
+  <div class="tiles" id="tiles-machines"></div>
+  <div id="panels-machines"></div>
 
   <details>
-    <summary>Vis tallene som tabel</summary>
+    <summary>Vis alle tal som tabel</summary>
     <div id="table"></div>
   </details>
 
-  <p class="note">Et <em>pull</em> er ikke en bruger. En TrueNAS-installation henter
-     mindst to images, hver opgradering henter igen, og din egen CI t&aelig;ller med.
-     L&aelig;s kurvens <em>retning</em>, ikke dens absolutte niveau.
-     GitLabs registry er ikke med: det offentligg&oslash;r ingen t&aelig;llere.
-     Kun hentninger af udgivelsesfiler p&aring; GitHub svarer nogenlunde til mennesker.</p>
+  <p class="note">GitLabs registry er ikke med: det offentligg&oslash;r ingen t&aelig;llere.
+     F-Droid heller ikke &mdash; derfor er Android-brugere usynlige her, uanset hvor mange der er.
+     AMO\u2019s brugertal kommer fra telemetri og runder ned, s&aring; en h&aring;ndfuld brugere
+     kan stadig vise 0. L&aelig;s det som et gulv, ikke som en optælling.</p>
 </div>
 
 <script>
-const SERIES = [
-  { key: "ghcr",            name: "ghcr.io",          color: "var(--s-ghcr)",
-    note: "Det registry TrueNAS-appen henter fra \\u2014 tallet der betyder mest." },
-  { key: "dockerhub",       name: "Docker Hub",       color: "var(--s-hub)",
-    note: "Spejling. H\\u00f8jere tal, fordi den har samlet CI-pulls siden 1. juli 2026." },
-  { key: "github_releases", name: "GitHub-udgivelser", color: "var(--s-rel)",
-    note: "Hentede filer, mest Android-APK\\u0027er. T\\u00e6ttest p\\u00e5 rigtige personer." },
+const PEOPLE = [
+  { key: "amo_users", name: "Firefox \u2014 daglige brugere", color: "var(--s1)",
+    note: "addons.mozilla.org. Gennemsnitligt antal installationer der sender telemetri." },
+  { key: "edge_installs", name: "Edge \u2014 aktive installationer", color: "var(--s2)",
+    note: "Microsofts butik. Installationer der stadig findes, ikke hentninger." },
+  { key: "github_releases", name: "GitHub \u2014 hentede filer", color: "var(--s3)",
+    note: "Udgivelsesfiler, mest Android-APK\u2019er. En hentning er en handling, ikke et kald." },
 ];
+const MACHINES = [
+  { key: "ghcr", name: "ghcr.io \u2014 pulls", color: "var(--s4)",
+    note: "Det registry TrueNAS-appen henter fra. Vokser j\u00e6vnt d\u00f8gnet rundt." },
+  { key: "dockerhub", name: "Docker Hub \u2014 pulls", color: "var(--s5)",
+    note: "Samme image, spejlet. Kontrolgruppen: intet automatisk peger herp\u00e5." },
+];
+const ALL = PEOPLE.concat(MACHINES);
 const nf = new Intl.NumberFormat("da-DK");
 const df = (s) => new Date(s + "T00:00:00Z").toLocaleDateString("da-DK", { day: "numeric", month: "short" });
 
@@ -249,64 +319,78 @@ fetch("stats.json", { cache: "no-cache" })
   .then((r) => r.json())
   .then(render)
   .catch((e) => {
-    document.getElementById("panels").innerHTML =
-      '<p class="empty">Kunne ikke l\\u00e6se stats.json: ' + e + "</p>";
+    document.getElementById("panels-people").innerHTML =
+      '<p class="empty">Kunne ikke l\u00e6se stats.json: ' + e + "</p>";
   });
+
+function tile(rows, s) {
+  const vals = rows.filter((r) => r[s.key] != null);
+  const last = vals.length ? vals[vals.length - 1][s.key] : null;
+  const prev = vals.length > 1 ? vals[vals.length - 2][s.key] : null;
+  const d = last != null && prev != null ? last - prev : null;
+  let sub = d == null ? "afventer n\u00e6ste m\u00e5ling"
+                      : (d > 0 ? "+" : "") + nf.format(d) + " siden sidst";
+  if (s.key === "amo_users") {
+    const w = vals.length ? vals[vals.length - 1].amo_weekly : null;
+    if (w != null) sub += " \u00b7 " + nf.format(w) + "/uge hentet";
+  }
+  return '<div class="tile"><h3><span class="dot" style="background:' + s.color + '"></span>' +
+    s.name + '</h3><div class="big">' + (last == null ? "\u2014" : nf.format(last)) +
+    '</div><div class="delta">' + sub + "</div></div>";
+}
 
 function render(doc) {
   const rows = doc.samples || [];
   document.getElementById("gen").textContent = rows.length
     ? "Senest opdateret " + df(doc.generated) : "";
 
-  document.getElementById("tiles").innerHTML = SERIES.map((s) => {
-    const vals = rows.filter((r) => r[s.key] != null);
-    const last = vals.length ? vals[vals.length - 1][s.key] : null;
-    const prev = vals.length > 1 ? vals[vals.length - 2][s.key] : null;
-    const d = last != null && prev != null ? last - prev : null;
-    return '<div class="tile"><h2><span class="dot" style="background:' + s.color + '"></span>' +
-      s.name + '</h2><div class="big">' + (last == null ? "\\u2014" : nf.format(last)) +
-      '</div><div class="delta">' +
-      (d == null ? "afventer n\\u00e6ste m\\u00e5ling" : (d > 0 ? "+" : "") + nf.format(d) + " siden sidst") +
-      "</div></div>";
-  }).join("");
+  for (const [group, tid, pid] of [[PEOPLE, "tiles-people", "panels-people"],
+                                   [MACHINES, "tiles-machines", "panels-machines"]]) {
+    document.getElementById(tid).innerHTML = group.map((s) => tile(rows, s)).join("");
+    document.getElementById(pid).innerHTML = group.map((s) =>
+      '<section class="panel"><h3><span class="dot" style="background:' + s.color + '"></span>' +
+      s.name + "</h3><p>" + s.note + '</p><div class="chart" id="c-' + s.key + '"></div></section>'
+    ).join("");
+    group.forEach((s) => drawChart(document.getElementById("c-" + s.key), rows, s));
+  }
 
-  // Small multiples, one panel per channel: the three counters differ by two
-  // orders of magnitude, and a shared axis would flatten the smallest to a
-  // straight line. A second y-axis is never the answer.
-  document.getElementById("panels").innerHTML = SERIES.map((s) =>
-    '<section class="panel"><h2><span class="dot" style="background:' + s.color + '"></span>' +
-    s.name + "</h2><p>" + s.note + '</p><div class="chart" id="c-' + s.key + '"></div></section>'
-  ).join("");
-  SERIES.forEach((s) => drawChart(document.getElementById("c-" + s.key), rows, s));
-
-  const cols = ["Dato"].concat(SERIES.map((s) => s.name));
+  const cols = ["Dato"].concat(ALL.map((s) => s.name));
   document.getElementById("table").innerHTML = "<table><thead><tr>" +
     cols.map((c) => "<th>" + c + "</th>").join("") + "</tr></thead><tbody>" +
     rows.slice().reverse().map((r) => "<tr><td>" + r.date + "</td>" +
-      SERIES.map((s) => "<td>" + (r[s.key] == null ? "\\u2014" : nf.format(r[s.key])) + "</td>").join("") +
+      ALL.map((s) => "<td>" + (r[s.key] == null ? "\u2014" : nf.format(r[s.key])) + "</td>").join("") +
       "</tr>").join("") + "</tbody></table>";
 }
 
 function drawChart(host, rows, s) {
   const pts = rows.filter((r) => r[s.key] != null).map((r) => ({ date: r.date, v: r[s.key] }));
   if (pts.length < 2) {
-    host.innerHTML = '<p class="empty">' + (pts.length ? "\\u00c9n m\\u00e5ling indtil nu \\u2014 " +
-      nf.format(pts[0].v) + ". En kurve kr\\u00e6ver mindst to." : "Ingen m\\u00e5linger endnu.") + "</p>";
+    host.innerHTML = '<p class="empty">' + (pts.length ? "\u00c9n m\u00e5ling indtil nu \u2014 " +
+      nf.format(pts[0].v) + ". En kurve kr\u00e6ver mindst to." : "Ingen m\u00e5linger endnu.") + "</p>";
     return;
   }
-  const W = 720, H = 200, L = 52, R = 46, T = 14, B = 28;
-  const iw = W - L - R, ih = H - T - B;
   const lo = Math.min.apply(null, pts.map((p) => p.v));
   const hi = Math.max.apply(null, pts.map((p) => p.v));
-  // A flat series would collapse to zero range and divide by zero; give it air.
-  const pad = hi === lo ? Math.max(1, hi * 0.05) : (hi - lo) * 0.12;
+  // En serie der ikke har rykket sig baerer én oplysning, og en graf er den
+  // forkerte form til én oplysning: den ville vise en vandret streg midt i et
+  // tomt felt. Sig det i stedet. Flytter serien sig senere, kommer grafen af
+  // sig selv.
+  if (hi === lo) {
+    host.innerHTML = '<p class="empty">U\u00e6ndret p\u00e5 ' + nf.format(hi) +
+      " gennem " + pts.length + " m\u00e5linger (" + df(pts[0].date) + " \u2013 " +
+      df(pts[pts.length - 1].date) + ").</p>";
+    return;
+  }
+  const W = 720, H = 170, L = 52, R = 46, T = 14, B = 28;
+  const iw = W - L - R, ih = H - T - B;
+  // En helt flad serie ville give nul spaendvidde og dividere med nul. Den er
+  // ogsaa et resultat i sig selv — Docker Hub staar stille — saa den skal tegnes
+  // som en vandret streg midt i feltet, ikke skjules.
+  const pad = (hi - lo) * 0.12;
   const y0 = lo - pad, y1 = hi + pad;
   const X = (i) => L + (pts.length === 1 ? iw / 2 : (i / (pts.length - 1)) * iw);
   const Y = (v) => T + ih - ((v - y0) / (y1 - y0)) * ih;
 
-  // Label the real minimum, midpoint and maximum rather than the padded scale
-  // ends: the padding exists to keep the line off the edges, and printing it
-  // would put numbers on the axis that never occurred in the data.
   const ticks = [lo, (lo + hi) / 2, hi];
   let svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' +
     s.name + ', udvikling over tid">';
@@ -326,13 +410,13 @@ function drawChart(host, rows, s) {
     '" r="5" fill="' + s.color + '"/>';
   svg += '<text class="lbl" x="' + (W - R + 8) + '" y="' + (Y(pts[lastI].v) + 4).toFixed(1) + '">' +
     nf.format(pts[lastI].v) + "</text>";
-  svg += '<line class="hair" id="h-' + s.key + '" y1="' + T + '" y2="' + (T + ih) + '"/>';
+  svg += '<line class="hair" y1="' + T + '" y2="' + (T + ih) + '"/>';
   svg += '<rect class="hit" x="' + L + '" y="' + T + '" width="' + iw + '" height="' + ih + '"/>';
   svg += "</svg>";
   host.innerHTML = svg + '<div class="tip"></div>';
 
-  const el = host.querySelector("svg"), hair = host.querySelector(".hair"), tip = host.querySelector(".tip");
-  const hit = host.querySelector(".hit");
+  const el = host.querySelector("svg"), hair = host.querySelector(".hair"),
+        tip = host.querySelector(".tip"), hit = host.querySelector(".hit");
   hit.addEventListener("pointermove", (ev) => {
     const box = el.getBoundingClientRect();
     const sx = (ev.clientX - box.left) / box.width * W;
@@ -344,7 +428,7 @@ function drawChart(host, rows, s) {
     tip.style.opacity = 1;
     tip.style.left = (X(i) / W * box.width) + "px";
     tip.style.top = (Y(pts[i].v) / H * box.height) + "px";
-    tip.innerHTML = "<strong>" + nf.format(pts[i].v) + "</strong> \\u00b7 " + df(pts[i].date);
+    tip.innerHTML = "<strong>" + nf.format(pts[i].v) + "</strong> \u00b7 " + df(pts[i].date);
   });
   hit.addEventListener("pointerleave", () => { hair.style.opacity = 0; tip.style.opacity = 0; });
 }
