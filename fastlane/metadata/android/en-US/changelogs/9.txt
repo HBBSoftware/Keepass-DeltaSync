@@ -1,0 +1,7 @@
+Three more languages, and a crash that was waiting for anyone on Android 6 or 7.
+
+• German, French and Spanish. The app speaks five languages now. On Android 13 and newer you can set its language on its own, under Settings → Apps → DeltaSync → Language, without changing the whole phone's. Older versions follow the system language as they always have.
+
+• Enrolling a device would have crashed on Android 6.0, 7.0 and 7.1. The code that stores this device's key used a Java class that only exists from Android 8 onwards, inside an app whose stated minimum is Android 6 — so on those phones the very first thing a new device does would have failed. It now uses the equivalent that has been part of Android since the beginning. Nothing already stored changes form, so an existing install is unaffected.
+
+• The Danish version line read "canonical schema" in English. That one string had never been translated; now it is.

@@ -206,6 +206,49 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [android/v0.4.4] — 2026-10-03
+
+### Fixed
+
+- **Enrolling a device would have crashed on Android 6 and 7 (Android)** —
+  `KeystoreTokenStore` and `ShareActivity` called `java.util.Base64` with no
+  `SDK_INT` guard and no core library desugaring. That class arrives in API 26;
+  `minSdk` is 23, deliberately, because `androidx.biometric` needs it. `save()`
+  runs during enrollment, so on Android 6.0, 7.0 and 7.1 the first thing a new
+  device does would have thrown `NoClassDefFoundError`. It now uses
+  `android.util.Base64`, present since API 1. Two flags matter and neither is
+  the default: encoding takes `NO_WRAP`, or the stored value gains line breaks
+  and stops matching what was written before; decoding takes `DEFAULT`, which
+  accepts what is already there. Existing installs are unaffected.
+
+  It had gone unnoticed because CI ran only `:app:assembleRelease`, and
+  `assemble` does not check API levels. `lint` now runs first in the same job,
+  so the next one stops the build rather than a user's phone.
+
+- **The Danish version footer was never translated (Android)** — Danish users
+  have read `canonical schema` in English since the string was added. It is the
+  one string the Danish file was missing.
+
+### Added
+
+- **German, French and Spanish (Android)** — 96 strings each, generated from
+  `values/strings.xml` so the comments and grouping line up with the English
+  file and a diff between two locales stays readable. Verified by building:
+  `aapt2` resolves every string in all five locales. That mattered most for
+  French, where a bare apostrophe is a resource error rather than a typo.
+
+- **The app's language can be set on its own (Android)** — `locales_config.xml`
+  and `android:localeConfig` put DeltaSync under Settings → Apps → Language on
+  Android 13 and up. Without it the only way to change the app's language was
+  to change the entire phone's, which is a poor trade for five of them. Older
+  releases ignore the file and follow the system locale as before.
+
+- **`MissingTranslation` is a build error (Android)** — a new string in
+  `values/` with no counterpart in the four translations now stops the build
+  instead of reaching a user. `app_name` is marked `translatable="false"`: the
+  brand name is not translated, and the Danish file already said so in a
+  comment.
+
 ## [client/v1.9.0] — 2026-09-14
 
 The browser host now serves Chrome and Edge as well as Firefox, and the client
