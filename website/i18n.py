@@ -342,6 +342,16 @@ def rewrite_structure(text, page, lang, paths=True):
             f'<a href="{link_to(page, lang, c)}">{LANGS[c]["name"]}</a>'
             for c in LANGS if c != lang)
 
+    # 6. The view counter. A first-party 1x1 image, so it works with JavaScript
+    #    off and pulls in nothing from anywhere else — the privacy page's promise
+    #    is about third parties, and this is not one. Replaced rather than
+    #    appended when already present, so running build or nav twice is safe.
+    px = (f'{ind}<img src="{"../" if LANGS[lang]["dir"] else ""}px.php'
+          f'?p={lang}/{page[:-5]}" alt="" width="1" height="1" aria-hidden="true"'
+          f' style="position:absolute;left:-9999px">')
+    text = re.sub(r'[ \t]*<img src="(?:\.\./)?px\.php\?[^"]*"[^>]*>\n', "", text)
+    text = text.replace("</body>", px + "\n</body>", 1)
+
     names = "|".join(re.escape(l["name"]) for l in LANGS.values())
     text = re.sub(rf'([ \t]*)<a href="[^"]*">(?:{names})</a>'
                   rf'(?:\s*&nbsp;·&nbsp;\s*<a href="[^"]*">(?:{names})</a>)*',

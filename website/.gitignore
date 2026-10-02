@@ -12,3 +12,6 @@ stats-*/
 /es/
 
 __pycache__/
+
+# px.php genereres af collect_stats.py med rapport-tokenet i sig.
+px.php
