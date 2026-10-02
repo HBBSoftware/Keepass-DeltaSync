@@ -2,10 +2,16 @@
 package dk.bjoerckbraun.deltasync.persistence
 
 import android.content.Context
+import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dk.bjoerckbraun.deltasync.sync.TokenStore
-import java.util.Base64
+
+// android.util.Base64 — IKKE java.util.Base64, som foerst findes fra API 26
+// mens minSdk er 23. NO_WRAP ved kodning er paakraevet: uden det indsaetter
+// android.util.Base64 linjeskift, og vaerdien ville ikke laengere svare til
+// det java.util.Base64 skrev. DEFAULT ved afkodning taeller linjeskift som
+// tilladte, saa allerede gemte vaerdier laeses uaendret.
 
 /**
  * [TokenStore]-impl der gemmer device-credentials i Android's
@@ -40,7 +46,7 @@ class KeystoreTokenStore(context: Context) : TokenStore {
             .putString(KEY_SERVER_URL, serverUrl.trimEnd('/'))
             .putString(KEY_DEVICE_ID, deviceId)
             .putString(KEY_DEVICE_TOKEN, deviceToken)
-            .putString(KEY_DEVICE_PRIVATE_KEY, Base64.getEncoder().encodeToString(devicePrivateKey))
+            .putString(KEY_DEVICE_PRIVATE_KEY, Base64.encodeToString(devicePrivateKey, Base64.NO_WRAP))
             .apply()
     }
 
@@ -53,7 +59,7 @@ class KeystoreTokenStore(context: Context) : TokenStore {
             serverUrl = serverUrl,
             deviceId = deviceId,
             deviceToken = deviceToken,
-            devicePrivateKey = Base64.getDecoder().decode(privateKeyB64),
+            devicePrivateKey = Base64.decode(privateKeyB64, Base64.DEFAULT),
         )
     }
 

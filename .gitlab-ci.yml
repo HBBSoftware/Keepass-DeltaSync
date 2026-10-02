@@ -340,6 +340,12 @@ build:android:
       ( cd android/libs && unzip -o -q deltasync.aar classes.jar \
           && mv classes.jar deltasync-classes.jar )
 
+      # lint koerer FOER assemble, saa en manglende oversaettelse eller et kald
+      # over minSdk stopper bygget med det samme. Det har aldrig koert i CI, og
+      # derfor stod seks NewApi-fejl upaatalte indtil 3. oktober 2026.
+      echo "==> lint"
+      ( cd android && ./gradlew --no-daemon :app:lintRelease )
+
       echo "==> assembleRelease"
       ( cd android && ./gradlew --no-daemon :app:assembleRelease )
 

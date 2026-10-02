@@ -3,6 +3,7 @@ package dk.bjoerckbraun.deltasync
 
 import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.os.Bundle
+import android.util.Base64
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -24,7 +25,6 @@ import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Base64
 
 /**
  * Ejer-side af v2 sharing: del den konfigurerede database med andre brugere,
@@ -237,7 +237,7 @@ class ShareActivity : ComponentActivity() {
             val outcome = withContext(Dispatchers.IO) {
                 try {
                     val lookup = api.lookupUser(username)
-                    val targetPub = Base64.getDecoder().decode(lookup.targetDevice.publicKey)
+                    val targetPub = Base64.decode(lookup.targetDevice.publicKey, Base64.DEFAULT)
                     val wrapped = GomobileCryptoSession.wrapMasterKeyForShare(
                         password.toByteArray(),
                         databaseId,
