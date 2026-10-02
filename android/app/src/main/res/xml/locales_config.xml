@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Uden denne liste kan brugeren kun skifte appens sprog ved at skifte hele
+  telefonens sprog. Med den dukker DeltaSync op under Indstillinger → Apps →
+  DeltaSync → Sprog på Android 13 og nyere. Ældre udgaver ignorerer den, og
+  følger som hidtil systemsproget.
+
+  Rækkefølgen betyder intet; listen skal matche values-*/-mapperne.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="da" />
+    <locale android:name="de" />
+    <locale android:name="fr" />
+    <locale android:name="es" />
+</locale-config>

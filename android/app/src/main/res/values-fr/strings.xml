@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- MainActivity -->
+    <string name="version_footer">v%1$s · schéma canonique v%2$d</string>
+    <string name="status_label">État</string>
+    <string name="status_not_enrolled">Non inscrit. Touchez « Inscrire l\'appareil » ci-dessous pour lier cet appareil à un serveur DeltaSync.</string>
+    <string name="status_enrolled_no_db_format">Inscrit.\n\nServeur : %1$s\nAppareil : %2$s…\n\nBase de données non configurée. Touchez ci-dessous pour choisir un .kdbx et l\'associer à une base du serveur.</string>
+    <string name="status_ready_format">Prêt à synchroniser.\n\nServeur : %1$s\nAppareil : %2$s…\nkdbx locale : %3$s\nBase serveur : %4$s…</string>
+
+    <string name="action_enroll_device">Inscrire l\'appareil</string>
+    <string name="action_setup_database">Configurer la base</string>
+    <string name="action_sync_now">Synchroniser maintenant</string>
+    <string name="action_share_database">Partager la base</string>
+    <string name="action_unenroll">Oublier les identifiants de l\'appareil</string>
+
+    <string name="server_required_label">Serveur requis</string>
+    <string name="server_required_note">DeltaSync a besoin d\'un serveur. Vous ou votre administrateur devez en avoir installé un (PHP + PostgreSQL), généré un jeton d\'inscription via la ligne de commande d\'administration, et vous avoir donné l\'URL du serveur. Cette application ne fonctionne pas seule — c\'est un client pour un serveur déjà en service.\n\nInstructions sur https://gitlab.com/Star95/keepass-deltasync.</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_dialog_title">Synchroniser maintenant</string>
+    <string name="sync_dialog_message">Saisissez le mot de passe maître de votre .kdbx pour déchiffrer localement.</string>
+    <string name="sync_dialog_hint">mot de passe maître kdbx</string>
+    <string name="sync_dialog_action">Synchroniser</string>
+    <string name="biometric_title">Confirmez que c\'est bien vous</string>
+    <string name="biometric_subtitle">Authentifiez-vous pour enregistrer votre mot de passe maître et permettre la synchronisation en arrière-plan.</string>
+    <string name="remember_not_confirmed">Non confirmé — la synchronisation automatique n\'a pas été activée.</string>
+    <string name="background_sync_enabled">La synchronisation en arrière-plan est active. Votre mot de passe est enregistré chiffré et sert à synchroniser automatiquement.</string>
+
+    <!-- Auto-sync -->
+    <string name="auto_sync_switch">Synchronisation automatique en arrière-plan</string>
+    <string name="auto_sync_note">Retient votre mot de passe maître (chiffré) et garde la base synchronisée automatiquement. Aucune empreinte nécessaire après la première fois.</string>
+    <string name="auto_sync_interval_row">Synchroniser toutes les %1$d minutes</string>
+    <string name="auto_sync_interval_dialog_title">Intervalle de synchronisation</string>
+    <string name="auto_sync_interval_option">%1$d minutes</string>
+    <string name="auto_sync_disabled">Synchronisation automatique désactivée.</string>
+    <string name="auto_sync_wrong_password">Mot de passe incorrect — synchronisation automatique désactivée. Réactivez-la pour le saisir à nouveau.</string>
+    <string name="sync_progress_starting">Démarrage…</string>
+    <string name="sync_progress_opening">Ouverture de la base…</string>
+    <string name="sync_progress_pulling">Récupération des changements… %1$d/%2$d</string>
+    <string name="sync_progress_saving">Enregistrement de la base…</string>
+    <string name="sync_progress_pushing">Envoi des changements… %1$d/%2$d</string>
+    <string name="sync_progress_finishing">Finalisation…</string>
+    <string name="sync_result_ok_title">Synchronisation réussie</string>
+    <string name="sync_result_format">Reçu : %1$d entrées, %2$d suppressions\nEnvoyé : %3$d entrées, %4$d suppressions\nSéquence serveur : %5$d</string>
+    <string name="sync_result_failed_title">Échec de la synchronisation</string>
+
+    <!-- ShareActivity -->
+    <string name="share_title">Partager la base</string>
+    <string name="share_description">Partagez cette base avec un autre utilisateur de DeltaSync. Il obtient un accès en lecture et écriture et peut la synchroniser sur ses propres appareils. Votre mot de passe maître est nécessaire pour lui envelopper la clé.</string>
+    <string name="share_add_label">Ajouter un membre</string>
+    <string name="share_username_hint">Nom d\'utilisateur avec qui partager</string>
+    <string name="share_username_required">Saisissez un nom d\'utilisateur.</string>
+    <string name="share_action">Partager avec l\'utilisateur</string>
+    <string name="share_members_label">Membres actuels</string>
+    <string name="share_no_members">Aucun membre pour l\'instant. Ajoutez quelqu\'un ci-dessus.</string>
+    <string name="share_member_line">%1$s — %2$s</string>
+    <string name="share_member_line_named">%1$s (%2$s) — %3$s</string>
+    <string name="share_remove">Retirer</string>
+    <string name="share_remove_title">Retirer le membre</string>
+    <string name="share_remove_confirm">Retirer l\'accès de %1$s à cette base ? Il ne pourra plus la synchroniser.</string>
+    <string name="share_removed">%1$s retiré.</string>
+    <string name="share_shared_with">Partagée avec %1$s.</string>
+    <string name="share_not_owner">Seul le propriétaire de la base peut gérer le partage. Partagez-la depuis l\'appareil qui l\'a créée.</string>
+    <string name="share_password_title">Mot de passe maître</string>
+    <string name="share_password_message">Saisissez le mot de passe maître de votre .kdbx pour envelopper la clé destinée au nouveau membre.</string>
+    <string name="share_error_format">Serveur : %1$d — %2$s</string>
+
+    <!-- EnrollActivity -->
+    <string name="enroll_title">Inscrire l\'appareil</string>
+    <string name="enroll_description">Échange un jeton d\'inscription à usage unique (émis par l\'administrateur du serveur) contre un jeton d\'appareil permanent. L\'application génère localement une paire de clés X25519 conservée dans l\'Android Keystore.</string>
+    <string name="enroll_label_server_url">URL du serveur</string>
+    <string name="enroll_label_token">Jeton d\'inscription</string>
+    <string name="enroll_label_device_name">Nom de l\'appareil (facultatif)</string>
+    <string name="enroll_action">Inscrire</string>
+    <string name="enroll_action_scan">Scanner le QR code</string>
+    <string name="enroll_or_enter_manually">ou saisir manuellement</string>
+    <string name="enroll_scan_prompt">Visez le QR code d\'inscription affiché par le panneau d\'administration.</string>
+    <string name="enroll_scan_invalid">Ce n\'est pas un QR code d\'inscription DeltaSync.</string>
+    <string name="enroll_scan_filled">Scanné. Vérifiez les informations et touchez « Inscrire ».</string>
+    <string name="enroll_error_required_fields">L\'URL du serveur et le jeton d\'inscription sont obligatoires.</string>
+    <string name="enroll_error_url_scheme">L\'URL du serveur doit commencer par https:// ou http://</string>
+    <string name="enroll_warning_cleartext">Connexion non chiffrée. Toute personne sur le réseau entre cet appareil et le serveur peut lire le trafic. Acceptable sur un réseau local de confiance ; utilisez https:// sur Internet.</string>
+    <string name="enroll_error_camera_denied">Accès à la caméra refusé. Autorisez-le pour scanner un QR code, ou saisissez l\'URL du serveur et le jeton à la main.</string>
+    <string name="enroll_error_server_format">Refusé par le serveur : %1$d %2$s %3$s</string>
+    <string name="enroll_error_generic_format">Échec de l\'inscription : %1$s</string>
+
+    <!-- SetupActivity -->
+    <string name="setup_title">Configurer la base</string>
+    <string name="setup_description">Choisissez votre fichier .kdbx local et associez-le à une base sur le serveur. L\'application retient la configuration et synchronise périodiquement en arrière-plan.</string>
+    <string name="setup_step_pick_file">1. Choisir le fichier .kdbx</string>
+    <string name="setup_action_pick_file">Choisir un fichier…</string>
+    <string name="setup_step_match_database">2. Associer à une base du serveur</string>
+    <string name="setup_action_list_databases">Lister les bases du serveur</string>
+    <string name="setup_action_create_database">Créer une base sur le serveur…</string>
+    <string name="setup_action_create_another">Créer une autre base…</string>
+    <string name="setup_create_hint">Ce serveur n\'a encore aucune base pour votre compte. Créez-en une ici — puis associez-y votre fichier .kdbx ci-dessous. Ce n\'est à faire qu\'une fois ; les autres appareils choisissent la même base dans la liste.</string>
+    <string name="setup_dialog_create_title">Nouvelle base</string>
+    <string name="setup_dialog_create_hint">Nom</string>
+    <string name="setup_dialog_create_ok">Créer</string>
+    <string name="setup_created_format">Base \"%1$s\" créée. Sélectionnez-la ci-dessous et enregistrez.</string>
+    <string name="setup_action_save">Enregistrer la configuration</string>
+    <string name="setup_error_not_enrolled">Non inscrit.</string>
+    <string name="setup_error_server_format">Serveur : %1$d %2$s %3$s</string>
+    <string name="setup_error_no_databases">Aucune base sur le serveur. Créez-en une d\'abord avec le client de bureau.</string>
+    <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
+    <string name="last_sync_format">Dernière synchronisation : %1$s</string>
+    <string name="last_sync_never">Pas encore synchronisé sur cet appareil.</string>
+    <string name="last_sync_just_now">à l\'instant</string>
+    <string name="unenroll_confirm_title">Oublier les identifiants de l\'appareil ?</string>
+    <string name="unenroll_confirm_message">Cet appareil cesse de se synchroniser et perd son identité sur le serveur. Pour le récupérer, il faut un nouveau jeton d\'inscription à usage unique auprès de la personne qui administre le serveur — le téléphone ne peut pas annuler cela tout seul.\n\nVotre fichier .kdbx local reste intact.</string>
+    <string name="unenroll_confirm_action">Oublier</string>
+</resources>

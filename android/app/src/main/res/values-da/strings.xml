@@ -3,6 +3,7 @@
     <!-- app_name forbliver "DeltaSync" — brand-navnet oversættes ikke. -->
 
     <!-- MainActivity -->
+    <string name="version_footer">v%1$s · kanonisk skema v%2$d</string>
     <string name="status_label">Status</string>
     <string name="status_not_enrolled">Ikke enrolled. Tryk på Enroll-knappen for at binde denne enhed til en DeltaSync-server.</string>
     <string name="status_enrolled_no_db_format">Enrolled.\n\nServer: %1$s\nEnhed: %2$s…\n\nDatabase ikke konfigureret. Tryk nedenfor for at vælge en .kdbx og matche den til en database på serveren.</string>

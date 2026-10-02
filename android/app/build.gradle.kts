@@ -40,6 +40,14 @@ android {
         jvmTarget = "17"
     }
 
+    // En ny streng i values/ uden modsvar i de fire oversaettelser skal stoppe
+    // bygget, ikke blive opdaget af en bruger. Det er Androids modstykke til
+    // website-generatorens "spans still English"-taelling.
+    lint {
+        error += "MissingTranslation"
+        error += "ExtraTranslation"
+    }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true

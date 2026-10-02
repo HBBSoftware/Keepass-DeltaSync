@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- MainActivity -->
+    <string name="version_footer">v%1$s · kanonisches Schema v%2$d</string>
+    <string name="status_label">Status</string>
+    <string name="status_not_enrolled">Nicht registriert. Tippen Sie unten auf „Gerät registrieren“, um dieses Gerät an einen DeltaSync-Server zu binden.</string>
+    <string name="status_enrolled_no_db_format">Registriert.\n\nServer: %1$s\nGerät: %2$s…\n\nDatenbank nicht eingerichtet. Tippen Sie unten, um eine .kdbx zu wählen und einer Serverdatenbank zuzuordnen.</string>
+    <string name="status_ready_format">Bereit zum Synchronisieren.\n\nServer: %1$s\nGerät: %2$s…\nLokale kdbx: %3$s\nServer-DB: %4$s…</string>
+
+    <string name="action_enroll_device">Gerät registrieren</string>
+    <string name="action_setup_database">Datenbank einrichten</string>
+    <string name="action_sync_now">Jetzt synchronisieren</string>
+    <string name="action_share_database">Datenbank freigeben</string>
+    <string name="action_unenroll">Gerätezugang vergessen</string>
+
+    <string name="server_required_label">Server erforderlich</string>
+    <string name="server_required_note">DeltaSync benötigt einen Server. Sie oder Ihr Administrator müssen einen aufgesetzt haben (PHP + PostgreSQL), über die Admin-Kommandozeile ein Registrierungstoken erzeugt und Ihnen die Server-URL gegeben haben. Diese App funktioniert nicht eigenständig — sie ist ein Client für einen bereits laufenden Server.\n\nAnleitung unter https://gitlab.com/Star95/keepass-deltasync.</string>
+
+    <!-- Sync dialog -->
+    <string name="sync_dialog_title">Jetzt synchronisieren</string>
+    <string name="sync_dialog_message">Geben Sie Ihr .kdbx-Master-Passwort ein, um lokal zu entschlüsseln.</string>
+    <string name="sync_dialog_hint">kdbx-Master-Passwort</string>
+    <string name="sync_dialog_action">Synchronisieren</string>
+    <string name="biometric_title">Bestätigen Sie, dass Sie es sind</string>
+    <string name="biometric_subtitle">Authentifizieren Sie sich, um Ihr Master-Passwort für die Hintergrundsynchronisierung zu speichern.</string>
+    <string name="remember_not_confirmed">Nicht bestätigt — die automatische Synchronisierung wurde nicht aktiviert.</string>
+    <string name="background_sync_enabled">Hintergrundsynchronisierung ist an. Ihr Passwort liegt verschlüsselt und wird zum automatischen Synchronisieren verwendet.</string>
+
+    <!-- Auto-sync -->
+    <string name="auto_sync_switch">Automatisch im Hintergrund synchronisieren</string>
+    <string name="auto_sync_note">Merkt sich Ihr Master-Passwort (verschlüsselt) und hält die Datenbank automatisch synchron. Nach dem ersten Mal ist kein Fingerabdruck mehr nötig.</string>
+    <string name="auto_sync_interval_row">Alle %1$d Minuten synchronisieren</string>
+    <string name="auto_sync_interval_dialog_title">Synchronisierungsintervall</string>
+    <string name="auto_sync_interval_option">%1$d Minuten</string>
+    <string name="auto_sync_disabled">Automatische Synchronisierung ausgeschaltet.</string>
+    <string name="auto_sync_wrong_password">Falsches Passwort — automatische Synchronisierung ausgeschaltet. Schalten Sie sie wieder ein, um es erneut einzugeben.</string>
+    <string name="sync_progress_starting">Wird gestartet…</string>
+    <string name="sync_progress_opening">Datenbank wird geöffnet…</string>
+    <string name="sync_progress_pulling">Änderungen werden geholt… %1$d/%2$d</string>
+    <string name="sync_progress_saving">Datenbank wird gespeichert…</string>
+    <string name="sync_progress_pushing">Änderungen werden gesendet… %1$d/%2$d</string>
+    <string name="sync_progress_finishing">Wird abgeschlossen…</string>
+    <string name="sync_result_ok_title">Synchronisierung OK</string>
+    <string name="sync_result_format">Geholt: %1$d Einträge, %2$d Löschungen\nGesendet: %3$d Einträge, %4$d Löschungen\nServer-Seq: %5$d</string>
+    <string name="sync_result_failed_title">Synchronisierung fehlgeschlagen</string>
+
+    <!-- ShareActivity -->
+    <string name="share_title">Datenbank freigeben</string>
+    <string name="share_description">Geben Sie diese Datenbank für einen anderen DeltaSync-Benutzer frei. Er erhält Lese- und Schreibzugriff und kann sie auf seinen eigenen Geräten synchronisieren. Sie brauchen Ihr Master-Passwort, um den Schlüssel für ihn zu verpacken.</string>
+    <string name="share_add_label">Mitglied hinzufügen</string>
+    <string name="share_username_hint">Benutzername, für den freigegeben wird</string>
+    <string name="share_username_required">Geben Sie einen Benutzernamen ein.</string>
+    <string name="share_action">Für Benutzer freigeben</string>
+    <string name="share_members_label">Aktuelle Mitglieder</string>
+    <string name="share_no_members">Noch keine Mitglieder. Fügen Sie oben jemanden hinzu.</string>
+    <string name="share_member_line">%1$s — %2$s</string>
+    <string name="share_member_line_named">%1$s (%2$s) — %3$s</string>
+    <string name="share_remove">Entfernen</string>
+    <string name="share_remove_title">Mitglied entfernen</string>
+    <string name="share_remove_confirm">Den Zugriff von %1$s auf diese Datenbank entziehen? Er kann sie dann nicht mehr synchronisieren.</string>
+    <string name="share_removed">%1$s entfernt.</string>
+    <string name="share_shared_with">Für %1$s freigegeben.</string>
+    <string name="share_not_owner">Nur der Eigentümer der Datenbank kann die Freigabe verwalten. Geben Sie sie von dem Gerät aus frei, das sie angelegt hat.</string>
+    <string name="share_password_title">Master-Passwort</string>
+    <string name="share_password_message">Geben Sie Ihr .kdbx-Master-Passwort ein, um den Schlüssel für das neue Mitglied zu verpacken.</string>
+    <string name="share_error_format">Server: %1$d — %2$s</string>
+
+    <!-- EnrollActivity -->
+    <string name="enroll_title">Gerät registrieren</string>
+    <string name="enroll_description">Tauscht ein Einmal-Registrierungstoken (vom Administrator des Servers ausgestellt) gegen ein dauerhaftes Gerätetoken. Die App erzeugt lokal ein X25519-Schlüsselpaar, das im Android-Keystore liegt.</string>
+    <string name="enroll_label_server_url">Server-URL</string>
+    <string name="enroll_label_token">Registrierungstoken</string>
+    <string name="enroll_label_device_name">Gerätename (optional)</string>
+    <string name="enroll_action">Registrieren</string>
+    <string name="enroll_action_scan">QR-Code scannen</string>
+    <string name="enroll_or_enter_manually">oder von Hand eingeben</string>
+    <string name="enroll_scan_prompt">Halten Sie die Kamera auf den Registrierungs-QR-Code aus dem Admin-Panel.</string>
+    <string name="enroll_scan_invalid">Das ist kein DeltaSync-Registrierungs-QR-Code.</string>
+    <string name="enroll_scan_filled">Gescannt. Prüfen Sie die Angaben und tippen Sie auf „Registrieren“.</string>
+    <string name="enroll_error_required_fields">Server-URL und Registrierungstoken sind erforderlich.</string>
+    <string name="enroll_error_url_scheme">Die Server-URL muss mit https:// oder http:// beginnen</string>
+    <string name="enroll_warning_cleartext">Unverschlüsselte Verbindung. Jeder im Netz zwischen diesem Gerät und dem Server kann den Verkehr mitlesen. In einem vertrauenswürdigen LAN in Ordnung; über das Internet https:// verwenden.</string>
+    <string name="enroll_error_camera_denied">Kamerazugriff verweigert. Erlauben Sie ihn, um einen QR-Code zu scannen, oder geben Sie Server-URL und Token von Hand ein.</string>
+    <string name="enroll_error_server_format">Server hat abgelehnt: %1$d %2$s %3$s</string>
+    <string name="enroll_error_generic_format">Registrierung fehlgeschlagen: %1$s</string>
+
+    <!-- SetupActivity -->
+    <string name="setup_title">Datenbank einrichten</string>
+    <string name="setup_description">Wählen Sie Ihre lokale .kdbx-Datei und ordnen Sie sie einer Datenbank auf dem Server zu. Die App merkt sich die Einstellung und synchronisiert regelmäßig im Hintergrund.</string>
+    <string name="setup_step_pick_file">1. .kdbx-Datei wählen</string>
+    <string name="setup_action_pick_file">Datei wählen…</string>
+    <string name="setup_step_match_database">2. Serverdatenbank zuordnen</string>
+    <string name="setup_action_list_databases">Datenbanken auf dem Server auflisten</string>
+    <string name="setup_action_create_database">Datenbank auf dem Server anlegen…</string>
+    <string name="setup_action_create_another">Weitere Datenbank anlegen…</string>
+    <string name="setup_create_hint">Für Ihr Konto gibt es auf diesem Server noch keine Datenbanken. Legen Sie hier eine an — und ordnen Sie Ihre .kdbx-Datei unten zu. Das ist nur einmal nötig; andere Geräte wählen dieselbe Datenbank aus der Liste.</string>
+    <string name="setup_dialog_create_title">Neue Datenbank</string>
+    <string name="setup_dialog_create_hint">Name</string>
+    <string name="setup_dialog_create_ok">Anlegen</string>
+    <string name="setup_created_format">Datenbank \"%1$s\" angelegt. Wählen Sie sie unten aus und speichern Sie.</string>
+    <string name="setup_action_save">Einstellung speichern</string>
+    <string name="setup_error_not_enrolled">Nicht registriert.</string>
+    <string name="setup_error_server_format">Server: %1$d %2$s %3$s</string>
+    <string name="setup_error_no_databases">Keine Datenbanken auf dem Server. Legen Sie zuerst eine über den Desktop-Client an.</string>
+    <string name="setup_database_radio_format">%1$s (%2$s) — %3$s…</string>
+    <string name="last_sync_format">Zuletzt synchronisiert: %1$s</string>
+    <string name="last_sync_never">Auf diesem Gerät noch nicht synchronisiert.</string>
+    <string name="last_sync_just_now">gerade eben</string>
+    <string name="unenroll_confirm_title">Gerätezugang vergessen?</string>
+    <string name="unenroll_confirm_message">Dieses Gerät synchronisiert nicht mehr und verliert seine Identität auf dem Server. Um es zurückzuholen, brauchen Sie ein neues Einmal-Registrierungstoken von der Person, die den Server betreut — das Telefon kann das nicht selbst rückgängig machen.\n\nIhre lokale .kdbx-Datei bleibt unberührt.</string>
+    <string name="unenroll_confirm_action">Vergessen</string>
+</resources>
