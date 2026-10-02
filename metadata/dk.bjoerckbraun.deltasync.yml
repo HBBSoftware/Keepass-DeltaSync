@@ -4,8 +4,8 @@ Categories:
   - Security
 License: GPL-3.0-or-later
 AuthorName: Hans Bjørck-Braun
-AuthorWebSite: https://deltasync.bjoerck-braun.dk
-WebSite: https://deltasync.bjoerck-braun.dk
+AuthorWebSite: https://deltasync.org
+WebSite: https://deltasync.org
 SourceCode: https://gitlab.com/Star95/keepass-deltasync
 IssueTracker: https://gitlab.com/Star95/keepass-deltasync/-/issues
 Changelog: https://gitlab.com/Star95/keepass-deltasync/-/blob/HEAD/CHANGELOG.md
