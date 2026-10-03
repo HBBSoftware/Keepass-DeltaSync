@@ -248,9 +248,19 @@ build:android:
     # "error: unmappable character". Debian ships C.UTF-8 with no setup.
     LANG: "C.UTF-8"
     LC_ALL: "C.UTF-8"
-    # Must match metadata/dk.bjoerckbraun.deltasync.yml's ndk: field, so our
-    # APK and F-Droid's are built against the same NDK.
-    NDK_VERSION: "25.2.9519653"
+    # Must match the ndk: field in the build block F-Droid actually uses, so
+    # our APK and theirs are built against the same NDK. That field is NOT ours
+    # to choose: AutoUpdateMode generates a fresh build block per release, and
+    # the bot writes its own buildserver's default NDK into it rather than
+    # copying what the previous block said. MR !48883 is what that costs when
+    # the two disagree — it put 26.1.10909125 beside our 25.2.9519653, all four
+    # libgojni.so differed, the signature transplant failed, and 0.4.3 was never
+    # published. Nothing else in the APK differed.
+    #
+    # So this line follows THEM. If a future bot MR writes a different NDK
+    # again, read it out of the MR diff and change this to match — correcting
+    # the recipe instead would only be overwritten at the next release.
+    NDK_VERSION: "26.1.10909125"
     COMPILE_SDK: "35"
     BUILD_TOOLS: "35.0.0"
     CMDLINE_TOOLS: "11076708"

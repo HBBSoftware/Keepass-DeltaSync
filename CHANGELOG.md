@@ -174,6 +174,37 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [android/v0.4.5] — 2026-10-03
+
+No change to the app. It exists so that F-Droid can publish one at all.
+
+### Fixed
+
+- **F-Droid could not reproduce our APK (Android)** — the recipe carries
+  `Binaries:`, so F-Droid rebuilds the published APK, requires a byte-for-byte
+  match, and only then transplants our signature onto their build. That check
+  has been failing since 0.4.3, and the entire difference was four files:
+  `lib/{arm64-v8a,armeabi-v7a,x86,x86_64}/libgojni.so`. Every class, resource
+  and manifest entry matched.
+
+  Those four are the Go code compiled by `gomobile bind`, so they carry the
+  fingerprint of the NDK that built them — and the two sides were using
+  different NDKs. Not by our choice: `AutoUpdateMode: Version` makes the F-Droid
+  bot generate a fresh build block for every release, and it writes its own
+  buildserver's default NDK into that block rather than copying the previous
+  one. `fdroiddata`'s checked-in recipe still says `25.2.9519653`; the block the
+  bot generated for 0.4.3 says `26.1.10909125`, and the build log shows their
+  machine downloading and using r26b.
+
+  So CI now follows them at `26.1.10909125`. Correcting the field in the recipe
+  instead would have lasted exactly one release. The comment at the pin in
+  `.gitlab-ci.yml` says where to read the next value from if the bot moves
+  again.
+
+  This is why the F-Droid listing still shows 0.4.2 from 9 September, without
+  the icon or the screenshots: 0.4.3 is the last version they tried to build,
+  and nothing since has been published. 0.4.4 would have failed the same way.
+
 ## [server/v0.6.0] — 2026-10-03
 
 A self-hoster on a host with no shell can now reach the admin panel, and

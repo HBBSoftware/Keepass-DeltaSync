@@ -1,0 +1,7 @@
+Nothing in the app itself changed. This release exists so F-Droid can publish it.
+
+F-Droid rebuilds our APK and compares it to ours byte for byte before it trusts
+our signature. That comparison has been failing: their build machine and ours
+used different versions of the Android native toolchain, so the four Go
+libraries inside came out slightly different — the only difference in the whole
+file. This build uses the same version they do.
