@@ -11,7 +11,8 @@
 // this file after setup is complete — it is not auto-deleted because the
 // webserver user typically cannot unlink files inside its own DocumentRoot.
 //
-// UI is in English by default; ?lang=da switches to Danish.
+// UI is in English by default; ?lang= switches to any language in $LANGS
+// (da, de, fr, es). Unknown values fall back to English.
 
 declare(strict_types=1);
 
@@ -24,8 +25,6 @@ $STRINGS = [
         'page_title'      => 'DeltaSync Setup',
         'heading'         => 'DeltaSync — First-time setup',
         'subheading'      => 'A short wizard that prepares the server. Run it once, save the admin token, then delete this file.',
-        'switch_to'       => 'Dansk',
-        'switch_url'      => '?lang=da',
 
         'guard_done_title'   => 'Setup already complete',
         'guard_done_body'    => 'The admin_tokens table already contains %d entries. This wizard refuses to re-run to avoid accidentally creating extra credentials.',
@@ -77,8 +76,6 @@ $STRINGS = [
         'page_title'      => 'DeltaSync opsætning',
         'heading'         => 'DeltaSync — Førstegangs-opsætning',
         'subheading'      => 'Kort guide der forbereder serveren. Kør den én gang, gem admin-tokenet, og slet denne fil bagefter.',
-        'switch_to'       => 'English',
-        'switch_url'      => '?lang=en',
 
         'guard_done_title'   => 'Opsætningen er allerede gennemført',
         'guard_done_body'    => 'admin_tokens-tabellen indeholder allerede %d token(s). Guiden afviser at køre igen for at undgå at oprette ekstra credentials.',
@@ -126,6 +123,171 @@ $STRINGS = [
 
         'btn_continue'       => 'Fortsæt',
     ],
+    'de' => [
+        'page_title'      => 'DeltaSync-Einrichtung',
+        'heading'         => 'DeltaSync — Ersteinrichtung',
+        'subheading'      => 'Ein kurzer Assistent, der den Server vorbereitet. Einmal ausführen, das Admin-Token speichern, dann diese Datei löschen.',
+
+        'guard_done_title'   => 'Einrichtung bereits abgeschlossen',
+        'guard_done_body'    => 'Die Tabelle admin_tokens enthält bereits %d Einträge. Dieser Assistent führt sich nicht erneut aus, um nicht versehentlich zusätzliche Zugangsdaten anzulegen.',
+        'guard_done_action'  => 'Löschen Sie diese Datei (server/public/setup.php) — sie wird nicht mehr benötigt und vergrößert die Angriffsfläche.',
+
+        'env_missing'        => 'Noch keine .env-Datei gefunden. Der Assistent legt eine an.',
+        'env_unwritable'     => 'Kann .env unter %s nicht schreiben. Stellen Sie sicher, dass das Verzeichnis für den Webserver-Benutzer beschreibbar ist (chmod 700, Ihrem Benutzer gehörend).',
+        'bootstrap_missing'  => 'bootstrap.php konnte nicht geladen werden (gesucht unter %s). Der Server-Code liegt nicht an der erwarteten Stelle.',
+
+        'step1_heading'      => 'Schritt 1 — Datenbankverbindung',
+        'step1_intro'        => 'Geben Sie die PostgreSQL-Verbindungsdaten ein. Der Assistent testet die Verbindung, bevor er sie nach server/.env schreibt. Lassen Sie LOG_LEVEL auf INFO, sofern Sie nicht bewusst DEBUG möchten.',
+        'step1_dsn'          => 'PostgreSQL-DSN',
+        'step1_dsn_hint'     => 'Beispiel: pgsql:host=localhost;port=5432;dbname=keepass_deltasync',
+        'step1_user'         => 'Datenbankbenutzer',
+        'step1_password'     => 'Datenbankpasswort',
+        'step1_log'          => 'Protokollstufe',
+        'step1_audit'        => 'Audit-Aufbewahrung (Tage)',
+        'step1_ttl'          => 'Gültigkeit des Enrollment-Tokens (Stunden)',
+        'step1_base'         => 'Basispfad der App (optional, z. B. /sync bei Betrieb unter einem Unterpfad)',
+        'step1_submit'       => 'Verbindung testen und .env speichern',
+
+        'step1_ok'           => 'Verbindung erfolgreich. server/.env gespeichert.',
+        'step1_fail'         => 'Verbindung fehlgeschlagen: %s',
+        'step1_write_fail'   => '.env konnte nicht geschrieben werden: %s',
+
+        'step2_heading'      => 'Schritt 2 — Schema-Migrationen ausführen',
+        'step2_intro'        => 'Die folgenden SQL-Dateien werden der Reihe nach gegen die Datenbank ausgeführt. Jede ist in dem Sinne idempotent, dass sie lautstark fehlschlägt, wenn ihre Tabellen bereits existieren — ein erneuter Lauf ist also sicher; er stoppt einfach bei der ersten vorhandenen Tabelle.',
+        'step2_no_files'     => 'Keine schema/*.sql-Dateien unter %s gefunden.',
+        'step2_run'          => 'Alle Migrationen ausführen',
+        'step2_ran'          => '%d Migrationsdatei(en) ausgeführt.',
+        'step2_partial'      => 'Migration %s fehlgeschlagen: %s. Frühere Dateien wurden möglicherweise schon angewendet — prüfen Sie den Zustand Ihrer Datenbank.',
+
+        'step3_heading'      => 'Schritt 3 — Erstes Admin-Token',
+        'step3_intro'        => 'Erzeugen Sie das erste Admin-Token. Es wird nur EINMAL angezeigt — kopieren Sie es, bevor Sie die Seite verlassen. Sie verwenden es mit der Admin-CLI: `keepass-deltasync admin user-create ...`.',
+        'step3_run'          => 'Admin-Token erzeugen',
+        'step3_token_label'  => 'Ihr Admin-Token (jetzt SOFORT speichern):',
+        'step3_usage'        => 'In HTTP-Anfragen verwenden als: Authorization: Bearer &lt;token&gt;',
+        'step3_env_hint'     => 'Oder als Umgebungsvariable für die Client-CLI setzen:',
+
+        'done_heading'       => 'Einrichtung abgeschlossen',
+        'done_body'          => 'Der Server ist bereit. Tun Sie jetzt Folgendes:',
+        'done_step_delete'   => 'Löschen Sie <code>server/public/setup.php</code> aus dem Web-Root. Der Assistent verweigert einen erneuten Lauf, aber die Datei ist unnötige Angriffsfläche.',
+        'done_step_user'     => 'Legen Sie Ihren ersten Benutzer mit der Admin-CLI an:',
+        'done_step_share'    => 'Senden Sie das erhaltene Enrollment-Token über einen sicheren Kanal an diesen Benutzer.',
+
+        'btn_continue'       => 'Weiter',
+    ],
+    'fr' => [
+        'page_title'      => 'Installation de DeltaSync',
+        'heading'         => 'DeltaSync — Première installation',
+        'subheading'      => 'Un bref assistant qui prépare le serveur. Exécutez-le une fois, enregistrez le jeton d\'administration, puis supprimez ce fichier.',
+
+        'guard_done_title'   => 'Installation déjà terminée',
+        'guard_done_body'    => 'La table admin_tokens contient déjà %d entrées. Cet assistant refuse de s\'exécuter à nouveau afin de ne pas créer d\'identifiants supplémentaires par inadvertance.',
+        'guard_done_action'  => 'Supprimez ce fichier (server/public/setup.php) — il n\'est plus nécessaire et augmente la surface d\'attaque.',
+
+        'env_missing'        => 'Aucun fichier .env trouvé pour l\'instant. L\'assistant va en créer un.',
+        'env_unwritable'     => 'Impossible d\'écrire dans .env à %s. Assurez-vous que le répertoire est accessible en écriture par l\'utilisateur du serveur web (chmod 700, appartenant à votre utilisateur).',
+        'bootstrap_missing'  => 'Impossible de charger bootstrap.php (cherché à %s). Le code du serveur n\'est pas à l\'emplacement attendu.',
+
+        'step1_heading'      => 'Étape 1 — Connexion à la base de données',
+        'step1_intro'        => 'Saisissez les informations de connexion PostgreSQL. L\'assistant teste la connexion avant de les écrire dans server/.env. Laissez LOG_LEVEL sur INFO sauf si vous voulez délibérément DEBUG.',
+        'step1_dsn'          => 'DSN PostgreSQL',
+        'step1_dsn_hint'     => 'Exemple : pgsql:host=localhost;port=5432;dbname=keepass_deltasync',
+        'step1_user'         => 'Utilisateur de la base de données',
+        'step1_password'     => 'Mot de passe de la base de données',
+        'step1_log'          => 'Niveau de journalisation',
+        'step1_audit'        => 'Conservation de l\'audit (jours)',
+        'step1_ttl'          => 'Durée de validité du jeton d\'inscription (heures)',
+        'step1_base'         => 'Chemin de base de l\'application (facultatif, par ex. /sync si servie sous un sous-chemin)',
+        'step1_submit'       => 'Tester la connexion et enregistrer .env',
+
+        'step1_ok'           => 'Connexion réussie. server/.env enregistré.',
+        'step1_fail'         => 'Échec de la connexion : %s',
+        'step1_write_fail'   => 'Impossible d\'écrire .env : %s',
+
+        'step2_heading'      => 'Étape 2 — Exécuter les migrations de schéma',
+        'step2_intro'        => 'Les fichiers SQL suivants seront exécutés dans l\'ordre sur la base de données. Chacun est idempotent au sens où il échoue bruyamment si ses tables existent déjà — relancer est donc sans risque ; le processus s\'arrête simplement à la première table existante.',
+        'step2_no_files'     => 'Aucun fichier schema/*.sql trouvé à %s.',
+        'step2_run'          => 'Exécuter toutes les migrations',
+        'step2_ran'          => '%d fichier(s) de migration exécuté(s).',
+        'step2_partial'      => 'Échec de la migration %s : %s. Des fichiers précédents ont peut-être été appliqués — vérifiez l\'état de votre base de données.',
+
+        'step3_heading'      => 'Étape 3 — Premier jeton d\'administration',
+        'step3_intro'        => 'Générez le jeton d\'administration initial. Il n\'est affiché qu\'UNE SEULE fois — copiez-le avant de quitter la page. Vous l\'utilisez avec la CLI d\'administration : `keepass-deltasync admin user-create ...`.',
+        'step3_run'          => 'Générer le jeton d\'administration',
+        'step3_token_label'  => 'Votre jeton d\'administration (enregistrez-le MAINTENANT) :',
+        'step3_usage'        => 'À utiliser dans les requêtes HTTP ainsi : Authorization: Bearer &lt;token&gt;',
+        'step3_env_hint'     => 'Ou définissez-le comme variable d\'environnement pour la CLI cliente :',
+
+        'done_heading'       => 'Installation terminée',
+        'done_body'          => 'Le serveur est prêt. Faites maintenant ceci :',
+        'done_step_delete'   => 'Supprimez <code>server/public/setup.php</code> de la racine web. L\'assistant refusera de s\'exécuter à nouveau, mais le fichier reste une surface d\'attaque inutile.',
+        'done_step_user'     => 'Créez votre premier utilisateur avec la CLI d\'administration :',
+        'done_step_share'    => 'Envoyez le jeton d\'inscription obtenu à cet utilisateur par un canal sécurisé.',
+
+        'btn_continue'       => 'Continuer',
+    ],
+    'es' => [
+        'page_title'      => 'Configuración de DeltaSync',
+        'heading'         => 'DeltaSync — Configuración inicial',
+        'subheading'      => 'Un asistente breve que prepara el servidor. Ejecútelo una vez, guarde el token de administración y luego elimine este archivo.',
+
+        'guard_done_title'   => 'La configuración ya está completa',
+        'guard_done_body'    => 'La tabla admin_tokens ya contiene %d entradas. Este asistente se niega a ejecutarse de nuevo para no crear credenciales adicionales por accidente.',
+        'guard_done_action'  => 'Elimine este archivo (server/public/setup.php) — ya no es necesario y amplía la superficie de ataque.',
+
+        'env_missing'        => 'Aún no se ha encontrado ningún archivo .env. El asistente creará uno.',
+        'env_unwritable'     => 'No se puede escribir en .env en %s. Asegúrese de que el directorio sea escribible por el usuario del servidor web (chmod 700, propiedad de su usuario).',
+        'bootstrap_missing'  => 'No se pudo cargar bootstrap.php (se buscó en %s). El código del servidor no está en la ubicación esperada.',
+
+        'step1_heading'      => 'Paso 1 — Conexión a la base de datos',
+        'step1_intro'        => 'Introduzca los datos de conexión de PostgreSQL. El asistente probará la conexión antes de escribirlos en server/.env. Deje LOG_LEVEL en INFO salvo que quiera DEBUG a propósito.',
+        'step1_dsn'          => 'DSN de PostgreSQL',
+        'step1_dsn_hint'     => 'Ejemplo: pgsql:host=localhost;port=5432;dbname=keepass_deltasync',
+        'step1_user'         => 'Usuario de la base de datos',
+        'step1_password'     => 'Contraseña de la base de datos',
+        'step1_log'          => 'Nivel de registro',
+        'step1_audit'        => 'Retención de auditoría (días)',
+        'step1_ttl'          => 'Validez del token de inscripción (horas)',
+        'step1_base'         => 'Ruta base de la aplicación (opcional, p. ej. /sync si se sirve bajo una subruta)',
+        'step1_submit'       => 'Probar la conexión y guardar .env',
+
+        'step1_ok'           => 'Conexión correcta. server/.env guardado.',
+        'step1_fail'         => 'La conexión falló: %s',
+        'step1_write_fail'   => 'No se pudo escribir .env: %s',
+
+        'step2_heading'      => 'Paso 2 — Ejecutar las migraciones del esquema',
+        'step2_intro'        => 'Los siguientes archivos SQL se ejecutarán en orden sobre la base de datos. Cada uno es idempotente en el sentido de que falla ruidosamente si sus tablas ya existen, así que volver a ejecutarlos es seguro; simplemente se detiene en la primera tabla existente.',
+        'step2_no_files'     => 'No se encontraron archivos schema/*.sql en %s.',
+        'step2_run'          => 'Ejecutar todas las migraciones',
+        'step2_ran'          => 'Se ejecutaron %d archivo(s) de migración.',
+        'step2_partial'      => 'La migración %s falló: %s. Puede que ya se hayan aplicado archivos anteriores — compruebe el estado de su base de datos.',
+
+        'step3_heading'      => 'Paso 3 — Primer token de administración',
+        'step3_intro'        => 'Genere el token de administración inicial. Se muestra UNA SOLA vez — cópielo antes de salir de la página. Se usa con la CLI de administración: `keepass-deltasync admin user-create ...`.',
+        'step3_run'          => 'Generar token de administración',
+        'step3_token_label'  => 'Su token de administración (guárdelo AHORA):',
+        'step3_usage'        => 'Úselo en las peticiones HTTP así: Authorization: Bearer &lt;token&gt;',
+        'step3_env_hint'     => 'O defínalo como variable de entorno para la CLI del cliente:',
+
+        'done_heading'       => 'Configuración completada',
+        'done_body'          => 'El servidor está listo. Ahora haga lo siguiente:',
+        'done_step_delete'   => 'Elimine <code>server/public/setup.php</code> de la raíz web. El asistente se negará a ejecutarse de nuevo, pero el archivo es superficie de ataque innecesaria.',
+        'done_step_user'     => 'Cree su primer usuario con la CLI de administración:',
+        'done_step_share'    => 'Envíe el token de inscripción resultante a ese usuario por un canal seguro.',
+
+        'btn_continue'       => 'Continuar',
+    ],
+];
+
+// The wizard's languages, in the order they appear in the header. The key is
+// both the ?lang= value and the <html lang> attribute; the label is each
+// language's own name, since someone who needs the switcher cannot be assumed
+// to read the language currently on screen.
+$LANGS = [
+    'en' => 'English',
+    'da' => 'Dansk',
+    'de' => 'Deutsch',
+    'fr' => 'Français',
+    'es' => 'Español',
 ];
 
 $lang = $_GET['lang'] ?? $_POST['lang'] ?? 'en';
@@ -398,6 +560,7 @@ body {
 }
 header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: baseline;
     gap: 1rem;
@@ -412,6 +575,27 @@ h1 {
     color: var(--muted);
     margin: 0;
     font-size: 0.95rem;
+}
+/* Fem sprognavne fylder ca. 410px, og indholdsspalten er 672px bred (720 minus
+   padding). Raekken kan derfor aldrig staa ved siden af overskriften, som den
+   gamle enkelt-knap kunne — saa den faar sin egen linje under den i stedet for
+   at ombryde til tre rodede rader. Den ombryder foerst internt under ca. 420px
+   skaermbredde. */
+header > div:first-child { flex: 1 1 100%; }
+.lang {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.lang a, .lang .current {
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+.lang .current {
+    color: var(--text);
+    border-color: var(--accent);
 }
 .lang a {
     color: var(--muted);
@@ -526,7 +710,13 @@ ol.done li { margin-bottom: 1rem; }
         <p class="subhead"><?= h($T['subheading']) ?></p>
     </div>
     <div class="lang">
-        <a href="<?= h($T['switch_url']) ?>"><?= h($T['switch_to']) ?></a>
+<?php foreach ($LANGS as $code => $label): ?>
+<?php if ($code === $lang): ?>
+        <span class="current" aria-current="true"><?= h($label) ?></span>
+<?php else: ?>
+        <a href="?lang=<?= h($code) ?>" hreflang="<?= h($code) ?>"><?= h($label) ?></a>
+<?php endif; ?>
+<?php endforeach; ?>
     </div>
 </header>
 
