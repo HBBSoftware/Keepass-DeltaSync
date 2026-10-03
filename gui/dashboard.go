@@ -792,19 +792,27 @@ func (u *ui) settingsTab() fyne.CanvasObject {
 	// gav den indledende værdisætning en uendelig løkke (dashboard byggede sig
 	// selv igen og igen). Vi sætter derfor startværdien stille og reagerer kun
 	// på reelle ændringer.
-	langSel := widget.NewSelect([]string{"Dansk", "English"}, nil)
-	if u.set.Language == string(langEN) {
-		langSel.Selected = "English"
-	} else {
-		langSel.Selected = "Dansk"
+	langNames := make([]string, len(langOrder))
+	for i, l := range langOrder {
+		langNames[i] = langLabels[l]
+	}
+	langSel := widget.NewSelect(langNames, nil)
+	langSel.Selected = langLabels[lang(u.set.Language)]
+	if langSel.Selected == "" {
+		// Gemt sprog kendes ikke (håndredigeret gui.json, eller et sprog vi
+		// har fjernet igen). Vis engelsk frem for et tomt felt.
+		langSel.Selected = langLabels[langEN]
 	}
 	langSel.OnChanged = func(choice string) {
-		l := langDA
-		if choice == "English" {
-			l = langEN
+		var l lang
+		for _, c := range langOrder {
+			if langLabels[c] == choice {
+				l = c
+				break
+			}
 		}
-		if string(l) == u.set.Language {
-			return // ingen reel ændring
+		if l == "" || string(l) == u.set.Language {
+			return // ukendt valg, eller ingen reel ændring
 		}
 		setLang(l)
 		u.set.Language = string(l)
