@@ -14,9 +14,6 @@ AutoName: DeltaSync
 
 RepoType: git
 Repo: https://gitlab.com/Star95/keepass-deltasync.git
-Binaries: 
-  https://github.com/HBBSoftware/Keepass-DeltaSync/releases/download/android/v%v/DeltaSync-%v.apk
-
 Builds:
   - versionName: 0.4.2
     versionCode: 7
@@ -47,9 +44,7 @@ Builds:
       - mv deltasync.aar ../android/libs/
       - cd ../android/libs
       - unzip -p deltasync.aar classes.jar > deltasync-classes.jar
-    ndk: 26.1.10909125
-
-AllowedAPKSigningKeys: 476e556a66d2614c6e43509fcc081ff54f1334e39f0ca1162e606c51ebd50d68
+    ndk: 25.2.9519653
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^android/v[\d.]+$

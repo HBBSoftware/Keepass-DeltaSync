@@ -1,7 +1,10 @@
-Nothing in the app itself changed. This release exists so F-Droid can publish it.
+The app itself is unchanged. What changes is how F-Droid publishes it.
 
-F-Droid rebuilds our APK and compares it to ours byte for byte before it trusts
-our signature. That comparison has been failing: their build machine and ours
-used different versions of the Android native toolchain, so the four Go
-libraries inside came out slightly different — the only difference in the whole
-file. This build uses the same version they do.
+F-Droid now builds DeltaSync from source and signs it with its own key, instead
+of republishing the APK we sign. That makes the F-Droid build a separate app
+from the one on GitHub and in Obtainium: Android will not update one into the
+other, and both can sit on a phone at once.
+
+If you installed from F-Droid before, you will need to remove it and install it
+again, then enroll the device once. If you use Obtainium or the GitHub release,
+nothing changes for you.

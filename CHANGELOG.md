@@ -176,34 +176,36 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [android/v0.4.5] — 2026-10-03
 
-No change to the app. It exists so that F-Droid can publish one at all.
+No change to the app. F-Droid now builds and signs its own copy, which makes
+the F-Droid build a separate app from the one on GitHub and in Obtainium.
 
-### Fixed
+### Changed
 
-- **F-Droid could not reproduce our APK (Android)** — the recipe carries
-  `Binaries:`, so F-Droid rebuilds the published APK, requires a byte-for-byte
-  match, and only then transplants our signature onto their build. That check
-  has been failing since 0.4.3, and the entire difference was four files:
-  `lib/{arm64-v8a,armeabi-v7a,x86,x86_64}/libgojni.so`. Every class, resource
-  and manifest entry matched.
+- **F-Droid builds and signs DeltaSync itself (Android)** — the recipe carried
+  `Binaries:`, so F-Droid rebuilt our published APK, required a byte-for-byte
+  match, and only then transplanted our signature onto their build. One binary
+  for every channel is the appeal of that arrangement; the cost is that two
+  toolchains have to agree exactly, and ours ship four native Go libraries built
+  by `gomobile`, which carry the fingerprint of whatever NDK compiled them.
 
-  Those four are the Go code compiled by `gomobile bind`, so they carry the
-  fingerprint of the NDK that built them — and the two sides were using
-  different NDKs. Not by our choice: `AutoUpdateMode: Version` makes the F-Droid
-  bot generate a fresh build block for every release, and it writes its own
-  buildserver's default NDK into that block rather than copying the previous
-  one. `fdroiddata`'s checked-in recipe still says `25.2.9519653`; the block the
-  bot generated for 0.4.3 says `26.1.10909125`, and the build log shows their
-  machine downloading and using r26b.
+  That is what has kept the listing on 0.4.2 since 9 September. 0.4.3's build on
+  F-Droid's own machine **succeeded** — `BUILD SUCCESSFUL in 2m 7s`, then
+  `Successfully built dk.bjoerckbraun.deltasync:8`. Only the comparison failed,
+  on `lib/{arm64-v8a,armeabi-v7a,x86,x86_64}/libgojni.so` and nothing else,
+  because `AutoUpdateMode: Version` makes the bot generate a fresh build block
+  per release and write its buildserver's own default NDK into it rather than
+  copying the previous one: `26.1.10909125` against our `25.2.9519653`.
 
-  So CI now follows them at `26.1.10909125`. Correcting the field in the recipe
-  instead would have lasted exactly one release. The comment at the pin in
-  `.gitlab-ci.yml` says where to read the next value from if the bot moves
-  again.
+  Chasing their NDK would work until the next time their default moved, and we
+  do not control the field. So `Binaries:` and `AllowedAPKSigningKeys:` are
+  gone instead. Their build already works, so this publishes immediately.
 
-  This is why the F-Droid listing still shows 0.4.2 from 9 September, without
-  the icon or the screenshots: 0.4.3 is the last version they tried to build,
-  and nothing since has been published. 0.4.4 would have failed the same way.
+  **It is a real trade, not a free win.** The F-Droid build now carries
+  F-Droid's signature rather than ours, so Android treats it as a different app
+  from the GitHub and Obtainium one. They cannot update into each other, both
+  can be installed at once, and anyone who installed 0.4.2 from F-Droid has to
+  remove it and install it again. That is cheap today — the listing is three
+  weeks stale and the install counts are nil — and it would not stay cheap.
 
 ## [server/v0.6.0] — 2026-10-03
 
