@@ -2,21 +2,65 @@
 
 package main
 
-// i18n holder en meget enkel to-sprogs-ordbog (dansk/engelsk). GUI'en er
-// bevidst en tynd skal oven på keepass-deltasync-CLI'en, så vi har kun brug
-// for et lille sæt strenge. Default er dansk; brugeren kan skifte til engelsk
-// i Indstillinger, og valget gemmes i gui.json sammen med stien til CLI'en.
+// i18n holder GUI'ens ordbøger. GUI'en er bevidst en tynd skal oven på
+// keepass-deltasync-CLI'en, så vi har kun brug for et lille sæt strenge.
+// Dansk og engelsk står nederst i denne fil; de tre øvrige sprog har hver sin
+// fil (i18n_de.go, i18n_fr.go, i18n_es.go) og melder sig ind i dicts fra en
+// init() — ellers ville denne fil være over 1700 linjer.
+//
+// Uden et gemt valg følger sproget operativsystemet, og valget gemmes i
+// gui.json sammen med stien til CLI'en.
+
+import (
+	"strings"
+
+	// Pakken hedder "lang", og det gør vores egen type også — derfor aliasset.
+	fynelang "fyne.io/fyne/v2/lang"
+)
 
 type lang string
 
 const (
 	langDA lang = "da"
 	langEN lang = "en"
+	langDE lang = "de"
+	langFR lang = "fr"
+	langES lang = "es"
 )
 
-// L er den aktive ordbog. Sættes ved opstart fra gemt indstilling og opdateres
-// når brugeren skifter sprog.
-var L = dicts[langDA]
+// langOrder er rækkefølgen i sprogvælgeren; langLabels er hvert sprogs eget
+// navn, fordi den der leder efter sprogskiftet ikke kan antages at læse det
+// sprog der står på skærmen.
+var langOrder = []lang{langDA, langEN, langDE, langFR, langES}
+
+var langLabels = map[lang]string{
+	langDA: "Dansk",
+	langEN: "English",
+	langDE: "Deutsch",
+	langFR: "Français",
+	langES: "Español",
+}
+
+// detectLang vælger sprog ud fra operativsystemets locale. SystemLocale giver
+// et fuldt tag som "da-DK" eller "pt-BR"; vi bruger kun basissproget.
+//
+// Faldet er engelsk, ikke dansk: en bruger hvis system står på et sprog vi
+// ikke har, forstår med større sandsynlighed engelsk end dansk.
+func detectLang() lang {
+	loc := string(fynelang.SystemLocale())
+	if i := strings.IndexAny(loc, "-_"); i > 0 {
+		loc = loc[:i]
+	}
+	if l := lang(strings.ToLower(loc)); dicts[l] != nil {
+		return l
+	}
+	return langEN
+}
+
+// L er den aktive ordbog. main() overskriver den straks via setLang med det
+// sprog loadSettings fandt — engelsk her er blot en defineret udgangsværdi,
+// ikke et valg.
+var L = dicts[langEN]
 
 func setLang(l lang) {
 	if d, ok := dicts[l]; ok {
@@ -512,7 +556,7 @@ var dicts = map[lang]*dict{
 			"- `keepass-deltasync admin user-delete <bruger> --yes`\n" +
 			"- `keepass-deltasync admin token-sql`",
 		HelpSettings: "## Indstillinger\n\n" +
-			"- **Sprog** — dansk eller engelsk.\n" +
+			"- **Sprog** — dansk, engelsk, tysk, fransk eller spansk.\n" +
 			"- **Tema** — System (følg styresystemet), Lyst eller Mørkt.\n" +
 			"- **Sti til CLI** — hvor `keepass-deltasync`-programmet ligger. GUI'en kalder det til alt arbejde.\n" +
 			"- **Vis hjælpe-panel** — dette felt.\n" +
@@ -805,7 +849,7 @@ var dicts = map[lang]*dict{
 			"- `keepass-deltasync admin user-delete <user> --yes`\n" +
 			"- `keepass-deltasync admin token-sql`",
 		HelpSettings: "## Settings\n\n" +
-			"- **Language** — Danish or English.\n" +
+			"- **Language** — Danish, English, German, French or Spanish.\n" +
 			"- **Theme** — System (follow the OS), Light or Dark.\n" +
 			"- **CLI path** — where the `keepass-deltasync` program lives. The GUI calls it for all work.\n" +
 			"- **Show help panel** — this panel.\n" +

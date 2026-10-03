@@ -39,18 +39,24 @@ func settingsPath() (string, error) {
 }
 
 func loadSettings() settings {
-	s := settings{Language: string(langDA)}
+	// Intet gemt valg betyder "ikke valgt endnu", ikke "dansk". Vi slår derfor
+	// operativsystemets sprog op hver gang i stedet for at skrive det i
+	// gui.json: så følger GUI'en med, hvis brugeren flytter til en maskine med
+	// et andet sprog, indtil de aktivt vælger et i Indstillinger.
+	s := settings{}
 	p, err := settingsPath()
 	if err != nil {
+		s.Language = string(detectLang())
 		return s
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {
+		s.Language = string(detectLang())
 		return s
 	}
 	_ = json.Unmarshal(data, &s)
 	if s.Language == "" {
-		s.Language = string(langDA)
+		s.Language = string(detectLang())
 	}
 	return s
 }
