@@ -6,31 +6,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-
-- **The admin panel can be reached on a host with no shell (server)** — the
-  login route answered `admin_account_not_configured` and told you to set
-  `ADMIN_USERNAME` and `ADMIN_PASSWORD`, which was untrue anywhere outside the
-  container: only `docker-entrypoint.sh` and `bin/admin` ever read them, and a
-  file-based host runs neither. `setup.php` is no help either, since it
-  predates the panel login and only ever creates an admin *token*. The real
-  instruction was an `INSERT` with a hand-made Argon2id hash, which is not
-  something a self-hoster should have to do.
-
-  The request path already loads `.env` on every request, and
-  `AdminAccount::set()` was already idempotent, so the fix is to use them: if
-  no account exists and both variables are set, the first login attempt
-  creates it. The message now describes something that works.
-
-  The same rule doubles as password rotation, which the panel otherwise has no
-  route for at all. Credentials that match `.env` but not the stored hash mean
-  the file was changed after the account was made, so the account is brought
-  into line and the login proceeds. Environment is the authority, not the
-  database. It costs nothing in the normal case: the branch is reached only
-  after a login has already failed, and the test is two string comparisons
-  rather than an Argon2 computation. An attacker gains nothing by reaching it,
-  since doing so requires already knowing the password in `.env`.
-
 ### Added
 
 - **Chrome and Edge extension** (`extension-chromium/`) — the same search &
@@ -98,6 +73,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   camera use is optional (`android.hardware.camera` not required). Ships in a
   future `android/*` release. (The QR itself is produced server-side — see
   server/v0.2.0.)
+
 - **Obtainium as an Android distribution channel** — signed release APKs are
   now published to GitHub Releases, so [Obtainium](https://github.com/ImranR98/Obtainium)
   can install the app and track updates while the F-Droid submission is
@@ -108,6 +84,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `android/README.md` carries the Obtainium deep link and the signing
   certificate's SHA-256. Note that switching between this channel and a future
   F-Droid build requires a reinstall — the signing keys differ.
+
 - **CI builds the Android APK** — a `build:android` job on `android/v*` tags
   builds the gomobile `.aar` and runs `assembleRelease`, publishing
   `DeltaSync-<version>-unsigned.apk` as an artifact. It deliberately stops
@@ -117,24 +94,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
   an unsigned APK locally before uploading, so the key never leaves the
   maintainer's machine. The job also fails if the tag and
   `build.gradle.kts`'s `versionName` disagree.
+
 - **SECURITY.md and CONTRIBUTING.md** — a vulnerability-reporting policy
   (private channels, scope, trust model) and a contributor guide (DCO sign-off,
   per-component build/test, release tagging). A `/.well-known/security.txt`
   is served from the website.
 
 ### Changed
-
-- **The admin panel explains what a user is.** The Users tab said only what the
-  button did — "creates the user and issues a one-time enrollment token" — and
-  never what a user *is*, so the model had to be inferred from behaviour. It now
-  says it: a user is a person, their phone and computer each enroll as a device
-  under that user, and all of a user's devices see the same databases with
-  nothing to share between them. Sharing is for two people, not two devices.
-
-  The Devices tab says the same thing from the other side. Between them the two
-  sentences answer the question that actually comes up — why a freshly enrolled
-  phone sees no databases — which is usually that the device belongs to a
-  different user than the one owning them.
 
 - **The Firefox extension connects by itself** (`extension/`) — on a machine
   where everything is set up, opening the popup (toolbar button or
@@ -151,6 +117,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   every popup open: each one costs an Argon2 run and would answer the same.
   Nothing in the security model moves; the extension still never sees the
   masterpassword.
+
 - **F-Droid recipe reworked** per review feedback on
   [fdroiddata!41661](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41661):
   Go is now built from source via fdroiddata's `go` srclib and `make.bash`,
@@ -160,6 +127,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   scanner runs (`scanignore:` dropped entirely); and `AutoName:`/`Description:`
   were removed so the app's name and description are pulled from `fastlane/`
   alone.
+
 - **Per-component release versioning** — release tags are now namespaced
   (`client/vX.Y.Z`, `android/vX.Y.Z`, `server/vX.Y.Z`) so the three
   components' version lines never collide. The bare `v1.0.0` / `v0.1.0`
@@ -205,6 +173,92 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [server/v0.6.0] — 2026-10-03
+
+A self-hoster on a host with no shell can now reach the admin panel, and
+update the server without guessing which files to copy. The first-run wizard
+is no longer English and Danish only.
+
+### Added
+
+- **The setup wizard speaks German, French and Spanish (server)** — `$STRINGS`
+  held two languages and a `switch_to` / `switch_url` pair, which can only ever
+  name "the other language". With five that stops meaning anything, so the pair
+  is gone and a single `$LANGS` list does both jobs: it validates `?lang=` and
+  it draws the switcher. Every language is listed under its own name, because
+  someone hunting for the language switch cannot be assumed to read the language
+  already on the screen.
+
+  All five dictionaries carry the same 41 keys with the same `%s` / `%d`
+  placeholders in the same order, and the two strings that are printed without
+  escaping — the one with `<code>` and the one with `&lt;token&gt;` — carry
+  identical markup in every language. Unknown values of `?lang=` fall back to
+  English rather than erroring.
+
+- **A deploy script for the file-based host (server)** — the public server had
+  drifted to 0.3.x while the image was at 0.5.0, because updating it meant
+  remembering which files to drag over SFTP. `server/deploy.py` does that part:
+  it skips files whose bytes already match, writes to a staging name and renames
+  over the target so a request never catches a half-written PHP file, and pins
+  the host key.
+
+  It never mirrors and never deletes, because the web root is shared with the
+  marketing site, which is deployed separately — a mirror would erase the site.
+  It refuses to upload `.env` at all, and asserts as much before connecting: that
+  file holds the host's own database credentials, and the cost of discovering
+  that mistake afterwards is a server that cannot reach its database.
+
+  What it deliberately does not do is the rest of what `docker-entrypoint.sh`
+  does. `schema/*.sql` is copied but not applied. On a host with no shell that is
+  a manual step, and a migration has to be applied *before* the code that needs
+  it.
+
+### Changed
+
+- **The admin panel explains what a user is.** The Users tab said only what the
+  button did — "creates the user and issues a one-time enrollment token" — and
+  never what a user *is*, so the model had to be inferred from behaviour. It now
+  says it: a user is a person, their phone and computer each enroll as a device
+  under that user, and all of a user's devices see the same databases with
+  nothing to share between them. Sharing is for two people, not two devices.
+
+  The Devices tab says the same thing from the other side. Between them the two
+  sentences answer the question that actually comes up — why a freshly enrolled
+  phone sees no databases — which is usually that the device belongs to a
+  different user than the one owning them.
+
+### Fixed
+
+- **The admin panel can be reached on a host with no shell (server)** — the
+  login route answered `admin_account_not_configured` and told you to set
+  `ADMIN_USERNAME` and `ADMIN_PASSWORD`, which was untrue anywhere outside the
+  container: only `docker-entrypoint.sh` and `bin/admin` ever read them, and a
+  file-based host runs neither. `setup.php` is no help either, since it
+  predates the panel login and only ever creates an admin *token*. The real
+  instruction was an `INSERT` with a hand-made Argon2id hash, which is not
+  something a self-hoster should have to do.
+
+  The request path already loads `.env` on every request, and
+  `AdminAccount::set()` was already idempotent, so the fix is to use them: if
+  no account exists and both variables are set, the first login attempt
+  creates it. The message now describes something that works.
+
+  The same rule doubles as password rotation, which the panel otherwise has no
+  route for at all. Credentials that match `.env` but not the stored hash mean
+  the file was changed after the account was made, so the account is brought
+  into line and the login proceeds. Environment is the authority, not the
+  database. It costs nothing in the normal case: the branch is reached only
+  after a login has already failed, and the test is two string comparisons
+  rather than an Argon2 computation. An attacker gains nothing by reaching it,
+  since doing so requires already knowing the password in `.env`.
+
+- **A deploy would have restored `setup.php` (server)** — the wizard's own page
+  tells you to delete it once setup is done, and `deploy.py` would have put it
+  back on the next update, silently restoring attack surface that had been
+  deliberately removed. It is also older than the panel login: it creates an
+  admin *token* and never the admin account, so on an existing server it is dead
+  weight. A genuinely new install uploads it by hand, once.
 
 ## [android/v0.4.4] — 2026-10-03
 
