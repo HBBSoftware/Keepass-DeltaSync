@@ -3,7 +3,8 @@
 
 The three registries we publish to are not equally open about numbers:
 
-    ghcr.io         total and per-version, but ONLY in the package page's HTML.
+    ghcr.io         per-version counts, but ONLY in the package page's HTML. The
+                    page's own total is useless: past 1000 it reads "1.63K".
                     The packages API needs a read:packages token; scraping does
                     not, so scraping is what we do.
     Docker Hub      pull_count straight out of a public JSON API.
@@ -77,12 +78,22 @@ def github_release_downloads():
     return sum(a.get("download_count", 0) for r in data for a in r.get("assets", []))
 
 
+def parse_count(s):
+    """'1,234' -> 1234, '1.63K' -> 1630. GitHub abbreviates past 999."""
+    s = s.replace(",", "")
+    mult = {"k": 1_000, "m": 1_000_000}.get(s[-1:].lower(), 1)
+    return round(float(s.rstrip("kKmM")) * mult)
+
+
 def ghcr_downloads():
-    """Scrape the package page. Returns (total, {version: count})."""
+    """Scrape the package page. Returns {version: count}.
+
+    The page's "Total downloads" is NOT used. Past 999 it reads like "1.63K",
+    which the old pattern took as 1 — from 7 Oct 2026 every row said ghcr had
+    one pull. Even parsed properly it has two significant digits, while the
+    version counts are still exact, so the total is derived from those.
+    """
     text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fetch(GHCR_PAGE))))
-    # The label sits AFTER the number for per-version counts and BEFORE it for
-    # the total. That asymmetry is GitHub's, not a typo.
-    total = re.search(r"Total downloads ([\d,]+)", text)
 
     # A version card reads, flattened:
     #   latest 0.5.0 Published 21 days ago · Digest … sha256:<hex> 420 Version downloads
@@ -92,15 +103,32 @@ def ghcr_downloads():
     # "Published" instead, and pick the version-looking token ("latest" is a
     # second tag on the same card, not a version).
     per = {}
-    for m in re.finditer(r"([\d,]+) Version downloads", text):
+    for m in re.finditer(r"([\d,.]+[KkMm]?) Version downloads", text):
         head = text[:m.start()]
         cut = head.rfind("Published")
         if cut < 0:
             continue
         tags = [t for t in head[max(0, cut - 60):cut].split() if re.fullmatch(r"\d[\w.+-]*", t)]
         if tags:
-            per[tags[-1]] = int(m.group(1).replace(",", ""))
-    return (int(total.group(1).replace(",", "")) if total else None), per
+            per[tags[-1]] = parse_count(m.group(1))
+    return per
+
+
+def recompute_ghcr(samples):
+    """Set every row's "ghcr" to the sum of all versions known by that date.
+
+    Run over the whole series, so rows written by the old scraper are repaired
+    too and the line is one definition throughout. A version that drops off the
+    package page keeps its last count rather than vanishing from the sum —
+    otherwise the total would fall whenever GitHub shows fewer cards. Older and
+    untagged images never shown on the page are not in it, so this sits ~100
+    below GitHub's own total; what matters is that it moves the same way.
+    """
+    known = {}
+    for s in sorted(samples, key=lambda s: s["date"]):
+        versions = s.get("ghcr_versions") or {}
+        known.update(versions)
+        s["ghcr"] = sum(known.values()) if versions else None
 
 
 def amo_stats():
@@ -168,12 +196,9 @@ def main() -> int:
             print(f"  {name}: FAILED ({e})")
 
     try:
-        total, per_version = ghcr_downloads()
-        row["ghcr"] = total
-        row["ghcr_versions"] = per_version
-        print(f"  ghcr: {total} (versions: {per_version})")
+        row["ghcr_versions"] = ghcr_downloads()
+        print(f"  ghcr versions: {row['ghcr_versions']}")
     except Exception as e:
-        row["ghcr"] = None
         row["ghcr_versions"] = {}
         print(f"  ghcr: FAILED ({e})")
 
@@ -194,6 +219,7 @@ def main() -> int:
     samples = [s for s in previous_history() if s.get("date") != today]
     samples.append(row)
     samples.sort(key=lambda s: s["date"])
+    recompute_ghcr(samples)
 
     out_dir = WEBSITE_ROOT / STATS_PATH
     out_dir.mkdir(parents=True, exist_ok=True)
