@@ -58,6 +58,8 @@
 
         <p>This page covers the browser extension <strong>DeltaSync — KeePass search &amp; go</strong>, in every browser it is published for: Firefox, Microsoft Edge and Chrome. The short version is that it collects nothing, and sends nothing anywhere.</p>
 
+        <p>It also covers the Android app <strong>DeltaSync</strong>, described <a href="#android">further down</a>. The app talks only to the server you choose, and never to the developer.</p>
+
         <!-- x-translated-note -->
 
         <h2>What the extension can read</h2>
@@ -91,6 +93,20 @@
 
         <p>Opening an entry's website is an ordinary visit to that website, exactly as if you had typed the address yourself.</p>
 
+        <h2 id="android">The Android app</h2>
+
+        <p>DeltaSync for Android talks to one server only: the one you enter when you enrol the phone. It contains no analytics, no ads and no crash reporting, and it never contacts the developer.</p>
+
+        <p><strong>What reaches your server.</strong> The contents of your entries and groups are encrypted on the phone before they are sent, and the server cannot read them. Alongside them go the names you give the phone and the database, the phone's public key, and the identifiers and timestamps that syncing needs. When you share a database, the username you look up is sent as well. Your master password and the keys that decrypt your data never leave the phone.</p>
+
+        <p>Whoever runs the server, you or your administrator, decides how that data is kept and deleted. The developer has no access to it.</p>
+
+        <p><strong>On the phone.</strong> The server address and the phone's token are stored encrypted with a key held in the Android Keystore. If you let background sync remember your database password, it is stored the same way. The app's data is excluded from Android backups and device transfers.</p>
+
+        <p><strong>Camera.</strong> The camera is used only to scan the enrolment QR code, and only when you press <em>Scan QR code</em>. Nothing it sees is stored or sent.</p>
+
+        <p><strong>Plain http.</strong> The app accepts <code>http://</code> addresses so it can reach a server on a home network, and marks such an address as unencrypted while you type it. Your entries stay encrypted either way, but the token and the names travel readable. Use <code>https://</code> whenever the server is reachable from the internet.</p>
+
         <h2>Nothing is sold or shared</h2>
 
         <p>No data is collected, so there is none to sell, share or use for any other purpose.</p>
@@ -103,13 +119,13 @@
 
         <h2>Checking this yourself</h2>
 
-        <p>The extension and the program are open source under the GPL-3.0, and the published packages are reproducible from the <a href="https://gitlab.com/Star95/keepass-deltasync">source</a>. The design and its security boundaries are described in <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>.</p>
+        <p>The extension, the program and the app are open source under the GPL-3.0, and the published packages are reproducible from the <a href="https://gitlab.com/Star95/keepass-deltasync">source</a>. The design and its security boundaries are described in <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>.</p>
 
         <h2>Contact</h2>
 
         <p>Questions about privacy go to the project's <a href="https://gitlab.com/Star95/keepass-deltasync/-/issues">issue tracker</a>. For anything you would rather not raise in public, see <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/SECURITY.md">SECURITY.md</a>.</p>
 
-        <p><em>Last updated 14 September 2026.</em></p>
+        <p><em>Last updated 17 October 2026.</em></p>
 
     </div>
 </main>

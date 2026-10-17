@@ -58,6 +58,8 @@
 
         <p>Denne side gælder browserudvidelsen <strong>DeltaSync — KeePass search &amp; go</strong> i alle de browsere, den er udgivet til: Firefox, Microsoft Edge og Chrome. Kort sagt indsamler den intet og sender intet nogen steder hen.</p>
 
+        <p>Den gælder også Android-appen <strong>DeltaSync</strong>, som er beskrevet <a href="#android">længere nede</a>. Appen taler kun med den server, du selv vælger, og aldrig med udvikleren.</p>
+
         <p>Den engelske udgave er den, butikkerne linker til. Står der noget forskelligt, er det den, der gælder.</p>
 
         <h2>Hvad udvidelsen kan læse</h2>
@@ -91,6 +93,20 @@
 
         <p>Når du åbner en entrys hjemmeside, er det et helt almindeligt besøg på den side, præcis som hvis du selv havde skrevet adressen.</p>
 
+        <h2 id="android">Android-appen</h2>
+
+        <p>DeltaSync til Android taler kun med én server: den, du skriver ind, når du tilmelder telefonen. Appen indeholder ingen statistik, ingen reklamer og ingen fejlrapportering, og den kontakter aldrig udvikleren.</p>
+
+        <p><strong>Hvad der når din server.</strong> Indholdet af dine poster og grupper bliver krypteret på telefonen, før det sendes, og serveren kan ikke læse det. Sammen med det sendes de navne, du giver telefonen og databasen, telefonens offentlige nøgle og de id'er og tidsstempler, synkroniseringen har brug for. Deler du en database, sendes også det brugernavn, du slår op. Dit masterpassword og de nøgler, der dekrypterer dine data, forlader aldrig telefonen.</p>
+
+        <p>Den, der driver serveren, du selv eller din administrator, bestemmer, hvordan de data opbevares og slettes. Udvikleren har ikke adgang til dem.</p>
+
+        <p><strong>På telefonen.</strong> Serveradressen og telefonens token gemmes krypteret med en nøgle, der ligger i Android Keystore. Lader du baggrundssynkroniseringen huske dit databasepassword, gemmes det på samme måde. Appens data er undtaget fra Androids backup og fra overførsel til en ny telefon.</p>
+
+        <p><strong>Kamera.</strong> Kameraet bruges kun til at scanne QR-koden ved tilmelding, og kun når du trykker <em>Scan QR-kode</em>. Intet af det, det ser, bliver gemt eller sendt.</p>
+
+        <p><strong>Ukrypteret http.</strong> Appen accepterer <code>http://</code>-adresser, så den kan nå en server på hjemmenetværket, og markerer en sådan adresse som ukrypteret, mens du skriver den. Dine poster er krypteret uanset hvad, men token og navne sendes læsbart. Brug <code>https://</code>, når serveren kan nås fra internettet.</p>
+
         <h2>Intet sælges eller deles</h2>
 
         <p>Der indsamles ingen data, så der er intet at sælge, dele eller bruge til andre formål.</p>
@@ -103,13 +119,13 @@
 
         <h2>Kontrollér det selv</h2>
 
-        <p>Udvidelsen og programmet er open source under GPL-3.0, og de udgivne pakker kan genskabes ud fra <a href="https://gitlab.com/Star95/keepass-deltasync">kildekoden</a>. Designet og dets sikkerhedsgrænser er beskrevet i <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>.</p>
+        <p>Udvidelsen, programmet og appen er open source under GPL-3.0, og de udgivne pakker kan genskabes ud fra <a href="https://gitlab.com/Star95/keepass-deltasync">kildekoden</a>. Designet og dets sikkerhedsgrænser er beskrevet i <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/docs/browser-extension.md">docs/browser-extension.md</a>.</p>
 
         <h2>Kontakt</h2>
 
         <p>Spørgsmål om privatliv hører til i projektets <a href="https://gitlab.com/Star95/keepass-deltasync/-/issues">issue tracker</a>. Er det noget, du hellere vil tage uden for offentligheden, så se <a href="https://gitlab.com/Star95/keepass-deltasync/-/blob/main/SECURITY.md">SECURITY.md</a>.</p>
 
-        <p><em>Senest opdateret 14. september 2026.</em></p>
+        <p><em>Senest opdateret 17. oktober 2026.</em></p>
 
     </div>
 </main>
