@@ -19,14 +19,14 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "dk.bjoerckbraun.deltasync"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dk.bjoerckbraun.deltasync"
         // 23 (Android 6.0) er nedre grænse: androidx.biometric kræver 23, og
         // Keystore-forankret EncryptedSharedPreferences er mere robust dér.
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 12
         versionName = "0.4.7"
     }
