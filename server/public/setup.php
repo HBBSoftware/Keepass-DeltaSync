@@ -309,7 +309,7 @@ function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8')
 
 function escapeEnvValue(string $v): string {
     // Wrap in double quotes if it contains spaces or special chars.
-    if ($v === '' || preg_match('/^[A-Za-z0-9_./:;=\-+]+$/', $v)) {
+    if ($v === '' || preg_match('~^[A-Za-z0-9_./:;=\-+]+$~', $v)) {
         return $v;
     }
     return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $v) . '"';

@@ -113,12 +113,26 @@ final class Config
             }
             [$key, $value] = array_pad(explode('=', $line, 2), 2, '');
             $key = trim($key);
-            $value = trim($value);
+            $value = self::unquote(trim($value));
             if ($key !== '' && getenv($key) === false) {
                 putenv("$key=$value");
                 $_ENV[$key] = $value;
             }
         }
+    }
+
+    /**
+     * Fjern de dobbelte anførselstegn setup.php's escapeEnvValue() sætter om
+     * værdier med mellemrum eller specialtegn, og ophæv dens \\ og \". Uden
+     * dette blev DATABASE_URL="pgsql:…" en ugyldig DSN, og et TTL på "336"
+     * blev til 0 ved (int)-castet.
+     */
+    private static function unquote(string $value): string
+    {
+        if (strlen($value) >= 2 && $value[0] === '"' && str_ends_with($value, '"')) {
+            return strtr(substr($value, 1, -1), ['\\\\' => '\\', '\\"' => '"']);
+        }
+        return $value;
     }
 
     private static function env(string $key, ?string $default = null): string
