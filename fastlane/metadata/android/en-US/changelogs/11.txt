@@ -1,0 +1,5 @@
+Fixes the app sending your whole database to the server every now and then.
+
+When the app fetched a change made on another device and saved it into your .kdbx file, the library it writes the file with quietly gave every entry, group and deletion a new modification time. On the next sync everything looked changed, so the app sent all of it again: several hundred items at once, about once a week. Nothing was lost, because the contents were the same, but each round pushed real older versions out of the server's version history, which keeps only the last three.
+
+The app now keeps the original times when it writes the file, and only real changes are sent.

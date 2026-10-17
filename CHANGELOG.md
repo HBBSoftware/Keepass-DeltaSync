@@ -174,6 +174,30 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [android/v0.4.6] — 2026-10-17
+
+Fixes the app sending your whole database to the server every now and then.
+
+### Fixed
+
+- **Whole database re-sent after a pull (Android)** — every modifier in kotpass
+  0.13.0 stamps the current time: `modifyEntry`, `modifyGroup`, `moveEntry` and
+  `moveGroup` overwrite `LastModificationTime`/`LocationChanged`, and
+  `removeEntry`/`removeGroup` append a new `DeletedObject` dated now, even for
+  an entry that is already gone. `applyToDatabase` ran `modifyEntry` for every
+  entry and `removeEntry` for every tombstone whenever a pull was written to
+  the `.kdbx`, so the whole database got the same modification time. The next
+  sync found everything newer than what it had recorded as synced and pushed
+  it all back: on the public server about 600 entries, 100 groups and every
+  tombstone, five times between 20 September and 17 October. Nothing was
+  lost, since the contents were unchanged, but each round rotated real older
+  versions out of the three the server keeps per entry.
+
+  `applyToDatabase` now ends with a pass through `modifyContent`, which stamps
+  nothing, and puts the times from the sync state back on every synced entry,
+  group and `DeletedObject`. A pulled entry keeps the server's `modified_at`,
+  so it matches what was recorded and is not echoed back.
+
 ## [android/v0.4.5] — 2026-10-03
 
 No change to the app. F-Droid now builds and signs its own copy, which makes
