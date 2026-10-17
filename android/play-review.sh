@@ -15,18 +15,21 @@
 #
 # Environment:
 #   KEEPASS_DELTASYNC_ADMIN_TOKEN  admin token; else read from ADMIN_TOKEN_FILE
-#   ADMIN_TOKEN_FILE               default ~/.Deploy/deltasync_admin_token.txt
-#   SERVER                         default https://deltasync.org
+#   ADMIN_TOKEN_FILE               default ~/.Deploy/deltasync_review_admin_token.txt
+#   SERVER                         default https://review.deltasync.org, a separate
+#                                  instance with its own database, so reviewers
+#                                  never touch real data. Its tokens live 336 h.
 #   REVIEW_USER                    default play-review
 #   DELTASYNC_CLI                  CLI binary; default `go run` from client/
 set -eu
 cd "$(dirname "$0")"
 
-SERVER="${SERVER:-https://deltasync.org}"
+SERVER="${SERVER:-https://review.deltasync.org}"
 REVIEW_USER="${REVIEW_USER:-play-review}"
-ADMIN_TOKEN_FILE="${ADMIN_TOKEN_FILE:-$HOME/.Deploy/deltasync_admin_token.txt}"
+ADMIN_TOKEN_FILE="${ADMIN_TOKEN_FILE:-$HOME/.Deploy/deltasync_review_admin_token.txt}"
 DEMO_KDBX=../website/review/deltasync-demo.kdbx
-DEMO_URL="$SERVER/review/deltasync-demo.kdbx"
+# The demo file is part of the website, not of the review server.
+DEMO_URL="https://deltasync.org/review/deltasync-demo.kdbx"
 # Not a secret: the file holds made-up entries and is public on the website.
 DEMO_PASSWORD="deltasync-review"
 
