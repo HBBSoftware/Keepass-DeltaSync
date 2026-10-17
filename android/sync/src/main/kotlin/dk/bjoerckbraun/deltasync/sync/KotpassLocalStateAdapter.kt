@@ -3,6 +3,7 @@ package dk.bjoerckbraun.deltasync.sync
 
 import app.keemobile.kotpass.database.KeePassDatabase
 import app.keemobile.kotpass.database.modifiers.binaries
+import app.keemobile.kotpass.database.modifiers.modifyContent
 import app.keemobile.kotpass.database.modifiers.modifyEntry
 import app.keemobile.kotpass.database.modifiers.modifyGroup
 import app.keemobile.kotpass.database.modifiers.modifyParentGroup
@@ -16,6 +17,7 @@ import app.keemobile.kotpass.models.Group
 import dk.bjoerckbraun.deltasync.canonical.Binary
 import dk.bjoerckbraun.deltasync.canonical.Mapper
 import kotlinx.datetime.Instant
+import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toKotlinInstant
 import okio.ByteString
 import java.util.UUID
@@ -300,8 +302,35 @@ object KotpassLocalStateAdapter {
             }
         }
 
-        return db
+        // 4. kotpass' modifyEntry/modifyGroup/move*/remove* stempler alle "nu" i
+        //    tiderne (og remove* i et nyt DeletedObject). Uden dette fik HELE
+        //    databasen samme ændringstid ved hver skrivning efter et pull, og
+        //    næste sync skubbede alt tilbage til serveren.
+        return restoreSyncedTimes(db, state)
     }
+
+    /**
+     * Sæt tiderne på alle synkede entries, grupper og sletninger tilbage til
+     * dem i [state]. Går via modifyContent og egen rekursion, som ikke rører
+     * tiderne. Entries uden for [state] (fx i papirkurven) beholder deres.
+     */
+    private fun restoreSyncedTimes(db: KeePassDatabase, state: LocalState): KeePassDatabase =
+        db.modifyContent {
+            copy(
+                group = withSyncedTimes(group, state),
+                deletedObjects = deletedObjects
+                    .map { d -> state.tombstones[d.id.toString()]?.let { d.copy(deletionTime = it.toJavaInstant()) } ?: d }
+                    .distinctBy { it.id },
+            )
+        }
+
+    private fun withSyncedTimes(group: Group, state: LocalState): Group = group.copy(
+        times = state.groups[group.uuid.toString()]?.let { Mapper.toKotpassTimes(it.times) } ?: group.times,
+        entries = group.entries.map { e ->
+            state.entries[e.uuid.toString()]?.let { e.copy(times = Mapper.toKotpassTimes(it.times)) } ?: e
+        },
+        groups = group.groups.map { withSyncedTimes(it, state) },
+    )
 
     /**
      * Walk'er det eksisterende træ og opsamler gruppe-UUIDs (ekskl. Root) +

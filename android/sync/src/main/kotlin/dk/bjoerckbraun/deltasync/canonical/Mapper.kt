@@ -123,15 +123,7 @@ object Mapper {
             throw IllegalStateException("entry has binary ${ref.name} but no binaryStore was supplied")
         },
     ): KotpassEntry {
-        val times = TimeData(
-            creationTime = entry.times.created.toJavaInstant(),
-            lastModificationTime = entry.times.modified.toJavaInstant(),
-            lastAccessTime = entry.times.accessed.toJavaInstant(),
-            locationChanged = entry.times.locationChanged.toJavaInstant(),
-            expiryTime = entry.times.expiresAt?.toJavaInstant(),
-            expires = entry.times.expires,
-            usageCount = entry.times.usageCount,
-        )
+        val times = toKotpassTimes(entry.times)
 
         val fields = EntryFields(
             entry.strings.mapValues { (_, s) ->
@@ -183,6 +175,21 @@ object Mapper {
     }
 
     /**
+     * Canonical-tider til kotpass' [TimeData]. Bruges også af
+     * KotpassLocalStateAdapter til at genskabe tiderne efter kotpass'
+     * modify-/move-/remove-funktioner, som alle stempler "nu".
+     */
+    fun toKotpassTimes(times: Times): TimeData = TimeData(
+        creationTime = times.created.toJavaInstant(),
+        lastModificationTime = times.modified.toJavaInstant(),
+        lastAccessTime = times.accessed.toJavaInstant(),
+        locationChanged = times.locationChanged.toJavaInstant(),
+        expiryTime = times.expiresAt?.toJavaInstant(),
+        expires = times.expires,
+        usageCount = times.usageCount,
+    )
+
+    /**
      * Konverter en kotpass-Group til canonical-format (v4 group-sync).
      * [parentUuid] er forældregruppens UUID, "" hvis gruppen ligger direkte i
      * Root (sentinel) — kalderen kender parent fra træ-traverseringen.
@@ -218,15 +225,7 @@ object Mapper {
      * KotpassLocalStateAdapter (v4 phase 5d). Øvrige kotpass-felter defaulter.
      */
     fun groupToKotpass(group: Group): KotpassGroup {
-        val times = TimeData(
-            creationTime = group.times.created.toJavaInstant(),
-            lastModificationTime = group.times.modified.toJavaInstant(),
-            lastAccessTime = group.times.accessed.toJavaInstant(),
-            locationChanged = group.times.locationChanged.toJavaInstant(),
-            expiryTime = group.times.expiresAt?.toJavaInstant(),
-            expires = group.times.expires,
-            usageCount = group.times.usageCount,
-        )
+        val times = toKotpassTimes(group.times)
         val icon = PredefinedIcon.entries.getOrElse(group.iconId) { PredefinedIcon.Folder }
         return KotpassGroup(
             uuid = UUID.fromString(group.uuid),

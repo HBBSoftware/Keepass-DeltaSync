@@ -5,6 +5,8 @@ import app.keemobile.kotpass.constants.GroupOverride
 import app.keemobile.kotpass.cryptography.EncryptedValue
 import app.keemobile.kotpass.database.Credentials
 import app.keemobile.kotpass.database.KeePassDatabase
+import app.keemobile.kotpass.database.decode
+import app.keemobile.kotpass.database.encode
 import app.keemobile.kotpass.database.findEntries
 import app.keemobile.kotpass.database.modifiers.modifyContent
 import app.keemobile.kotpass.database.modifiers.modifyMeta
@@ -518,6 +520,56 @@ class KotpassLocalStateAdapterTest {
         accessed = Instant.parse("2026-05-01T10:00:00Z"),
         locationChanged = Instant.parse("2026-05-01T10:00:00Z"),
     )
+
+    @Test
+    fun `applyToDatabase after a pull leaves untouched timestamps alone`() {
+        val folderId = UUID.fromString("f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0")
+        val recycleBinId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+        val pulledUuid = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        val rootUuid = UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val nestedUuid = UUID.fromString("33333333-3333-3333-3333-333333333333")
+        val trashedUuid = UUID.fromString("44444444-4444-4444-4444-444444444444")
+        val purgedUuid = UUID.fromString("55555555-5555-5555-5555-555555555555")
+        val old = Instant.parse("2026-05-29T10:00:00Z").toJavaInstant()
+        val oldTimes = TimeData(old, old, old, null, old, false, 0)
+
+        val db = freshDatabase()
+            .modifyParentGroup {
+                copy(
+                    entries = entries + kotpassEntry(pulledUuid, "Pulled") + kotpassEntry(rootUuid, "Root entry"),
+                    groups = groups + Group(
+                        uuid = folderId, name = "Folder", times = oldTimes,
+                        entries = listOf(kotpassEntry(nestedUuid, "Nested")),
+                    ) + Group(
+                        uuid = recycleBinId, name = "Recycle Bin", times = oldTimes,
+                        entries = listOf(kotpassEntry(trashedUuid, "Trashed")),
+                    ),
+                )
+            }
+            .modifyMeta { copy(recycleBinEnabled = true, recycleBinUuid = recycleBinId) }
+            .modifyContent { copy(deletedObjects = deletedObjects + DeletedObject(purgedUuid, old)) }
+
+        val before = KotpassLocalStateAdapter.read(db)
+
+        // Det SyncEngine.pull gør med én ændring fra serveren.
+        val state = KotpassLocalStateAdapter.read(db)
+        val serverMtime = Instant.parse("2026-10-17T13:54:00Z")
+        state.entries[pulledUuid.toString()] = state.entries.getValue(pulledUuid.toString()).let {
+            it.copy(times = it.times.copy(modified = serverMtime))
+        }
+
+        // Skriv og genindlæs som en rigtig fil, så alt kotpass gør ved encode tæller med.
+        val written = KotpassLocalStateAdapter.applyToDatabase(state, db)
+        val bytes = java.io.ByteArrayOutputStream().also { written.encode(it) }.toByteArray()
+        val after = KotpassLocalStateAdapter.read(KeePassDatabase.decode(bytes.inputStream(), credentials))
+
+        assertEquals(serverMtime, after.entries.getValue(pulledUuid.toString()).times.modified)
+        for (uuid in listOf(rootUuid, nestedUuid)) {
+            assertEquals(before.entries.getValue(uuid.toString()).times, after.entries.getValue(uuid.toString()).times, "entry $uuid")
+        }
+        assertEquals(before.groups.getValue(folderId.toString()).times, after.groups.getValue(folderId.toString()).times, "group")
+        assertEquals(before.tombstones, after.tombstones, "tombstones")
+    }
 
     private fun freshDatabase(): KeePassDatabase =
         KeePassDatabase.Ver4x.create(
