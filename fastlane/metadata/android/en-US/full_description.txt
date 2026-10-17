@@ -19,9 +19,8 @@ How it differs from other KeePass sync solutions:
   derived from your master password via Argon2id and HKDF-SHA256. The
   server stores opaque ciphertext.
 
-• Concurrent edits merge: two devices editing different entries (or even
-  different fields of the same entry) merge cleanly. Field-level
-  last-writer-wins on conflicts.
+• Concurrent edits merge: two devices editing different entries merge
+  cleanly. If both change the same entry, the most recent edit wins.
 
 • Multi-user sharing without key escrow: NaCl sealed-box wraps the
   database master key to each recipient's device public key. The server
@@ -37,7 +36,7 @@ You point it at a .kdbx file on the device, supply the master password
 once, and it keeps the file in sync with the server through WorkManager.
 
 Project: https://gitlab.com/Star95/keepass-deltasync
-Website: https://deltasync.bjoerck-braun.dk
+Website: https://deltasync.org
 
 Groups sync too: group structure and which group each entry belongs to stay
 in sync across devices, alongside the entry contents.
