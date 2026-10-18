@@ -206,6 +206,8 @@ volumes:
                 Go to:
 <pre><code>https://your-domain/setup.php</code></pre>
                 You should see a page titled <em>"DeltaSync — First-time setup"</em>. Prefer Danish? Click <em>Dansk</em> in the corner, or add <code>?lang=da</code> to the address. If you instead get an error or a blank page, jump to <a href="#trouble">Troubleshooting</a> below.
+                <br><br>
+                The first thing the wizard asks for is a <strong>setup key</strong>. It has just written that key to the file <code>server/.setup-key</code> on your host, next to <code>bootstrap.php</code>. Open the file in FileZilla or your file manager, copy its contents and paste them into the wizard. This proves the server is yours: the file is outside the web root, so nobody can fetch it from a browser.
             </li>
 
             <li>
@@ -230,7 +232,7 @@ volumes:
 
             <li>
                 <strong>Delete <code>setup.php</code>.</strong>
-                Back in FileZilla / your file manager, delete the file <code>setup.php</code> from the <code>public/</code> folder on your host. The wizard refuses to run a second time once a token exists, but the file is unnecessary and removing it keeps your server clean. <em>Your server is now live.</em>
+                The wizard deletes <code>setup.php</code> by itself when it finishes. If it tells you it could not, delete the file from the <code>public/</code> folder in FileZilla or your file manager. Either way the wizard will never run again on this server. <em>Your server is now live.</em>
             </li>
 
             <li>
@@ -282,7 +284,7 @@ url = "https://your-domain"</code></pre>
         <p>During setup, the web server needs permission to create <code>server/.env</code>. Make the <code>server/</code> folder writable by your web user (e.g. <code>chmod 700 server</code> and ensure it is owned by your account), run the wizard, then you can tighten permissions again afterwards.</p>
 
         <h3>The wizard says "Setup already complete"</h3>
-        <p>That's fine — it means an admin token already exists, so the wizard locks itself to avoid creating duplicates. Just delete <code>setup.php</code> (step 9) and carry on.</p>
+        <p>That's fine — the wizard has already been run on this server and has locked itself for good. Delete <code>setup.php</code> (step 9) if it is still there, and carry on.</p>
 
         <h3>"Connection failed" in Step 1</h3>
         <p>Your database details are wrong, or the database isn't reachable. On shared hosting the host is usually <code>localhost</code>. Double-check the database name, user, and password, and that the database actually exists.</p>

@@ -7,9 +7,11 @@
 //   Step 2. Run schema migrations (creates tables)
 //   Step 3. Generate the first admin token
 //
-// Re-runs are blocked once admin_tokens contains at least one row. Delete
-// this file after setup is complete — it is not auto-deleted because the
-// webserver user typically cannot unlink files inside its own DocumentRoot.
+// Nothing happens until the visitor enters the key the wizard writes to
+// server/.setup-key, outside the web root — see "Access gate" below. When the
+// last step is done it writes server/.setup-done, refuses to run from then on,
+// and tries to delete itself; many hosts do not let the web server user do
+// that, in which case the page asks the admin to.
 //
 // UI is in English by default; ?lang= switches to any language in $LANGS
 // (da, de, fr, es). Unknown values fall back to English.
@@ -29,6 +31,16 @@ $STRINGS = [
         'guard_done_title'   => 'Setup already complete',
         'guard_done_body'    => 'The admin_tokens table already contains %d entries. This wizard refuses to re-run to avoid accidentally creating extra credentials.',
         'guard_done_action'  => 'Delete this file (server/public/setup.php) — it is no longer needed and adds attack surface.',
+        'guard_marker_body'  => 'This wizard has already been completed (server/.setup-done exists) and does nothing more.',
+        'lock_heading'       => 'Unlock the wizard',
+        'lock_intro'         => 'To prove that this is your server, the wizard has written a setup key to the file <code>server/.setup-key</code>, next to <code>bootstrap.php</code>. Open that file over SFTP or in your host\'s file manager and paste its contents here. The file is outside the web root, so it cannot be fetched from a browser.',
+        'lock_field'         => 'Setup key',
+        'lock_submit'        => 'Unlock',
+        'lock_wrong'         => 'That is not the setup key.',
+        'lock_unwritable'    => 'The wizard could not create <code>server/.setup-key</code>. Create that file yourself over SFTP, put a random string of at least 20 characters in it, reload this page and enter the same string.',
+        'lock_short'         => 'The setup key in <code>server/.setup-key</code> is shorter than 20 characters. Replace it with a longer random string.',
+        'env_newline'        => 'A value contains a line break, which .env cannot hold. Remove it and try again.',
+        'done_self_deleted'  => 'The wizard has deleted <code>setup.php</code> itself. There is nothing left to clean up.',
 
         'env_missing'        => 'No .env file found yet. The wizard will create one.',
         'env_unwritable'     => 'Cannot write to .env at %s. Make sure the directory is writable by the webserver user (chmod 700, owned by your user).',
@@ -80,6 +92,16 @@ $STRINGS = [
         'guard_done_title'   => 'Opsætningen er allerede gennemført',
         'guard_done_body'    => 'admin_tokens-tabellen indeholder allerede %d token(s). Guiden afviser at køre igen for at undgå at oprette ekstra credentials.',
         'guard_done_action'  => 'Slet denne fil (server/public/setup.php) — den er ikke længere nødvendig og udgør angrebs-flade.',
+        'guard_marker_body'  => 'Guiden er allerede gennemført (server/.setup-done findes) og gør ikke mere.',
+        'lock_heading'       => 'Lås guiden op',
+        'lock_intro'         => 'For at bevise at det er din server, har guiden skrevet en opsætningsnøgle i filen <code>server/.setup-key</code>, ved siden af <code>bootstrap.php</code>. Åbn filen over SFTP eller i værtens filhåndtering, og indsæt indholdet her. Filen ligger uden for web-roden, så den kan ikke hentes fra en browser.',
+        'lock_field'         => 'Opsætningsnøgle',
+        'lock_submit'        => 'Lås op',
+        'lock_wrong'         => 'Det er ikke opsætningsnøglen.',
+        'lock_unwritable'    => 'Guiden kunne ikke oprette <code>server/.setup-key</code>. Opret filen selv over SFTP med en tilfældig tekst på mindst 20 tegn, genindlæs siden, og indtast den samme tekst.',
+        'lock_short'         => 'Opsætningsnøglen i <code>server/.setup-key</code> er kortere end 20 tegn. Erstat den med en længere tilfældig tekst.',
+        'env_newline'        => 'En værdi indeholder et linjeskift, som .env ikke kan rumme. Fjern det og prøv igen.',
+        'done_self_deleted'  => 'Guiden har selv slettet <code>setup.php</code>. Der er intet tilbage at rydde op.',
 
         'env_missing'        => 'Ingen .env-fil endnu. Guiden opretter en.',
         'env_unwritable'     => 'Kan ikke skrive til .env på %s. Sørg for at mappen er skrivbar for webserver-brugeren (chmod 700, ejet af din bruger).',
@@ -131,6 +153,16 @@ $STRINGS = [
         'guard_done_title'   => 'Einrichtung bereits abgeschlossen',
         'guard_done_body'    => 'Die Tabelle admin_tokens enthält bereits %d Einträge. Dieser Assistent führt sich nicht erneut aus, um nicht versehentlich zusätzliche Zugangsdaten anzulegen.',
         'guard_done_action'  => 'Löschen Sie diese Datei (server/public/setup.php) — sie wird nicht mehr benötigt und vergrößert die Angriffsfläche.',
+        'guard_marker_body'  => 'Dieser Assistent wurde bereits abgeschlossen (server/.setup-done existiert) und tut nichts mehr.',
+        'lock_heading'       => 'Assistenten entsperren',
+        'lock_intro'         => 'Als Nachweis, dass dies Ihr Server ist, hat der Assistent einen Einrichtungsschlüssel in die Datei <code>server/.setup-key</code> geschrieben, neben <code>bootstrap.php</code>. Öffnen Sie die Datei per SFTP oder im Dateimanager Ihres Hosters und fügen Sie den Inhalt hier ein. Die Datei liegt außerhalb des Web-Roots und kann daher nicht über einen Browser abgerufen werden.',
+        'lock_field'         => 'Einrichtungsschlüssel',
+        'lock_submit'        => 'Entsperren',
+        'lock_wrong'         => 'Das ist nicht der Einrichtungsschlüssel.',
+        'lock_unwritable'    => 'Der Assistent konnte <code>server/.setup-key</code> nicht anlegen. Legen Sie die Datei selbst per SFTP an, mit einer zufälligen Zeichenfolge von mindestens 20 Zeichen, laden Sie die Seite neu und geben Sie dieselbe Zeichenfolge ein.',
+        'lock_short'         => 'Der Einrichtungsschlüssel in <code>server/.setup-key</code> ist kürzer als 20 Zeichen. Ersetzen Sie ihn durch eine längere zufällige Zeichenfolge.',
+        'env_newline'        => 'Ein Wert enthält einen Zeilenumbruch, den .env nicht aufnehmen kann. Entfernen Sie ihn und versuchen Sie es erneut.',
+        'done_self_deleted'  => 'Der Assistent hat <code>setup.php</code> selbst gelöscht. Es gibt nichts mehr aufzuräumen.',
 
         'env_missing'        => 'Noch keine .env-Datei gefunden. Der Assistent legt eine an.',
         'env_unwritable'     => 'Kann .env unter %s nicht schreiben. Stellen Sie sicher, dass das Verzeichnis für den Webserver-Benutzer beschreibbar ist (chmod 700, Ihrem Benutzer gehörend).',
@@ -182,6 +214,16 @@ $STRINGS = [
         'guard_done_title'   => 'Installation déjà terminée',
         'guard_done_body'    => 'La table admin_tokens contient déjà %d entrées. Cet assistant refuse de s\'exécuter à nouveau afin de ne pas créer d\'identifiants supplémentaires par inadvertance.',
         'guard_done_action'  => 'Supprimez ce fichier (server/public/setup.php) — il n\'est plus nécessaire et augmente la surface d\'attaque.',
+        'guard_marker_body'  => 'Cet assistant a déjà été mené à terme (server/.setup-done existe) et ne fait plus rien.',
+        'lock_heading'       => 'Déverrouiller l\'assistant',
+        'lock_intro'         => 'Pour prouver qu\'il s\'agit bien de votre serveur, l\'assistant a écrit une clé d\'installation dans le fichier <code>server/.setup-key</code>, à côté de <code>bootstrap.php</code>. Ouvrez ce fichier via SFTP ou dans le gestionnaire de fichiers de votre hébergeur et collez son contenu ici. Le fichier se trouve hors de la racine web : il ne peut pas être récupéré depuis un navigateur.',
+        'lock_field'         => 'Clé d\'installation',
+        'lock_submit'        => 'Déverrouiller',
+        'lock_wrong'         => 'Ce n\'est pas la clé d\'installation.',
+        'lock_unwritable'    => 'L\'assistant n\'a pas pu créer <code>server/.setup-key</code>. Créez ce fichier vous-même via SFTP avec une chaîne aléatoire d\'au moins 20 caractères, rechargez la page et saisissez la même chaîne.',
+        'lock_short'         => 'La clé d\'installation dans <code>server/.setup-key</code> fait moins de 20 caractères. Remplacez-la par une chaîne aléatoire plus longue.',
+        'env_newline'        => 'Une valeur contient un saut de ligne, que .env ne peut pas contenir. Supprimez-le et réessayez.',
+        'done_self_deleted'  => 'L\'assistant a supprimé <code>setup.php</code> lui-même. Il n\'y a plus rien à nettoyer.',
 
         'env_missing'        => 'Aucun fichier .env trouvé pour l\'instant. L\'assistant va en créer un.',
         'env_unwritable'     => 'Impossible d\'écrire dans .env à %s. Assurez-vous que le répertoire est accessible en écriture par l\'utilisateur du serveur web (chmod 700, appartenant à votre utilisateur).',
@@ -233,6 +275,16 @@ $STRINGS = [
         'guard_done_title'   => 'La configuración ya está completa',
         'guard_done_body'    => 'La tabla admin_tokens ya contiene %d entradas. Este asistente se niega a ejecutarse de nuevo para no crear credenciales adicionales por accidente.',
         'guard_done_action'  => 'Elimine este archivo (server/public/setup.php) — ya no es necesario y amplía la superficie de ataque.',
+        'guard_marker_body'  => 'Este asistente ya se completó (existe server/.setup-done) y no hace nada más.',
+        'lock_heading'       => 'Desbloquear el asistente',
+        'lock_intro'         => 'Para demostrar que este es su servidor, el asistente ha escrito una clave de instalación en el archivo <code>server/.setup-key</code>, junto a <code>bootstrap.php</code>. Abra ese archivo por SFTP o en el gestor de archivos de su proveedor y pegue aquí su contenido. El archivo está fuera de la raíz web, así que no se puede descargar desde un navegador.',
+        'lock_field'         => 'Clave de instalación',
+        'lock_submit'        => 'Desbloquear',
+        'lock_wrong'         => 'Esa no es la clave de instalación.',
+        'lock_unwritable'    => 'El asistente no pudo crear <code>server/.setup-key</code>. Cree ese archivo usted mismo por SFTP con una cadena aleatoria de al menos 20 caracteres, recargue la página e introduzca la misma cadena.',
+        'lock_short'         => 'La clave de instalación en <code>server/.setup-key</code> tiene menos de 20 caracteres. Sustitúyala por una cadena aleatoria más larga.',
+        'env_newline'        => 'Un valor contiene un salto de línea, que .env no puede contener. Elimínelo e inténtelo de nuevo.',
+        'done_self_deleted'  => 'El asistente ha eliminado <code>setup.php</code> por sí mismo. No queda nada por limpiar.',
 
         'env_missing'        => 'Aún no se ha encontrado ningún archivo .env. El asistente creará uno.',
         'env_unwritable'     => 'No se puede escribir en .env en %s. Asegúrese de que el directorio sea escribible por el usuario del servidor web (chmod 700, propiedad de su usuario).',
@@ -327,6 +379,79 @@ function hashToken(string $token): string {
 }
 
 // ------------------------------------------------------------------
+// Access gate
+// ------------------------------------------------------------------
+//
+// Without this, anyone who reaches the URL before the owner does — or after,
+// on an install that never mints an admin token — could point .env at their
+// own database or mint an admin token. Two files outside the web root decide
+// instead of the database:
+//
+//   .setup-key   written on first visit. Every POST must carry its contents,
+//                so only someone who can read the server's files (SFTP, the
+//                host's file manager) can drive the wizard. A forged
+//                cross-site form has no key either, which is the CSRF guard.
+//   .setup-done  written by the last step. While it exists the wizard does
+//                nothing. The old gate counted admin_tokens rows, and an
+//                install whose admin signs in with ADMIN_USERNAME/PASSWORD
+//                from .env may never create one, which left it open for good.
+
+$keyPath  = $rootDir . '/.setup-key';
+$donePath = $rootDir . '/.setup-done';
+const SETUP_KEY_MIN_LENGTH = 20;
+
+$setupDone  = is_file($donePath);
+$setupKey   = null;
+$keyProblem = null;
+if (!$setupDone) {
+    if (!is_file($keyPath)) {
+        // 'x' fails if a concurrent first visit got there first; its key wins.
+        $fh = @fopen($keyPath, 'x');
+        if ($fh !== false) {
+            fwrite($fh, bin2hex(random_bytes(16)) . "\n");
+            fclose($fh);
+            @chmod($keyPath, 0600);
+        }
+    }
+    $raw = is_file($keyPath) ? @file_get_contents($keyPath) : false;
+    if ($raw === false) {
+        $keyProblem = 'lock_unwritable';
+    } elseif (strlen(trim($raw)) < SETUP_KEY_MIN_LENGTH) {
+        $keyProblem = 'lock_short';
+    } else {
+        $setupKey = trim($raw);
+    }
+}
+
+$givenKey  = trim((string) ($_POST['setup_key'] ?? ''));
+$unlocked  = !$setupDone && $setupKey !== null
+          && $_SERVER['REQUEST_METHOD'] === 'POST'
+          && hash_equals($setupKey, $givenKey);
+$lockError = ($setupKey !== null && $givenKey !== '' && !$unlocked) ? $T['lock_wrong'] : null;
+
+// Everything below reads or changes server state, and none of it — not even
+// an error message — reaches a visitor who has not entered the key.
+$envVars         = [];
+$pdo             = null;
+$pdoErr          = null;
+$adminTokenCount = 0;
+$step            = -1;
+$flash           = null;   // success message
+$flashError      = null;   // error message
+$generatedToken  = null;
+$selfDeleted     = false;
+
+// Marks the wizard finished. Without the key file nobody can unlock it again
+// even if .setup-done is later deleted by mistake; a new key is only written
+// when neither exists.
+function finishSetup(string $donePath, string $keyPath): void {
+    @file_put_contents($donePath, 'Completed by setup.php on ' . date('Y-m-d H:i:s') . "\n", LOCK_EX);
+    @unlink($keyPath);
+}
+
+if ($unlocked):
+
+// ------------------------------------------------------------------
 // State detection
 // ------------------------------------------------------------------
 
@@ -401,15 +526,15 @@ if ($adminTokensTableExists && $adminTokenCount > 0) {
     $step = 0;
 }
 
+if ($step === 0) {
+    finishSetup($donePath, $keyPath);
+}
+
 // ------------------------------------------------------------------
 // POST handlers (mutate state)
 // ------------------------------------------------------------------
 
-$flash = null;          // success message
-$flashError = null;     // error message
-$generatedToken = null;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 0) {
+if ($step !== 0) {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'save_env') {
@@ -421,25 +546,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 0) {
         $newTtl   = trim($_POST['ttl']      ?? '24');
         $newBase  = trim($_POST['base_path'] ?? '');
 
-        // Test connection first.
         try {
+            // .env is one value per line; a line break would split the value
+            // and leave a broken file behind.
+            foreach ([$newDsn, $newUser, $newPass, $newLog, $newAudit, $newTtl, $newBase] as $v) {
+                if (preg_match('/[\r\n]/', $v)) {
+                    throw new \InvalidArgumentException($T['env_newline']);
+                }
+            }
+
+            // Test connection first.
             $testPdo = new PDO($newDsn, $newUser, $newPass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ]);
             $testPdo->query('SELECT 1');
 
-            // Write .env atomically.
-            $lines = [
-                '# Generated by setup.php on ' . date('Y-m-d H:i:s'),
-                'DATABASE_URL=' . escapeEnvValue($newDsn),
-                'DATABASE_USER=' . escapeEnvValue($newUser),
-                'DATABASE_PASSWORD=' . escapeEnvValue($newPass),
-                'LOG_LEVEL=' . escapeEnvValue($newLog),
-                'AUDIT_RETENTION_DAYS=' . escapeEnvValue($newAudit),
-                'ENROLLMENT_TOKEN_TTL_HOURS=' . escapeEnvValue($newTtl),
+            // Write .env atomically. Only the keys this form asks for are
+            // replaced; every other line — ADMIN_USERNAME, TRUSTED_PROXIES,
+            // ARGON2_* — is kept. Rewriting the whole file used to drop them
+            // without a word.
+            $managed = [
+                'DATABASE_URL'               => $newDsn,
+                'DATABASE_USER'              => $newUser,
+                'DATABASE_PASSWORD'          => $newPass,
+                'LOG_LEVEL'                  => $newLog,
+                'AUDIT_RETENTION_DAYS'       => $newAudit,
+                'ENROLLMENT_TOKEN_TTL_HOURS' => $newTtl,
+                'APP_BASE_PATH'              => $newBase,  // empty = remove
             ];
-            if ($newBase !== '') {
-                $lines[] = 'APP_BASE_PATH=' . escapeEnvValue($newBase);
+            $lines = ['# Generated by setup.php on ' . date('Y-m-d H:i:s')];
+            if (is_file($envPath)) {
+                foreach (file($envPath, FILE_IGNORE_NEW_LINES) as $line) {
+                    if (str_starts_with($line, '# Generated by setup.php')) { continue; }
+                    $k = trim(explode('=', $line, 2)[0]);
+                    if (!array_key_exists($k, $managed)) {
+                        $lines[] = $line;
+                    }
+                }
+            }
+            foreach ($managed as $k => $v) {
+                if ($k === 'APP_BASE_PATH' && $v === '') { continue; }
+                $lines[] = $k . '=' . escapeEnvValue($v);
             }
             $content = implode("\n", $lines) . "\n";
 
@@ -467,6 +614,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 0) {
                 $adminTokensTableExists = false;
             }
             $step = $adminTokensTableExists ? 3 : 2;
+        } catch (\InvalidArgumentException $e) {
+            $flashError = $e->getMessage();
         } catch (\PDOException $e) {
             $flashError = sprintf($T['step1_fail'], $e->getMessage());
         } catch (\Throwable $e) {
@@ -502,11 +651,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step !== 0) {
             $stmt->execute(['h' => hashToken($generatedToken)]);
             $adminTokenCount = 1;
             $step = 4;  // Done page
+            finishSetup($donePath, $keyPath);
+            $selfDeleted = @unlink(__FILE__);
         } catch (\Throwable $e) {
             $flashError = $e->getMessage();
         }
     }
 }
+
+endif; // $unlocked
 
 ?>
 <!DOCTYPE html>
@@ -730,7 +883,35 @@ ol.done li { margin-bottom: 1rem; }
     <div class="flash error"><?= h(sprintf($T['step1_fail'], $pdoErr)) ?></div>
 <?php endif; ?>
 
-<?php if ($step === 0): ?>
+<?php if ($setupDone): ?>
+    <section class="step">
+        <h2><?= h($T['guard_done_title']) ?></h2>
+        <p><?= h($T['guard_marker_body']) ?></p>
+        <p class="warn"><?= h($T['guard_done_action']) ?></p>
+    </section>
+
+<?php elseif (!$unlocked): ?>
+    <section class="step">
+        <h2><?= h($T['lock_heading']) ?></h2>
+        <?php if ($keyProblem !== null): ?>
+            <div class="flash error"><?= $T[$keyProblem] ?></div>
+        <?php else: ?>
+            <p><?= $T['lock_intro'] ?></p>
+            <?php if ($lockError !== null): ?>
+                <div class="flash error"><?= h($lockError) ?></div>
+            <?php endif; ?>
+            <form method="post" autocomplete="off">
+                <input type="hidden" name="lang" value="<?= h($lang) ?>">
+                <div class="row">
+                    <label><?= h($T['lock_field']) ?></label>
+                    <input type="password" name="setup_key" required autofocus>
+                </div>
+                <button class="btn" type="submit"><?= h($T['lock_submit']) ?></button>
+            </form>
+        <?php endif; ?>
+    </section>
+
+<?php elseif ($step === 0): ?>
     <section class="step">
         <h2><?= h($T['guard_done_title']) ?></h2>
         <p><?= h(sprintf($T['guard_done_body'], $adminTokenCount)) ?></p>
@@ -747,6 +928,7 @@ ol.done li { margin-bottom: 1rem; }
 
         <form method="post">
             <input type="hidden" name="action" value="save_env">
+            <input type="hidden" name="setup_key" value="<?= h($setupKey) ?>">
             <input type="hidden" name="lang" value="<?= h($lang) ?>">
 
             <div class="row">
@@ -801,6 +983,7 @@ ol.done li { margin-bottom: 1rem; }
             </ul>
             <form method="post">
                 <input type="hidden" name="action" value="run_migrations">
+                <input type="hidden" name="setup_key" value="<?= h($setupKey) ?>">
                 <input type="hidden" name="lang" value="<?= h($lang) ?>">
                 <button class="btn" type="submit"><?= h($T['step2_run']) ?></button>
             </form>
@@ -813,6 +996,7 @@ ol.done li { margin-bottom: 1rem; }
         <p><?= h($T['step3_intro']) ?></p>
         <form method="post">
             <input type="hidden" name="action" value="gen_token">
+            <input type="hidden" name="setup_key" value="<?= h($setupKey) ?>">
             <input type="hidden" name="lang" value="<?= h($lang) ?>">
             <button class="btn" type="submit"><?= h($T['step3_run']) ?></button>
         </form>
@@ -832,7 +1016,7 @@ export KEEPASS_DELTASYNC_ADMIN_TOKEN="<?= h($generatedToken) ?>"</code></pre>
 
         <h2 style="margin-top:2rem;"><?= h($T['done_body']) ?></h2>
         <ol class="done">
-            <li><?= $T['done_step_delete'] ?></li>
+            <li><?= $selfDeleted ? $T['done_self_deleted'] : $T['done_step_delete'] ?></li>
             <li>
                 <?= h($T['done_step_user']) ?>
 <pre><code>keepass-deltasync admin user-create alice --display-name "Alice"</code></pre>

@@ -206,6 +206,8 @@ volumes:
                 Gå til:
 <pre><code>https://dit-domæne/setup.php</code></pre>
                 Du bør se en side med titlen <em>"DeltaSync — Førstegangs-opsætning"</em>. Guiden er på engelsk som standard — klik <em>Dansk</em> i hjørnet, eller tilføj <code>?lang=da</code> til adressen. Får du i stedet en fejl eller en blank side, så spring ned til <a href="#trouble">Fejlfinding</a> nederst.
+                <br><br>
+                Det første guiden beder om, er en <strong>opsætningsnøgle</strong>. Den har netop skrevet nøglen i filen <code>server/.setup-key</code> på dit webhotel, ved siden af <code>bootstrap.php</code>. Åbn filen i FileZilla eller din filhåndtering, kopiér indholdet, og indsæt det i guiden. Det beviser, at serveren er din: filen ligger uden for web-roden, så ingen kan hente den fra en browser.
             </li>
 
             <li>
@@ -230,7 +232,7 @@ volumes:
 
             <li>
                 <strong>Slet <code>setup.php</code>.</strong>
-                Tilbage i FileZilla / din filhåndtering: slet filen <code>setup.php</code> fra <code>public/</code>-mappen på dit webhotel. Guiden nægter at køre en gang til når der findes et token, men filen er unødvendig, og at fjerne den holder din server ren. <em>Din server er nu live.</em>
+                Guiden sletter selv <code>setup.php</code>, når den er færdig. Siger den, at det ikke lykkedes, så slet filen fra <code>public/</code>-mappen i FileZilla eller din filhåndtering. Guiden kører under alle omstændigheder aldrig igen på denne server. <em>Din server er nu live.</em>
             </li>
 
             <li>
@@ -282,7 +284,7 @@ url = "https://dit-domæne"</code></pre>
         <p>Under opsætningen skal webserveren have lov til at oprette <code>server/.env</code>. Gør <code>server/</code>-mappen skrivbar for din web-bruger (fx <code>chmod 700 server</code> og sørg for at den ejes af din konto), kør guiden, og stram så permissions igen bagefter.</p>
 
         <h3>Guiden siger "Opsætningen er allerede gennemført"</h3>
-        <p>Det er helt fint — det betyder at der allerede findes et admin-token, så guiden låser sig selv for at undgå dubletter. Slet bare <code>setup.php</code> (trin 9) og gå videre.</p>
+        <p>Det er helt fint — guiden er allerede kørt på denne server og har låst sig selv for altid. Slet <code>setup.php</code> (trin 9), hvis den stadig ligger der, og gå videre.</p>
 
         <h3>"Forbindelse fejlede" i Trin 1</h3>
         <p>Dine database-oplysninger er forkerte, eller databasen kan ikke nås. På delte webhoteller er værten som regel <code>localhost</code>. Dobbelttjek databasenavn, bruger og adgangskode, og at databasen faktisk findes.</p>

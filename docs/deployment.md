@@ -116,7 +116,14 @@ kan oprette ekstra vhosts/subdomæner hos din hoster.
 2. **Opret en tom PostgreSQL 14+-database** og en bruger med write-access.
 3. **Kør setup-wizard'en** ved at åbne `https://<dit-domæne>/setup.php` i
    browser. Wizard'en:
-   - Beder om DB-credentials, tester forbindelsen, skriver `server/.env`
+   - Beder først om opsætningsnøglen. Den skriver en tilfældig nøgle i
+     `server/.setup-key` (uden for web-roden) ved første besøg; hent den over
+     SFTP eller i værtens filhåndtering. Uden nøglen gør guiden intet og viser
+     intet om serveren. Kan den ikke skrive filen, kan du selv oprette den med
+     en tilfældig tekst på mindst 20 tegn.
+   - Beder om DB-credentials, tester forbindelsen, skriver `server/.env`.
+     Kun guidens egne nøgler erstattes; resten af en eksisterende `.env`
+     bevares
    - Kører alle schema-migrationer (`schema/*.sql`)
    - Genererer det første admin-token (vises ÉN gang — gem det med det samme)
    - UI på engelsk default, dansk via `?lang=da`
@@ -132,11 +139,14 @@ kan oprette ekstra vhosts/subdomæner hos din hoster.
    overensstemmelse. Environment er kilden, ikke databasen.
 
    Bemærk at `setup.php` **ikke** kender til den konto. Wizard'en er ældre end
-   panel-loginet og opretter kun et admin-token.
+   panel-loginet og opretter kun et admin-token. Rækkefølgen er ligegyldig:
+   guiden bevarer `ADMIN_*`, hvis de allerede står i `.env`.
 
-5. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2)
-   så det ikke kan misbruges. Wizard'en blokerer auto-genkørsel når
-   admin_tokens har rækker, men filen er stadig unødvendig angrebs-flade.
+5. **Slet `setup.php`** fra `public/` (eller `web-root/sync/` for Recipe 2),
+   hvis den stadig ligger der. Sidste trin skriver `server/.setup-done`, sletter
+   nøglefilen og forsøger at slette `setup.php` selv; mange værter tillader
+   ikke webserveren det. Så længe `.setup-done` findes, nægter guiden at køre,
+   men filen er stadig unødvendig angrebsflade.
 
 Alternativt (uden setup.php — hvis du foretrækker scripted setup):
 ```sh

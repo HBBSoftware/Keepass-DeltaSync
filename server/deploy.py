@@ -72,7 +72,8 @@ LOCAL_ROOT = pathlib.Path(__file__).resolve().parent
 # older than the panel login anyway — it creates an admin token, never the
 # admin account. A genuinely new install uploads it by hand, once.
 EXCLUDE_NAMES = {".env", ".gitignore", ".dockerignore", "Dockerfile",
-                 "docker-entrypoint.sh", "deploy.py", "setup.php"}
+                 "docker-entrypoint.sh", "deploy.py", "setup.php",
+                 ".setup-key", ".setup-done"}
 EXCLUDE_DIRS = {"tests", "vendor"}
 
 

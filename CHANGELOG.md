@@ -174,6 +174,59 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [server/v0.6.1] — 2026-10-18
+
+The setup wizard no longer trusts whoever reaches it first. Only installs on
+plain PHP hosting are affected: the container image has never shipped
+`setup.php`, so Docker, TrueNAS and the images on ghcr.io and Docker Hub
+behave exactly as before.
+
+### Security
+
+- **The setup wizard requires a key from the server's own files (server)** —
+  `setup.php` took every action from any visitor, with no login and no CSRF
+  token, as long as `admin_tokens` was empty. That let an anonymous visitor
+  point `.env` at a database of their own, run the migrations and mint an admin
+  token, and the form showed the current DSN and database user to anyone. The
+  gate was also the wrong thing to count: an install whose admin signs in with
+  `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env` may never create an admin
+  token, which left the wizard open for good. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-2).
+
+  On first visit the wizard now writes a random key to `server/.setup-key`,
+  outside the web root, and does nothing until that key is entered. Every form
+  carries it, so a forged cross-site form has nothing to send. Nothing about the
+  server, not even an error message, reaches a visitor without the key. This
+  works on hosts with no shell: the key is read over SFTP or in the host's file
+  manager. If the wizard cannot write the file, it says so, and the admin can
+  create it by hand with any string of at least 20 characters.
+
+  The last step writes `server/.setup-done`, and while that file exists the
+  wizard refuses to run, whatever the database says. It also tries to delete
+  `setup.php`. Many hosts do not let the web server do that, in which case the
+  page still asks the admin to. An existing install whose `admin_tokens` already
+  has rows writes the marker the first time the key is entered.
+
+### Fixed
+
+- **Saving the database step erased the rest of `.env` (server)** — the
+  wizard rewrote the file from its own seven keys, dropping `ADMIN_USERNAME`,
+  `ADMIN_PASSWORD`, `TRUSTED_PROXIES`, `ARGON2_*` and anything else in it.
+  Clearing `TRUSTED_PROXIES` also took the `Secure` flag off the admin session
+  cookie behind a proxy. Only the keys the form asks for are replaced now, and
+  every other line is kept.
+
+- **A value with a line break produced a broken `.env` (server)** — the
+  wizard now refuses it with a message instead of writing a file the server
+  cannot read.
+
+- **Values the wizard quoted were read back with their quotes (server)** —
+  `escapeEnvValue()` wraps values with special characters in double quotes, but
+  `Config::loadDotEnv()` kept them, so a database password with a special
+  character never matched. The regex that should let plain values through
+  unquoted also had an unescaped `/` and failed on every call, so every value
+  was quoted. Both are fixed.
+
 ## [gui/v0.3.6] — 2026-10-18
 
 ### Added

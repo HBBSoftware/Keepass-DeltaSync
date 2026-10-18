@@ -3,3 +3,5 @@
 /composer.lock
 /tests/coverage/
 /.phpunit.cache/
+/.setup-key
+/.setup-done
