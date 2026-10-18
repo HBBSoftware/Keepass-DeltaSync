@@ -174,6 +174,33 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [gui/v0.3.6] — 2026-10-18
+
+### Added
+
+- **German, French and Spanish.** The language picker in Settings now offers
+  five languages. Each new language lives in its own file (`gui/i18n_de.go`
+  and so on) and registers itself from `init()`. `gui/i18n_test.go` catches
+  the three failures that would otherwise be silent: a missing field (a button
+  with no text), a language that is loaded but missing from the picker, and
+  swapped `%s`/`%d` verbs.
+
+### Changed
+
+- **The GUI starts in your system language, not Danish.** Until now a first
+  start was always in Danish, whatever the machine was set to. The language
+  now comes from the operating system's locale. When that language is not one
+  of the five, the GUI falls back to English, not Danish, because a user on an
+  unsupported locale is more likely to read English. The detected language is
+  not written to `gui.json`, so the GUI keeps following the system until you
+  pick a language in Settings.
+  Reported in [#2](https://gitlab.com/Star95/keepass-deltasync/-/issues/2).
+
+### Fixed
+
+- **The Firefox tab linked to the old domain.** Its guide link now points at
+  `deltasync.org` rather than `deltasync.bjoerck-braun.dk`.
+
 ## [android/v0.4.6] — 2026-10-17
 
 Fixes the app sending your whole database to the server every now and then.

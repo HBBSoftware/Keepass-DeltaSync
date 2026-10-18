@@ -28,7 +28,7 @@ import (
 // keepass-deltasync add-local", og intet sted stod hvor den fil var.
 
 // firefoxGuideURL er den samme side som udvidelsens opsætningsknapper peger på.
-const firefoxGuideURL = "https://deltasync.bjoerck-braun.dk/firefox.html"
+const firefoxGuideURL = "https://deltasync.org/firefox.html"
 
 // firefoxTab bygger fanen: en kort forklaring, knapperne der udfører de to
 // trin, og en liste over de databaser udvidelsen ville kunne søge i.
