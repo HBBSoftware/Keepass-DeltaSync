@@ -199,9 +199,15 @@ func (u *ui) memberRow(db database, m member) fyne.CanvasObject {
 	return indented(container.NewBorder(nil, nil, nil, right, lbl))
 }
 
-// shareDatabase deler databasen med en anden bruger via
-// `share --password-stdin <db> <username>`. Masterpasswordet bruges lokalt til
-// at wrappe database-nøglen til modtagerens enhed (serveren ser det aldrig).
+// shareDatabase deler databasen med en anden bruger. Masterpasswordet bruges
+// lokalt til at wrappe database-nøglen til modtagerens enhed (serveren ser det
+// aldrig).
+//
+// Modtagerens nøgle kommer fra serveren, så vi slår den op først
+// (`share --check`) og deler kun til en nøgle brugeren har godkendt: en kendt,
+// uændret nøgle går direkte igennem; en ny eller ændret kræver at brugeren har
+// sammenlignet aftrykket med modtageren. Det godkendte aftryk sendes med til
+// `share --fingerprint`, så en nøgle der skifter mellem de to kald afvises.
 func (u *ui) shareDatabase(db database) {
 	username := widget.NewEntry()
 	username.SetPlaceHolder(L.Username)
@@ -214,21 +220,96 @@ func (u *ui) shareDatabase(db database) {
 		if !ok || username.Text == "" || pw.Text == "" {
 			return
 		}
-		name := db.Name
+		name, user, password := db.Name, username.Text, pw.Text
 		u.async(func() any {
-			ctx, cancel := withTimeout(60 * time.Second)
+			ctx, cancel := withTimeout(30 * time.Second)
 			defer cancel()
-			return u.c.share(ctx, name, username.Text, pw.Text)
+			k, r := u.c.shareCheck(ctx, name, user)
+			return shareCheckResult{k, r}
 		}, func(v any) {
-			r := v.(result)
-			u.log(r.Combined())
-			if r.Err != nil {
-				dialog.ShowError(errSimple(describeErr(r)), u.win)
+			res := v.(shareCheckResult)
+			if res.r.Err != nil {
+				u.log(res.r.Combined())
+				msg := describeErr(res.r)
+				if cliTooOld(res.r) {
+					msg = L.ShareNeedsNewerCLI
+				}
+				dialog.ShowError(errSimple(msg), u.win)
 				return
 			}
-			u.refreshDatabases()
+			share := func() { u.runShare(name, user, password, res.k.Fingerprint) }
+			if res.k.Status == "known" {
+				share()
+				return
+			}
+			u.confirmShareKey(res.k, share)
 		})
 	})
+}
+
+type shareCheckResult struct {
+	k shareKey
+	r result
+}
+
+// runShare udfører selve delingen med et aftryk brugeren har godkendt.
+func (u *ui) runShare(db, user, password, fingerprint string) {
+	u.async(func() any {
+		ctx, cancel := withTimeout(60 * time.Second)
+		defer cancel()
+		return u.c.share(ctx, db, user, password, fingerprint)
+	}, func(v any) {
+		r := v.(result)
+		u.log(r.Combined())
+		if r.Err != nil {
+			dialog.ShowError(errSimple(describeErr(r)), u.win)
+			return
+		}
+		u.refreshDatabases()
+	})
+}
+
+// confirmShareKey viser modtagerens aftryk og kræver et flueben, før der kan
+// deles. Del-knappen er slået fra indtil da: et aftryk man kan klikke sig
+// forbi uden at have kigget på, beskytter ikke mod noget.
+func (u *ui) confirmShareKey(k shareKey, onConfirm func()) {
+	intro := fmt.Sprintf(L.ShareKeyNew, k.User)
+	if k.Status == "changed" {
+		intro = fmt.Sprintf(L.ShareKeyChanged, k.User)
+	}
+	introLb := widget.NewLabel(intro)
+	introLb.Wrapping = fyne.TextWrapWord
+	if k.Status == "changed" {
+		introLb.Importance = widget.DangerImportance
+	}
+
+	fp := widget.NewLabelWithStyle(k.Fingerprint, fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
+	details := widget.NewForm(
+		widget.NewFormItem(L.ShareKeyDevice, widget.NewLabel(k.Device)),
+		widget.NewFormItem(L.ShareKeyFingerprint, fp),
+	)
+
+	var d *dialog.CustomDialog
+	shareBtn := widget.NewButton(L.ShareDatabase, func() {
+		d.Hide()
+		onConfirm()
+	})
+	shareBtn.Importance = widget.HighImportance
+	shareBtn.Disable()
+	compared := widget.NewCheck(fmt.Sprintf(L.ShareKeyCompared, k.User), func(on bool) {
+		if on {
+			shareBtn.Enable()
+		} else {
+			shareBtn.Disable()
+		}
+	})
+	cancelBtn := widget.NewButton(L.Cancel, func() { d.Hide() })
+
+	content := container.NewVBox(introLb, details, compared)
+	d = dialog.NewCustomWithoutButtons(fmt.Sprintf(L.ShareKeyTitle, k.User), content, u.win)
+	d.SetButtons([]fyne.CanvasObject{cancelBtn, shareBtn})
+	d.Resize(fyne.NewSize(620, 360))
+	d.Show()
 }
 
 // unshareMember fjerner et medlem fra databasen via `unshare <db> <username>`.
@@ -860,10 +941,27 @@ func (u *ui) settingsTab() fyne.CanvasObject {
 	})
 	cliRow := container.NewBorder(nil, nil, nil, cliBrowse, cliPath)
 
+	// Denne enheds aftryk: det andre sammenligner med, før de deler en
+	// database med os. Hentes fra CLI'en i baggrunden; "—" hvis enheden ikke
+	// er enrolled endnu, eller CLI'en er for gammel til `fingerprint`.
+	fpLabel := widget.NewLabelWithStyle("…", fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
+	u.async(func() any {
+		ctx, cancel := withTimeout(30 * time.Second)
+		defer cancel()
+		fp, r := u.c.deviceFingerprint(ctx)
+		if r.Err != nil || fp == "" {
+			return "—"
+		}
+		return fp
+	}, func(v any) { fpLabel.SetText(v.(string)) })
+	fpItem := widget.NewFormItem(L.DeviceFingerprint, fpLabel)
+	fpItem.HintText = L.DeviceFingerprintHint
+
 	form := widget.NewForm(
 		widget.NewFormItem(L.Language, langSel),
 		widget.NewFormItem(L.ThemeLabel, themeSel),
 		widget.NewFormItem(L.CLIPathLabel, cliRow),
+		fpItem,
 	)
 
 	// Hjælpe-panel: vis et wiki-agtigt felt i bunden med en beskrivelse af den

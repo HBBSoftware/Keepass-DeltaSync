@@ -33,6 +33,7 @@ Commands:
   versions <name> <uuid>      List server-stored versions of an entry
   restore <name> <uuid> <n>   Roll an entry back to version n (1, 2 or 3)
   share <name> <username>     Share an owned database with another user (v2)
+  fingerprint                 Show this device's key fingerprint, for others to compare before sharing
   unshare <name> <username>   Remove a member (or yourself) from a database
   shares <name>               List members of a database (owner only)
   status                      Show current enrollment + last-seen info
@@ -80,6 +81,8 @@ func main() {
 		exitOnError(runRestore(os.Args[2:]))
 	case "share":
 		exitOnError(runShare(os.Args[2:]))
+	case "fingerprint":
+		exitOnError(runFingerprint(os.Args[2:]))
 	case "unshare":
 		exitOnError(runUnshare(os.Args[2:]))
 	case "shares":

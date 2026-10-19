@@ -65,6 +65,12 @@
     <string name="share_password_title">Contraseña maestra</string>
     <string name="share_password_message">Introduzca la contraseña maestra de su .kdbx para envolver la clave del nuevo miembro.</string>
     <string name="share_error_format">Servidor: %1$d — %2$s</string>
+    <string name="share_key_title">Comprobar la clave de %1$s</string>
+    <string name="share_key_new">Todavía no ha compartido con %1$s desde este dispositivo. Pida a esa persona que le lea su huella, por teléfono o en persona. Puede verla en su aplicación DeltaSync o con keepass-deltasync fingerprint. Comparta solo si coincide con la de abajo.</string>
+    <string name="share_key_changed">La clave de %1$s ha cambiado desde la última vez que compartió con esa persona. Es lo esperado si ha configurado un dispositivo nuevo. Si no, puede que el servidor le esté dando una clave que no es suya, y compartir entregaría la base de datos. Pídale que le lea su huella y comparta solo si coincide con la de abajo.</string>
+    <string name="share_key_device">Dispositivo: %1$s</string>
+    <string name="share_key_compared">He comparado la huella con %1$s y coincide</string>
+    <string name="device_fingerprint_format">Clave de este dispositivo: %1$s\nLéala a quien vaya a compartir una base de datos con usted. Esa persona la compara con lo que ve antes de compartir.</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Registrar dispositivo</string>

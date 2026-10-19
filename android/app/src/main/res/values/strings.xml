@@ -66,6 +66,12 @@
     <string name="share_password_title">Master password</string>
     <string name="share_password_message">Enter your .kdbx master password to wrap the key for the new member.</string>
     <string name="share_error_format">Server: %1$d — %2$s</string>
+    <string name="share_key_title">Check %1$s\'s key</string>
+    <string name="share_key_new">You have not shared with %1$s from this device before. Ask them to read out their fingerprint, by phone or in person. They can see it in their DeltaSync app or with keepass-deltasync fingerprint. Share only if it matches the one below.</string>
+    <string name="share_key_changed">%1$s\'s key has changed since you last shared with them. That is expected if they have set up a new device. If not, the server may be handing you a key that is not theirs, and sharing would give away the database. Ask them to read out their fingerprint, and share only if it matches the one below.</string>
+    <string name="share_key_device">Device: %1$s</string>
+    <string name="share_key_compared">I have compared the fingerprint with %1$s, and it matches</string>
+    <string name="device_fingerprint_format">This device\'s key: %1$s\nRead this out to someone who is about to share a database with you. They compare it with what they see before they share.</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Enroll device</string>

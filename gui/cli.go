@@ -428,8 +428,67 @@ func (c *cli) sync(ctx context.Context, name, masterPassword string) result {
 // Masterpasswordet sendes via stdin — serveren bruger det IKKE, men klienten
 // skal bruge det lokalt til at wrappe database-nøglen til modtagerens enhed.
 // Flaget SKAL stå før de positionelle argumenter (flag-pakke-reglen).
-func (c *cli) share(ctx context.Context, db, username, masterPassword string) result {
-	return c.run(ctx, masterPassword+"\n", "share", "--password-stdin", db, username)
+//
+// fingerprint er det aftryk brugeren har godkendt i dialogen efter shareCheck.
+// CLI'en afviser, hvis serveren nu leverer en anden nøgle.
+func (c *cli) share(ctx context.Context, db, username, masterPassword, fingerprint string) result {
+	return c.run(ctx, masterPassword+"\n", "share", "--password-stdin", "--fingerprint", fingerprint, db, username)
+}
+
+// shareKey er svaret fra `share --check`: hvem der deles med, hvilken enhed
+// nøglen hører til, nøglens aftryk, og om vi kender den fra en tidligere
+// deling ("new", "known" eller "changed").
+type shareKey struct {
+	User        string
+	Device      string
+	Fingerprint string
+	Status      string
+}
+
+// shareCheck spejler `keepass-deltasync share --check <db> <username>`. Intet
+// password — der deles intet, nøglen slås kun op. Outputtet er "navn: værdi"-
+// linjer; ukendte navne ignoreres, så CLI'en kan tilføje flere.
+func (c *cli) shareCheck(ctx context.Context, db, username string) (shareKey, result) {
+	r := c.run(ctx, "", "share", "--check", db, username)
+	if r.Err != nil {
+		return shareKey{}, r
+	}
+	return parseShareKey(r.Stdout), r
+}
+
+func parseShareKey(out string) shareKey {
+	var k shareKey
+	for _, line := range strings.Split(out, "\n") {
+		name, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		switch strings.TrimSpace(name) {
+		case "user":
+			k.User = value
+		case "device":
+			k.Device = value
+		case "fingerprint":
+			k.Fingerprint = value
+		case "status":
+			k.Status = value
+		}
+	}
+	return k
+}
+
+// cliTooOld genkender en CLI fra før `share --check`. Den kender ikke flaget
+// og fejler med Go's flag-pakkes egen besked.
+func cliTooOld(r result) bool {
+	return strings.Contains(r.Stderr, "flag provided but not defined")
+}
+
+// deviceFingerprint spejler `keepass-deltasync fingerprint` — aftrykket af
+// denne enheds nøgle, som andre sammenligner med før de deler med os.
+func (c *cli) deviceFingerprint(ctx context.Context) (string, result) {
+	r := c.run(ctx, "", "fingerprint")
+	return strings.TrimSpace(r.Stdout), r
 }
 
 // unshare spejler `keepass-deltasync unshare <db> <username>` — fjerner et medlem

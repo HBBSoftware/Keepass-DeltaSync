@@ -262,6 +262,19 @@ func PublicKeyFromPrivate(privateKey []byte) ([]byte, error) {
 	return crypto.PublicKeyFromPrivate(privateKey)
 }
 
+// KeyFingerprint er det menneskelæsbare aftryk af en enheds public-key, fx
+// "7F3A-91C2-0D4E-B8A1-55E0" — samme funktion som desktop-klientens, så et
+// aftryk læst op fra en Android-enhed kan sammenlignes med et vist på en pc.
+func KeyFingerprint(publicKey []byte) string {
+	return crypto.KeyFingerprint(publicKey)
+}
+
+// KeyID er den fulde SHA-256 af en public-key som hex. Android gemmer den om
+// kendte modtagere, så næste deling kan se om nøglen er skiftet.
+func KeyID(publicKey []byte) string {
+	return crypto.KeyID(publicKey)
+}
+
 // WrapMasterKeyForShare er ejer-side af v2 sharing — modstykket til
 // UnwrapSharedMasterKey. Alice (owner) deriverer database master_key fra sit
 // masterpassword (Argon2id, ~200ms) og wrap'er det som sealed-box til

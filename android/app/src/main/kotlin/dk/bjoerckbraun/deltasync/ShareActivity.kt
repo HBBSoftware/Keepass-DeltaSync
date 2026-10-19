@@ -5,6 +5,9 @@ import dk.bjoerckbraun.deltasync.ui.applySystemAndImeInsets
 import android.os.Bundle
 import android.util.Base64
 import android.view.View
+import android.content.DialogInterface
+import android.graphics.Typeface
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -21,6 +24,7 @@ import dk.bjoerckbraun.deltasync.api.ShareMember
 import dk.bjoerckbraun.deltasync.persistence.DatabaseConfigStore
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
+import dk.bjoerckbraun.deltasync.persistence.KnownKeyStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +50,7 @@ class ShareActivity : ComponentActivity() {
 
     private lateinit var configStore: DatabaseConfigStore
     private lateinit var passphraseStore: EncryptedPassphraseStore
+    private lateinit var knownKeys: KnownKeyStore
     private lateinit var api: ApiClient
     private lateinit var databaseId: String
 
@@ -63,6 +68,7 @@ class ShareActivity : ComponentActivity() {
         val credentials = KeystoreTokenStore(applicationContext).load()
         configStore = DatabaseConfigStore(applicationContext)
         passphraseStore = EncryptedPassphraseStore(applicationContext)
+        knownKeys = KnownKeyStore(applicationContext)
         val config = configStore.load()
         if (credentials == null || config == null) {
             // Burde ikke ske — knappen vises kun når begge er på plads.
@@ -228,23 +234,71 @@ class ShareActivity : ComponentActivity() {
             .show()
     }
 
+    /**
+     * Del i tre trin. Modtagerens public-key kommer fra serveren, og en
+     * kompromitteret server kan levere sin egen — så vi wrapper kun til en
+     * nøgle brugeren har godkendt:
+     *
+     *  1. Slå modtageren op og regn nøglens aftryk.
+     *  2. Kendt og uændret nøgle ([KnownKeyStore]) → videre. Ny eller ændret
+     *     → dialog med aftrykket; Del-knappen er slået fra indtil brugeren har
+     *     krydset af at aftrykket er sammenlignet med modtageren.
+     *  3. Wrap og del — til præcis den nøgle der blev vist.
+     */
     private fun doShare(username: String, password: String) {
-        progress.visibility = View.VISIBLE
-        errorText.visibility = View.GONE
-        shareActionButton.isEnabled = false
+        setBusy(true)
 
         lifecycleScope.launch {
-            val outcome = withContext(Dispatchers.IO) {
+            val looked = withContext(Dispatchers.IO) {
                 try {
                     val lookup = api.lookupUser(username)
                     val targetPub = Base64.decode(lookup.targetDevice.publicKey, Base64.DEFAULT)
+                    Recipient(
+                        userId = lookup.user.id,
+                        username = lookup.user.username,
+                        device = lookup.targetDevice.name,
+                        publicKey = targetPub,
+                        fingerprint = GomobileCryptoSession.keyFingerprint(targetPub),
+                        keyId = GomobileCryptoSession.keyId(targetPub),
+                    )
+                } catch (e: ApiException) {
+                    ShareOutcome.Failure(getString(R.string.share_error_format, e.statusCode, e.detail))
+                } catch (e: Exception) {
+                    ShareOutcome.Failure(e.message ?: e::class.simpleName ?: "unknown error")
+                }
+            }
+            when (looked) {
+                is ShareOutcome.Failure -> {
+                    setBusy(false)
+                    showError(looked.message)
+                }
+                is Recipient -> {
+                    val known = knownKeys.load(looked.username)
+                    if (known == looked.keyId) {
+                        completeShare(looked, password)
+                    } else {
+                        setBusy(false)
+                        confirmKey(looked, changed = known != null) { completeShare(looked, password) }
+                    }
+                }
+                else -> setBusy(false)
+            }
+        }
+    }
+
+    private fun completeShare(recipient: Recipient, password: String) {
+        setBusy(true)
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                try {
                     val wrapped = GomobileCryptoSession.wrapMasterKeyForShare(
                         password.toByteArray(),
                         databaseId,
-                        targetPub,
+                        recipient.publicKey,
                     )
-                    api.shareDatabase(databaseId, lookup.user.id, wrapped)
-                    ShareOutcome.Success(lookup.user.username)
+                    api.shareDatabase(databaseId, recipient.userId, wrapped)
+                    knownKeys.save(recipient.username, recipient.keyId)
+                    ShareOutcome.Success(recipient.username)
                 } catch (e: ApiException) {
                     ShareOutcome.Failure(getString(R.string.share_error_format, e.statusCode, e.detail))
                 } catch (e: Exception) {
@@ -252,8 +306,7 @@ class ShareActivity : ComponentActivity() {
                 }
             }
 
-            progress.visibility = View.GONE
-            shareActionButton.isEnabled = true
+            setBusy(false)
             when (outcome) {
                 is ShareOutcome.Success -> {
                     usernameInput.text?.clear()
@@ -263,6 +316,59 @@ class ShareActivity : ComponentActivity() {
                 is ShareOutcome.Failure -> showError(outcome.message)
             }
         }
+    }
+
+    /**
+     * Viser modtagerens aftryk og kræver et flueben før der kan deles. Et
+     * aftryk man kan trykke sig forbi uden at have kigget på, beskytter ikke
+     * mod noget — derfor er knappen slået fra indtil da.
+     */
+    private fun confirmKey(recipient: Recipient, changed: Boolean, onConfirm: () -> Unit) {
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val message = TextView(this).apply {
+            text = getString(
+                if (changed) R.string.share_key_changed else R.string.share_key_new,
+                recipient.username,
+            )
+            if (changed) setTextColor(getColor(android.R.color.holo_red_dark))
+        }
+        val device = TextView(this).apply {
+            text = getString(R.string.share_key_device, recipient.device)
+            setPadding(0, pad, 0, 0)
+        }
+        val fingerprint = TextView(this).apply {
+            text = recipient.fingerprint
+            typeface = Typeface.MONOSPACE
+            textSize = 20f
+            setTextIsSelectable(true)
+            setPadding(0, pad / 2, 0, pad / 2)
+        }
+        val compared = CheckBox(this).apply {
+            text = getString(R.string.share_key_compared, recipient.username)
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad + pad / 5, pad / 2, pad + pad / 5, 0)
+            addView(message)
+            addView(device)
+            addView(fingerprint)
+            addView(compared)
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.share_key_title, recipient.username))
+            .setView(android.widget.ScrollView(this).apply { addView(layout) })
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.share_action) { _, _ -> onConfirm() }
+            .show()
+        val positive = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+        positive.isEnabled = false
+        compared.setOnCheckedChangeListener { _, on -> positive.isEnabled = on }
+    }
+
+    private fun setBusy(busy: Boolean) {
+        progress.visibility = if (busy) View.VISIBLE else View.GONE
+        if (busy) errorText.visibility = View.GONE
+        shareActionButton.isEnabled = !busy
     }
 
     private fun setShareFormEnabled(enabled: Boolean) {
@@ -287,4 +393,14 @@ class ShareActivity : ComponentActivity() {
         data class Success(val username: String) : ShareOutcome()
         data class Failure(val message: String) : ShareOutcome()
     }
+
+    /** Resultatet af opslaget i trin 1 — det der vises i dialogen og wrappes til. */
+    private class Recipient(
+        val userId: String,
+        val username: String,
+        val device: String,
+        val publicKey: ByteArray,
+        val fingerprint: String,
+        val keyId: String,
+    )
 }

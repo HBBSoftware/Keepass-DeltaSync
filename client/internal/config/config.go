@@ -68,6 +68,28 @@ type Config struct {
 	Language  string     `toml:"language,omitempty"`
 	Server    Server     `toml:"server"`
 	Databases []Database `toml:"database"`
+
+	// KnownKeys husker hvilken public-key hver modtager havde sidst vi delte
+	// med dem: username → crypto.KeyID (fuld SHA-256, hex). Serveren leverer
+	// modtagerens nøgle, så uden denne hukommelse kan en kompromitteret server
+	// skifte den ud uden at nogen opdager det. Kendt og uændret nøgle → del
+	// uden spørgsmål; ny eller ændret → brugeren skal sammenligne aftrykket.
+	// Lokal for denne maskine; den synkroniseres ikke.
+	KnownKeys map[string]string `toml:"known_keys,omitempty"`
+}
+
+// KnownKey returnerer den gemte KeyID for username, eller "" hvis vi aldrig
+// har delt med dem fra denne maskine.
+func (c *Config) KnownKey(username string) string {
+	return c.KnownKeys[username]
+}
+
+// RememberKey gemmer username's nuværende KeyID. Caller'en skal selv Save().
+func (c *Config) RememberKey(username, keyID string) {
+	if c.KnownKeys == nil {
+		c.KnownKeys = map[string]string{}
+	}
+	c.KnownKeys[username] = keyID
 }
 
 // Server holder server-URL og device-token (sat efter enrollment).

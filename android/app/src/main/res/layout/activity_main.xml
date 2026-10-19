@@ -218,6 +218,18 @@
             android:text="@string/action_unenroll"
             android:visibility="gone" />
 
+        <!-- Denne enheds nøgleaftryk, til den der deler en database med os.
+             Markerbart, så det kan kopieres ind i en besked. -->
+        <TextView
+            android:id="@+id/deviceFingerprintText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textSize="13sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textIsSelectable="true"
+            android:visibility="gone" />
+
     </LinearLayout>
 
 </ScrollView>

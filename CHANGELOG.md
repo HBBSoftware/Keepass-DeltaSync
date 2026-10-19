@@ -6,6 +6,42 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **Sharing checks the recipient's key before giving it the database (client,
+  GUI, Android)** — to share, a client asks the server for the recipient's
+  public key and wraps the database key to it. Nothing checked that key, so a
+  compromised server could hand over its own and receive the database key in
+  the clear, with every past and future entry readable from then on. That is
+  the one way the server could break the promise in the threat model. Reported
+  in [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
+
+  Every client now shows the key's fingerprint, such as
+  `7F3A-91C2-0D4E-B8A1-55E0`, the first time you share with someone and
+  whenever their key changes. Sharing stays disabled until you confirm that
+  you have compared it with them, by phone or in person. The recipient sees
+  their own with `keepass-deltasync fingerprint`, under Settings in the
+  desktop app, or at the bottom of the Android app's main screen. A key you
+  have confirmed is remembered, so sharing again with the same person asks
+  nothing. A changed key gets a warning: it is expected when they set up a new
+  device, and it is also exactly what an attack would look like.
+
+  The fingerprint is computed in one place, in Go, and Android calls the same
+  function through gomobile, so a fingerprint read out from a phone matches
+  the one shown on a PC. Scripts keep working: `share --password-stdin` shares
+  to a known, unchanged key, and takes `--fingerprint` for anything else. The
+  desktop app looks the key up with `share --check`, shows the dialog, and
+  passes the fingerprint you confirmed, so a key that changes between the two
+  calls is refused. Nothing changes on the server or in the protocol.
+
+### Changed
+
+- **The threat model no longer promises certificate pinning (docs)** — it
+  said a man-in-the-middle was impossible "with valid certificate pinning",
+  but no client pins. They use the platform's normal certificate checks, and
+  they accept `http://` on purpose, because self-hosting on a LAN would
+  otherwise be impossible. The text now says so. Reported in #3 (F-3).
+
 ### Added
 
 - **Chrome and Edge extension** (`extension-chromium/`) — the same search &

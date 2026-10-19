@@ -32,6 +32,7 @@ import dk.bjoerckbraun.deltasync.persistence.DataStoreSyncStatePersistence
 import dk.bjoerckbraun.deltasync.persistence.EncryptedPassphraseStore
 import dk.bjoerckbraun.deltasync.persistence.KeystoreTokenStore
 import dk.bjoerckbraun.deltasync.persistence.SafKdbxFile
+import dk.bjoerckbraun.deltasync.persistence.KnownKeyStore
 import dk.bjoerckbraun.deltasync.persistence.LastSyncStore
 import dk.bjoerckbraun.deltasync.persistence.SyncProbeStore
 import dk.bjoerckbraun.deltasync.sync.GomobileCryptoSession
@@ -67,6 +68,7 @@ class MainActivity : FragmentActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var lastSyncText: TextView
+    private lateinit var deviceFingerprintText: TextView
     private lateinit var versionText: TextView
     private lateinit var enrollButton: MaterialButton
     private lateinit var setupButton: MaterialButton
@@ -102,6 +104,7 @@ class MainActivity : FragmentActivity() {
 
         statusText = findViewById(R.id.statusText)
         lastSyncText = findViewById(R.id.lastSyncText)
+        deviceFingerprintText = findViewById(R.id.deviceFingerprintText)
         versionText = findViewById(R.id.versionText)
         enrollButton = findViewById(R.id.enrollButton)
         setupButton = findViewById(R.id.setupButton)
@@ -164,6 +167,7 @@ class MainActivity : FragmentActivity() {
     private fun refreshStatus() {
         val credentials = tokenStore.load()
         val config = configStore.load()
+        renderDeviceFingerprint(credentials)
 
         when {
             credentials == null -> {
@@ -345,8 +349,30 @@ class MainActivity : FragmentActivity() {
         passphraseStore.clear()
         probeStore.clear()
         lastSyncStore.clear()
+        KnownKeyStore(applicationContext).clear()
         SyncWorker.cancelPeriodic(applicationContext)
         refreshStatus()
+    }
+
+    /**
+     * Denne enheds nøgleaftryk. Den der deler en database med os, ser et
+     * aftryk som serveren har leveret og skal sammenligne det med dette — læst
+     * op ad en kanal serveren ikke styrer. Kun vist når enheden er tilmeldt.
+     */
+    private fun renderDeviceFingerprint(credentials: TokenStore.Credentials?) {
+        val fp = credentials?.let {
+            runCatching {
+                GomobileCryptoSession.keyFingerprint(
+                    GomobileCryptoSession.publicKeyFromPrivate(it.devicePrivateKey),
+                )
+            }.getOrNull()
+        }
+        if (fp == null) {
+            deviceFingerprintText.visibility = View.GONE
+            return
+        }
+        deviceFingerprintText.text = getString(R.string.device_fingerprint_format, fp)
+        deviceFingerprintText.visibility = View.VISIBLE
     }
 
     /** Bruger slog auto-sync fra: ryd det gemte password og stop worker'en. */

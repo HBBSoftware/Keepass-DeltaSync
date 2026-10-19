@@ -66,6 +66,12 @@
     <string name="share_password_title">Master-password</string>
     <string name="share_password_message">Indtast dit .kdbx-master-password for at pakke nøglen til det nye medlem.</string>
     <string name="share_error_format">Server: %1$d — %2$s</string>
+    <string name="share_key_title">Tjek nøglen for %1$s</string>
+    <string name="share_key_new">Du har ikke delt med %1$s fra denne enhed før. Bed personen læse sit fingeraftryk op, i telefonen eller ansigt til ansigt. Det kan ses i personens DeltaSync-app eller med keepass-deltasync fingerprint. Del kun, hvis det er det samme som nedenfor.</string>
+    <string name="share_key_changed">Nøglen for %1$s er ændret, siden du sidst delte med personen. Det er forventet, hvis personen har sat en ny enhed op. Ellers kan serveren give dig en nøgle, der ikke er personens, og så ville delingen give databasen væk. Bed personen læse sit fingeraftryk op, og del kun, hvis det er det samme som nedenfor.</string>
+    <string name="share_key_device">Enhed: %1$s</string>
+    <string name="share_key_compared">Jeg har sammenlignet fingeraftrykket med %1$s, og det passer</string>
+    <string name="device_fingerprint_format">Denne enheds nøgle: %1$s\nLæs den op for den, der skal dele en database med dig. Personen sammenligner den med det, de selv ser, før de deler.</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Enroll enhed</string>

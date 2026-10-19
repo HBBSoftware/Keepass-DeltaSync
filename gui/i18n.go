@@ -238,21 +238,34 @@ type dict struct {
 	SelectMemberFirst string
 	CannotRemoveOwner string
 	ConfirmUnshare    string // "%s" = bruger, "%q" = db
-	SetupShared       string
-	SetupSharedTitle  string // "%s" = remote-navn
-	AlreadyLocal      string
-	NewLocalPassword  string
-	BindExisting      string
-	BoundNowSync      string
-	MasterPwd         string
-	MasterPwdFor      string
-	Language          string
-	ThemeLabel        string
-	ThemeSystem       string
-	ThemeLight        string
-	ThemeDark         string
-	HelpPanelLabel    string
-	HelpPanelDesc     string
+
+	// Nøglekontrol før deling: serveren leverer modtagerens public-key, så
+	// brugeren skal sammenligne aftrykket med modtageren første gang og når
+	// nøglen skifter. Se client/cmd/keepass-deltasync/share.go.
+	ShareKeyTitle         string // "%s" = bruger
+	ShareKeyNew           string // "%s" = bruger
+	ShareKeyChanged       string // "%s" = bruger
+	ShareKeyDevice        string
+	ShareKeyFingerprint   string
+	ShareKeyCompared      string // "%s" = bruger
+	ShareNeedsNewerCLI    string
+	DeviceFingerprint     string
+	DeviceFingerprintHint string
+	SetupShared           string
+	SetupSharedTitle      string // "%s" = remote-navn
+	AlreadyLocal          string
+	NewLocalPassword      string
+	BindExisting          string
+	BoundNowSync          string
+	MasterPwd             string
+	MasterPwdFor          string
+	Language              string
+	ThemeLabel            string
+	ThemeSystem           string
+	ThemeLight            string
+	ThemeDark             string
+	HelpPanelLabel        string
+	HelpPanelDesc         string
 
 	// Opdateringstjek
 	UpdateAvailable  string // format: nyeste version, nuværende version
@@ -476,28 +489,37 @@ var dicts = map[lang]*dict{
 		ColDisplay:         "Visningsnavn",
 		ColAdded:           "Tilføjet",
 
-		ShareDatabase:     "Del database",
-		ShareTitle:        "Del %q med en bruger",
-		ShareWith:         "Del med (brugernavn)",
-		RemoveMember:      "Fjern medlem",
-		SelectMemberFirst: "Vælg først et medlem i listen.",
-		CannotRemoveOwner: "Ejeren kan ikke fjernes.",
-		ConfirmUnshare:    "Fjern %s fra %q?",
-		SetupShared:       "Sæt op lokalt",
-		SetupSharedTitle:  "Sæt den delte database %q op lokalt",
-		AlreadyLocal:      "Databasen er allerede sat op lokalt.",
-		NewLocalPassword:  "Nyt lokalt password",
-		BindExisting:      "Forbind eksisterende .kdbx (egen database, ny enhed)",
-		BoundNowSync:      "Forbundet! Klik på ⟳ (Synkronisér) for at hente entries.",
-		MasterPwd:         "Masterpassword",
-		MasterPwdFor:      "Masterpassword for",
-		Language:          "Sprog",
-		ThemeLabel:        "Tema",
-		ThemeSystem:       "System (følg styresystem)",
-		ThemeLight:        "Lyst",
-		ThemeDark:         "Mørkt",
-		HelpPanelLabel:    "Vis hjælpe-panel",
-		HelpPanelDesc:     "Når slået til, vises et felt i bunden af vinduet med en beskrivelse af den fane du er på — hvad siden gør, og hvad knapperne svarer til i keepass-deltasync-programmet.",
+		ShareDatabase:         "Del database",
+		ShareTitle:            "Del %q med en bruger",
+		ShareWith:             "Del med (brugernavn)",
+		RemoveMember:          "Fjern medlem",
+		SelectMemberFirst:     "Vælg først et medlem i listen.",
+		CannotRemoveOwner:     "Ejeren kan ikke fjernes.",
+		ConfirmUnshare:        "Fjern %s fra %q?",
+		ShareKeyTitle:         "Tjek nøglen for %s",
+		ShareKeyNew:           "Du har ikke delt med %s fra denne computer før. Bed personen læse sit fingeraftryk op, i telefonen eller ansigt til ansigt. Det kan ses i personens DeltaSync-app eller med keepass-deltasync fingerprint. Del kun, hvis det er det samme som nedenfor.",
+		ShareKeyChanged:       "Nøglen for %s er ændret, siden du sidst delte med personen. Det er forventet, hvis personen har sat en ny enhed op. Ellers kan serveren give dig en nøgle, der ikke er personens, og så ville delingen give databasen væk. Bed personen læse sit fingeraftryk op, og del kun, hvis det er det samme som nedenfor.",
+		ShareKeyDevice:        "Enhed",
+		ShareKeyFingerprint:   "Fingeraftryk",
+		ShareKeyCompared:      "Jeg har sammenlignet fingeraftrykket med %s, og det passer",
+		ShareNeedsNewerCLI:    "Kommandolinje-klienten er for gammel til at tjekke modtagerens nøgle. Opdater keepass-deltasync til nyeste version og prøv igen.",
+		DeviceFingerprint:     "Denne enheds nøgle",
+		DeviceFingerprintHint: "Læs den op for den, der skal dele en database med dig. Personen sammenligner den med det, de selv ser, før de deler.",
+		SetupShared:           "Sæt op lokalt",
+		SetupSharedTitle:      "Sæt den delte database %q op lokalt",
+		AlreadyLocal:          "Databasen er allerede sat op lokalt.",
+		NewLocalPassword:      "Nyt lokalt password",
+		BindExisting:          "Forbind eksisterende .kdbx (egen database, ny enhed)",
+		BoundNowSync:          "Forbundet! Klik på ⟳ (Synkronisér) for at hente entries.",
+		MasterPwd:             "Masterpassword",
+		MasterPwdFor:          "Masterpassword for",
+		Language:              "Sprog",
+		ThemeLabel:            "Tema",
+		ThemeSystem:           "System (følg styresystem)",
+		ThemeLight:            "Lyst",
+		ThemeDark:             "Mørkt",
+		HelpPanelLabel:        "Vis hjælpe-panel",
+		HelpPanelDesc:         "Når slået til, vises et felt i bunden af vinduet med en beskrivelse af den fane du er på — hvad siden gør, og hvad knapperne svarer til i keepass-deltasync-programmet.",
 
 		UpdateAvailable:  "Version %s er tilgængelig — du kører %s.",
 		UpdateDownload:   "Hent",
@@ -769,28 +791,37 @@ var dicts = map[lang]*dict{
 		ColDisplay:         "Display name",
 		ColAdded:           "Added",
 
-		ShareDatabase:     "Share database",
-		ShareTitle:        "Share %q with a user",
-		ShareWith:         "Share with (username)",
-		RemoveMember:      "Remove member",
-		SelectMemberFirst: "Select a member in the list first.",
-		CannotRemoveOwner: "The owner can't be removed.",
-		ConfirmUnshare:    "Remove %s from %q?",
-		SetupShared:       "Set up locally",
-		SetupSharedTitle:  "Set up the shared database %q locally",
-		AlreadyLocal:      "The database is already set up locally.",
-		NewLocalPassword:  "New local password",
-		BindExisting:      "Connect existing .kdbx (your own database, new device)",
-		BoundNowSync:      "Connected! Click ⟳ (Sync) to fetch entries.",
-		MasterPwd:         "Master password",
-		MasterPwdFor:      "Master password for",
-		Language:          "Language",
-		ThemeLabel:        "Theme",
-		ThemeSystem:       "System (follow OS)",
-		ThemeLight:        "Light",
-		ThemeDark:         "Dark",
-		HelpPanelLabel:    "Show help panel",
-		HelpPanelDesc:     "When enabled, a panel at the bottom of the window describes the tab you are on — what the page does, and what the buttons map to in the keepass-deltasync program.",
+		ShareDatabase:         "Share database",
+		ShareTitle:            "Share %q with a user",
+		ShareWith:             "Share with (username)",
+		RemoveMember:          "Remove member",
+		SelectMemberFirst:     "Select a member in the list first.",
+		CannotRemoveOwner:     "The owner can't be removed.",
+		ConfirmUnshare:        "Remove %s from %q?",
+		ShareKeyTitle:         "Check %s's key",
+		ShareKeyNew:           "You have not shared with %s from this computer before. Ask them to read out their fingerprint, by phone or in person. They can see it in their DeltaSync app or with keepass-deltasync fingerprint. Share only if it matches the one below.",
+		ShareKeyChanged:       "%s's key has changed since you last shared with them. That is expected if they have set up a new device. If not, the server may be handing you a key that is not theirs, and sharing would give away the database. Ask them to read out their fingerprint, and share only if it matches the one below.",
+		ShareKeyDevice:        "Device",
+		ShareKeyFingerprint:   "Fingerprint",
+		ShareKeyCompared:      "I have compared the fingerprint with %s, and it matches",
+		ShareNeedsNewerCLI:    "The command-line client is too old to check the recipient's key. Update keepass-deltasync to the latest version and try again.",
+		DeviceFingerprint:     "This device's key",
+		DeviceFingerprintHint: "Read this out to someone who is about to share a database with you. They compare it with what they see before they share.",
+		SetupShared:           "Set up locally",
+		SetupSharedTitle:      "Set up the shared database %q locally",
+		AlreadyLocal:          "The database is already set up locally.",
+		NewLocalPassword:      "New local password",
+		BindExisting:          "Connect existing .kdbx (your own database, new device)",
+		BoundNowSync:          "Connected! Click ⟳ (Sync) to fetch entries.",
+		MasterPwd:             "Master password",
+		MasterPwdFor:          "Master password for",
+		Language:              "Language",
+		ThemeLabel:            "Theme",
+		ThemeSystem:           "System (follow OS)",
+		ThemeLight:            "Light",
+		ThemeDark:             "Dark",
+		HelpPanelLabel:        "Show help panel",
+		HelpPanelDesc:         "When enabled, a panel at the bottom of the window describes the tab you are on — what the page does, and what the buttons map to in the keepass-deltasync program.",
 
 		UpdateAvailable:  "Version %s is available — you are running %s.",
 		UpdateDownload:   "Download",

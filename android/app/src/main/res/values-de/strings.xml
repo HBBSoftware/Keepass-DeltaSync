@@ -65,6 +65,12 @@
     <string name="share_password_title">Master-Passwort</string>
     <string name="share_password_message">Geben Sie Ihr .kdbx-Master-Passwort ein, um den Schlüssel für das neue Mitglied zu verpacken.</string>
     <string name="share_error_format">Server: %1$d — %2$s</string>
+    <string name="share_key_title">Schlüssel von %1$s prüfen</string>
+    <string name="share_key_new">Sie haben von diesem Gerät aus noch nicht mit %1$s geteilt. Bitten Sie die Person, ihren Fingerabdruck vorzulesen, am Telefon oder persönlich. Sie findet ihn in ihrer DeltaSync-App oder mit keepass-deltasync fingerprint. Teilen Sie nur, wenn er mit dem unten angezeigten übereinstimmt.</string>
+    <string name="share_key_changed">Der Schlüssel von %1$s hat sich geändert, seit Sie zuletzt mit dieser Person geteilt haben. Das ist zu erwarten, wenn sie ein neues Gerät eingerichtet hat. Andernfalls gibt Ihnen der Server womöglich einen fremden Schlüssel, und durch das Teilen würde die Datenbank preisgegeben. Bitten Sie die Person, ihren Fingerabdruck vorzulesen, und teilen Sie nur, wenn er mit dem unten angezeigten übereinstimmt.</string>
+    <string name="share_key_device">Gerät: %1$s</string>
+    <string name="share_key_compared">Ich habe den Fingerabdruck mit %1$s verglichen, und er stimmt überein</string>
+    <string name="device_fingerprint_format">Schlüssel dieses Geräts: %1$s\nLesen Sie ihn jemandem vor, der eine Datenbank mit Ihnen teilen will. Die Person vergleicht ihn vor dem Teilen mit dem, was sie sieht.</string>
 
     <!-- EnrollActivity -->
     <string name="enroll_title">Gerät registrieren</string>

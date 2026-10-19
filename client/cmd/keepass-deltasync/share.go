@@ -9,7 +9,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
+
+	"golang.org/x/term"
 
 	"gitlab.com/Star95/keepass-deltasync/client/internal/api"
 	"gitlab.com/Star95/keepass-deltasync/client/internal/config"
@@ -24,11 +27,24 @@ import (
 // device-public-key op, wrap'er master_key som sealed-box, og POST'er til
 // /shares. Server lagrer den opaque sealed-box; den kan kun unwrappes af
 // Bob's enheds private-key.
+//
+// Bob's public-key kommer fra serveren, og det er hele svagheden: en
+// kompromitteret server kan levere sin egen og få master_key i klartekst.
+// Derfor wrapper vi kun til en nøgle brugeren har godkendt — enten fordi den
+// er den samme som sidst vi delte med Bob (cfg.KnownKeys), eller fordi
+// brugeren har sammenlignet aftrykket med Bob ad en anden kanal:
+//
+//   - interaktivt: vi viser aftrykket og spørger.
+//   - --fingerprint <fp>: aftrykket er bekræftet andetsteds (GUI'ens dialog
+//     efter `share --check`). Afviger serverens nøgle nu, afbryder vi.
+//   - --password-stdin uden --fingerprint: kun en kendt, uændret nøgle.
 func runShare(args []string) error {
 	fs := flag.NewFlagSet("share", flag.ContinueOnError)
 	pwStdin := fs.Bool("password-stdin", false, "read masterpassword from stdin instead of interactive prompt")
+	check := fs.Bool("check", false, "only look up the recipient's key and print its fingerprint and status; share nothing")
+	expectFP := fs.String("fingerprint", "", "share only if the recipient's key has this fingerprint (as compared with them)")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync share <db-name> <username> [--password-stdin]")
+		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync share [--check | --fingerprint <fp>] [--password-stdin] <db-name> <username>")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -93,6 +109,39 @@ func runShare(args []string) error {
 		return fmt.Errorf("target public key has unexpected size: %d", len(targetPub))
 	}
 
+	recipient := lookup.User.Username
+	fingerprint := crypto.KeyFingerprint(targetPub)
+	status := recipientKeyStatus(cfg.KnownKey(recipient), crypto.KeyID(targetPub))
+
+	if *check {
+		// Linjeformat som GUI'en parser (gui/cli.go shareCheck). Felterne
+		// kan udvides, men eksisterende navne må ikke ændres.
+		fmt.Printf("user: %s\n", recipient)
+		fmt.Printf("device: %s\n", lookup.TargetDevice.Name)
+		fmt.Printf("fingerprint: %s\n", fingerprint)
+		fmt.Printf("status: %s\n", status)
+		return nil
+	}
+
+	switch {
+	case *expectFP != "":
+		if !crypto.SameFingerprint(*expectFP, fingerprint) {
+			return fmt.Errorf("%s's key is not the one you confirmed: the server now returns %s, you confirmed %s. "+
+				"Nothing was shared. Compare the fingerprint with %s again before you retry", recipient, fingerprint, *expectFP, recipient)
+		}
+	case status == keyKnown:
+		// Samme nøgle som sidst — intet at spørge om.
+	case !*pwStdin && term.IsTerminal(int(os.Stdin.Fd())):
+		printKeyNotice(recipient, lookup.TargetDevice.Name, fingerprint, status)
+		if !confirmYes(fmt.Sprintf("Have you compared this fingerprint with %s, and does it match? [y/N] ", recipient)) {
+			return errors.New("not shared")
+		}
+	default:
+		return fmt.Errorf("%s's key needs your confirmation (%s, fingerprint %s). Compare it with %s, "+
+			"who can see it in their DeltaSync app or with `keepass-deltasync fingerprint`, "+
+			"then run again with --fingerprint %s", recipient, status, fingerprint, recipient, fingerprint)
+	}
+
 	// Deriver master_key fra masterpassword. Argon2id ~200ms.
 	// Tjek OS-keyring først (samme convention som daemon-mode), fall back til prompt.
 	password, kerr := keyring.Get(db.RemoteID)
@@ -122,6 +171,13 @@ func runShare(args []string) error {
 		return fmt.Errorf("share database: %w", err)
 	}
 
+	// Først nu er nøglen godkendt og brugt; næste deling med samme nøgle
+	// spørger ikke igen. En fejl her ændrer ikke at delingen lykkedes.
+	cfg.RememberKey(recipient, crypto.KeyID(targetPub))
+	if err := config.Save(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not remember %s's key (%v); you will be asked again next time\n", recipient, err)
+	}
+
 	fmt.Printf("Shared %q with %s (device: %s).\n", dbName, lookup.User.Username, lookup.TargetDevice.Name)
 	fmt.Println("They can now run `databases` to see the shared database, then `init-shared` (coming in M4) to bootstrap a local copy.")
 	return nil
@@ -146,4 +202,53 @@ func fetchRole(ctx context.Context, client *api.Client, deviceToken, databaseID 
 		}
 	}
 	return "", fmt.Errorf("database %s not found on server (deleted, or you lost access)", databaseID)
+}
+
+// Status for en modtagers nøgle set fra denne maskine. Strengene er en del af
+// `share --check`'s output og læses af GUI'en.
+const (
+	keyNew     = "new"     // aldrig delt med modtageren herfra
+	keyKnown   = "known"   // samme nøgle som sidst
+	keyChanged = "changed" // en anden nøgle end sidst
+)
+
+func recipientKeyStatus(known, current string) string {
+	switch {
+	case known == "":
+		return keyNew
+	case known == current:
+		return keyKnown
+	default:
+		return keyChanged
+	}
+}
+
+func printKeyNotice(recipient, device, fingerprint, status string) {
+	fmt.Fprintln(os.Stderr)
+	if status == keyChanged {
+		fmt.Fprintf(os.Stderr, "WARNING: %s's key has changed since you last shared with them.\n", recipient)
+		fmt.Fprintf(os.Stderr, "That is expected if %s has set up a new device. Otherwise the server may be\n", recipient)
+		fmt.Fprintln(os.Stderr, "handing you a key that is not theirs, and sharing would give away the database.")
+	} else {
+		fmt.Fprintf(os.Stderr, "You have not shared with %s from this machine before.\n", recipient)
+	}
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  Device:       %s\n", device)
+	fmt.Fprintf(os.Stderr, "  Fingerprint:  %s\n", fingerprint)
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "Ask %s to read out the fingerprint of that device (in their DeltaSync app, or\n", recipient)
+	fmt.Fprintln(os.Stderr, "`keepass-deltasync fingerprint`), by phone or in person. Share only if it matches.")
+	fmt.Fprintln(os.Stderr)
+}
+
+// confirmYes stiller et ja/nej-spørgsmål på terminalen. Alt andet end y/yes
+// (også en tom linje eller EOF) er nej.
+func confirmYes(prompt string) bool {
+	fmt.Fprint(os.Stderr, prompt)
+	var answer string
+	if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+		return false
+	}
+	a := strings.ToLower(strings.TrimSpace(answer))
+	return a == "y" || a == "yes"
 }

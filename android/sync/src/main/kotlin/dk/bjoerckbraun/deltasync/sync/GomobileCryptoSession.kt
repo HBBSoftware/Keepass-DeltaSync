@@ -116,6 +116,15 @@ class GomobileCryptoSession internal constructor(
         ): ByteArray = Mobile.wrapMasterKeyForShare(password, databaseId, targetPublicKey)
 
         /**
+         * Menneskelæsbart aftryk af en public-key, fx "7F3A-91C2-0D4E-B8A1-55E0".
+         * Regnes af Go-siden, så det er det samme som desktop-klienten viser.
+         */
+        fun keyFingerprint(publicKey: ByteArray): String = Mobile.keyFingerprint(publicKey)
+
+        /** Fuld SHA-256 af en public-key (hex) — det appen gemmer om kendte modtagere. */
+        fun keyId(publicKey: ByteArray): String = Mobile.keyID(publicKey)
+
+        /**
          * Det canonical-skema-version Go-siden emitterer i nye blobs.
          * Bør matche `dk.bjoerckbraun.deltasync.canonical.SchemaVersion`;
          * en mismatch indikerer at .aar'en og :sync-modulet er ude af sync.

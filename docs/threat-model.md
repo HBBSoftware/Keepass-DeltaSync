@@ -10,8 +10,8 @@ vi giver mod hver. Modellen dækker både v1 (single-user) og v2
 |-------|-------------|
 | **Bruger** | Lovlig ejer eller medlem af en database. Har masterpassword (owner) eller wrapped_master_key + device-private-key (member). |
 | **Server-admin** | Har fuld adgang til hosting-miljø: DB-rows, log-filer, kørende processer. Kan ikke åbne klient-krypterede blobs uden klient-side keymateriale. |
-| **Passiv netværks-observatør** | Ser TLS-krypteret trafik. Med valid certifikat-pinning umuligt at MitM uden CA-kompromittering. |
-| **Aktiv angriber med RCE på server** | Kan læse alle DB-rows, ændre dem, observere kørende processer. Stadig blokeret fra klient-krypteret blob-indhold. |
+| **Passiv netværks-observatør** | Ser TLS-krypteret trafik, når serveren bruger HTTPS. Klienterne bruger platformens almindelige certifikatvalidering; der er **ingen certifikat-pinning**, så en angriber med et certifikat fra en kompromitteret eller tvunget CA kan MitM'e. Klienterne accepterer også `http://`, fordi selvhosting på et LAN (`192.168.x.x`, en container på localhost) ellers ikke kan lade sig gøre; over `http://` ser observatøren device-tokenet. |
+| **Aktiv angriber med RCE på server** | Kan læse alle DB-rows, ændre dem, observere kørende processer. Blokeret fra klient-krypteret blob-indhold — med ét forbehold: ved deling leverer serveren modtagerens public-key, så den kan forsøge at give sin egen. Klienten afviser det, når brugeren sammenligner nøgleaftrykket; se "Modtagerens nøgle kommer fra serveren" nedenfor. |
 | **Angriber med adgang til klient-enhed** | Har potentielt adgang til config.toml (device_token + device_private_key) og lokal .kdbx-fil. |
 | **Anden enrolled bruger** | Har egen device-token, kan lookup andre brugere via username. Kan ikke se andre brugeres databaser uden delt adgang. |
 
@@ -79,6 +79,46 @@ stoler på Bob, må hun:
 
 **Forensisk genåbning er fundamentalt uundgåelig** i ende-til-ende-
 krypteret deling — Bob HAR data'en så længe han var medlem.
+
+### Modtagerens nøgle kommer fra serveren
+
+Når Alice deler, spørger hendes klient serveren om Bob's public-key
+(`GET /users/lookup`), og serveren svarer med nøglen fra Bob's senest
+tilmeldte enhed. En kompromitteret server kan svare med sin egen nøgle i
+stedet; så wrapper Alice master_key til serveren, som derefter kan
+dekryptere alle blobs i databasen — også de historiske.
+
+Klienterne (CLI, desktop-GUI og Android) wrapper derfor kun til en nøgle,
+brugeren har godkendt:
+
+- **Aftryk**: SHA-256 af public-key'en, de første 80 bit vist som
+  `7F3A-91C2-0D4E-B8A1-55E0`. Regnes ét sted (`crypto.KeyFingerprint` i Go);
+  Android kalder samme funktion via gomobile. Bob ser sit eget aftryk med
+  `keepass-deltasync fingerprint`, under Indstillinger i GUI'en eller nederst
+  på Android-appens forside.
+- **Første deling** med en bruger fra en given enhed: klienten viser
+  aftrykket og kræver en aktiv bekræftelse (flueben, eller `y` i CLI'en) af
+  at det er sammenlignet med modtageren ad en kanal serveren ikke styrer.
+- **Kendt nøgle (TOFU)**: klienten husker den fulde SHA-256 pr. brugernavn
+  (`[known_keys]` i config.toml; SharedPreferences på Android). Er nøglen
+  uændret ved næste deling, spørges der ikke igen.
+- **Ændret nøgle**: tydelig advarsel og fornyet bekræftelse. Det er
+  forventet, når Bob har tilmeldt en ny enhed, og det er netop det et angreb
+  ville ligne.
+- **Scripts**: `share --password-stdin` deler kun til en kendt, uændret
+  nøgle, eller med `--fingerprint <aftryk>`. GUI'en slår nøglen op med
+  `share --check`, viser dialogen og sender det godkendte aftryk med; skifter
+  serveren nøglen mellem de to kald, afvises delingen.
+
+Hvad det ikke dækker:
+
+- Beskyttelsen ved første deling er kun så god som sammenligningen. Krydser
+  Alice af uden at have talt med Bob, er hun lige så udsat som før.
+- Hukommelsen er pr. enhed og synkroniseres ikke. Deler Alice fra en ny
+  enhed, er alle modtagere "nye" igen.
+- Ældre klienter (CLI før 1.10.0, GUI før 0.3.7, Android før 0.4.7) har
+  ingen kontrol.
+- Bob's andre enheder får ikke nøglen ved deling; kun den senest tilmeldte.
 
 ### Privacy lookup
 
