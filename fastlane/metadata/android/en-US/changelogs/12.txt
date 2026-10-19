@@ -1,0 +1,3 @@
+Sharing now checks the recipient's key.
+
+The first time you share a database with someone, and whenever their key changes, the app shows the key's fingerprint and only shares after you tick that you have compared it with them, by phone or in person. This stops a compromised server from slipping in a key of its own. Your own fingerprint is at the bottom of the main screen.

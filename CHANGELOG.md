@@ -62,14 +62,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `keepassxc-cli` fails before it opens the pipe, the client gives up within
   seconds instead of waiting forever.
 
-- **Sharing checks the recipient's key before giving it the database
-  (Android)** — the same check as in client/v1.10.0 and gui/v0.3.7, for the
-  share screen: the key's fingerprint is shown the first time you share with
-  someone and when their key changes, and the share button stays disabled
-  until you confirm you compared it with them. The main screen shows this
-  device's own fingerprint. Reported in
-  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
-
 ### Added
 
 - **Chrome and Edge extension** (`extension-chromium/`) — the same search &
@@ -237,6 +229,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [android/v0.4.7] — 2026-10-19
+
+### Security
+
+- **Sharing checks the recipient's key before giving it the database
+  (Android)** — the same check as in client/v1.10.0 and gui/v0.3.7, for the
+  share screen: the key's fingerprint is shown the first time you share with
+  someone and when their key changes, and the share button stays disabled
+  until you confirm you compared it with them. The main screen shows this
+  device's own fingerprint. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
 
 ## [client/v1.10.0] — 2026-10-19
 
