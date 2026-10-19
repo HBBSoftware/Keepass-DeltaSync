@@ -8,6 +8,15 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **The deploy scripts sent the SFTP password before checking the host key
+  (deploy)** — `server/deploy.py` and `website/deploy.py` pin the host's key
+  so a redirected DNS name cannot collect the password, but they logged in
+  first and compared the key afterwards. A wrong key stopped the upload, after
+  the password had already gone to whoever answered. Both now open the
+  connection, check the key and only then authenticate. Tested against an SFTP
+  server: with a wrong pin the old scripts' login shows in the server log, the
+  new ones' does not. Found in our own review.
+
 - **Pulled entries no longer touch the disk as plain text (client)** — to
   merge what it pulled, the client decrypts the entries into a KeePass XML
   document and has `keepassxc-cli import` build a temporary `.kdbx` from it.

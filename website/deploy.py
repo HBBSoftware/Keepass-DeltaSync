@@ -94,15 +94,18 @@ def main() -> int:
             print("  would upload", posixpath.join(REMOTE_ROOT, rel))
         return 0
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    # The host key is checked BEFORE the password is sent. Transport.connect()
+    # with a password authenticates first and only then lets you look at the
+    # key, so a pin checked afterwards refuses the upload but has already
+    # handed the password to whoever answered on port 22.
     transport = paramiko.Transport((HOST, 22))
-    transport.connect(username=USER, password=PASSWORD)
+    transport.start_client(timeout=30)
     got = fingerprint(transport.get_remote_server_key())
     if got != EXPECTED_HOSTKEY:
         transport.close()
         print(f"host key mismatch\n  expected {EXPECTED_HOSTKEY}\n  got      {got}", file=sys.stderr)
         return 1
+    transport.auth_password(USER, PASSWORD)
     print(f"connected to {HOST}, host key {got}")
 
     sftp = paramiko.SFTPClient.from_transport(transport)

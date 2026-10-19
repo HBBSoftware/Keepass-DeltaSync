@@ -122,13 +122,18 @@ def main() -> int:
         print("DEPLOY_SFTP_USER and DEPLOY_SFTP_PASSWORD must be set", file=sys.stderr)
         return 2
 
+    # The host key is checked BEFORE the password is sent. Transport.connect()
+    # with a password authenticates first and only then lets you look at the
+    # key, so a pin checked afterwards refuses the upload but has already
+    # handed the password to whoever answered on port 22.
     transport = paramiko.Transport((HOST, 22))
-    transport.connect(username=USER, password=PASSWORD)
+    transport.start_client(timeout=30)
     got = fingerprint(transport.get_remote_server_key())
     if got != EXPECTED_HOSTKEY:
         transport.close()
         print(f"host key mismatch\n  expected {EXPECTED_HOSTKEY}\n  got      {got}", file=sys.stderr)
         return 1
+    transport.auth_password(USER, PASSWORD)
     print(f"connected to {HOST}, host key {got}")
 
     sftp = paramiko.SFTPClient.from_transport(transport)
