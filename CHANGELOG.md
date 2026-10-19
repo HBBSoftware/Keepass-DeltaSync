@@ -8,6 +8,32 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **The server could make a device encrypt under a key the server knows
+  (client)** — on every run the client asks the server whether it is the
+  owner or a member of the database, and that answer decides where the key
+  comes from: an owner derives it from the master password, a member unwraps
+  a `wrapped_master_key` that the server also supplies. Nothing on the device
+  remembered which it was. A compromised server could therefore call the owner
+  a member, hand over a key of its own wrapped to the device, and every entry
+  pushed from then on would be readable by the server. It could do the same to
+  a real member by swapping their wrapped key. Found in our own review; the
+  Android app was not affected, since it always derives the key from the
+  password.
+
+  Each binding in `config.toml` now records its `role` and a `key_check` (a
+  128-bit HMAC of the key, which does not reveal it). A run where the server's
+  role differs, or the key does not match, stops before anything is sent. The
+  role is set by `init` and `init-shared`; bindings made before this release
+  take it from their first run. The key check is recorded only when the key is
+  known to be right — at `init-shared`, or once a blob from the server has
+  decrypted — so a mistyped password is never remembered as the real one. As a
+  side effect, an owner who types the wrong password now gets a plain "is it
+  the right password?" instead of decryption errors later.
+
+  Tested against a 0.6.1 server whose database was changed by hand to stage
+  both attacks: client 1.10.0 synced and pushed the new entry under the
+  server's key; this version refuses and sends nothing.
+
 - **The deploy scripts sent the SFTP password before checking the host key
   (deploy)** — `server/deploy.py` and `website/deploy.py` pin the host's key
   so a redirected DNS name cannot collect the password, but they logged in

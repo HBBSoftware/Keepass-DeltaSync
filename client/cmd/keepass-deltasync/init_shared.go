@@ -177,6 +177,10 @@ func runInitShared(args []string) error {
 		RemoteID:    shared.ID,
 		LastSeq:     changes.CurrentSeq,
 		EntryStates: entryStates,
+		// Herfra må serveren hverken gøre os til ejer eller give os en anden
+		// nøgle; se resolveMasterEntryKeys.
+		Role:     "member",
+		KeyCheck: crypto.KeyCheck(entryKey),
 	}
 	cfg.AddDatabase(newDB)
 	if err := config.Save(cfg); err != nil {

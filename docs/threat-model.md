@@ -130,6 +130,24 @@ Hvad det ikke dækker:
   ingen kontrol.
 - Bob's andre enheder får ikke nøglen ved deling; kun den senest tilmeldte.
 
+### Serveren bestemmer om vi er ejer eller medlem
+
+Ved hver kørsel fortæller serveren klienten, om den er `owner` eller
+`member` af en database, og det afgør hvor nøglen kommer fra: en owner
+afleder den af masterpassword'et, et member pakker en `wrapped_master_key`
+ud, som serveren også leverer. Kunne serveren ændre svaret, kunne den kalde
+en ejer for medlem og give sin egen nøgle med — og alt ejeren pusher derefter,
+ville være læseligt for serveren.
+
+Desktop-klienten husker derfor pr. binding sin `role` og en `key_check`
+(HMAC-SHA256 af entry-key'en, 128 bit) i config.toml og stopper, før den
+sender noget, hvis serveren siger noget andet. Rollen sættes ved `init` og
+`init-shared`; bindinger fra før klient 1.10.1 får den ved første kørsel
+(tillid ved første brug). Kontrolværdien gemmes kun når nøglen bevisligt er
+rigtig: ved `init-shared` og når en blob fra serveren har ladet sig
+dekryptere. Android-appen afleder altid nøglen af password'et og er ikke
+berørt.
+
 ### Privacy lookup
 
 `GET /users/lookup?username=X` lader enhver enrolled bruger finde andre

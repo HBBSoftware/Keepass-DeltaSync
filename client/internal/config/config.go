@@ -142,6 +142,20 @@ type Database struct {
 	// (se keyring.Set/Get), og en database uden server har ikke sådan én. Uden
 	// et lokalt id ville alle lokal-kun databaser dele samme keyring-slot.
 	LocalID string `toml:"local_id,omitempty"`
+
+	// Role og KeyCheck er hvad denne enhed ved om databasens nøgle, uafhængigt
+	// af serveren. Serveren fortæller ved hver kørsel om vi er "owner" eller
+	// "member", og det afgør om nøglen afledes af masterpassword'et eller
+	// pakkes ud af en wrapped_master_key som serveren leverer. Uden en lokal
+	// hukommelse kunne en kompromitteret server kalde en ejer for medlem, give
+	// sin egen nøgle med, og få alt nyt krypteret under den.
+	//
+	// Role sættes ved init/init-shared (ældre bindinger: første kørsel efter
+	// opdateringen) og må aldrig skifte. KeyCheck er crypto.KeyCheck(entryKey)
+	// og gemmes kun når nøglen bevisligt er rigtig: ved init, init-shared, og
+	// når en blob fra serveren lader sig dekryptere.
+	Role     string `toml:"role,omitempty"`
+	KeyCheck string `toml:"key_check,omitempty"`
 }
 
 // LocalOnly rapporterer om databasen kun er registreret lokalt — altså at der

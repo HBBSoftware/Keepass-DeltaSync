@@ -79,6 +79,10 @@ func runInit(args []string) error {
 	client := api.New(cfg.Server.URL)
 
 	var remoteID, remoteName, createdAt string
+	// Rollen ligger fast fra nu af; se resolveMasterEntryKeys. Opretter vi
+	// databasen, er vi ejer. Binder vi til en eksisterende, er det serverens
+	// svar her og nu, vi husker.
+	role := "owner"
 
 	if *bind != "" {
 		if !uuidRe.MatchString(*bind) {
@@ -101,6 +105,9 @@ func runInit(args []string) error {
 		remoteID = match.ID
 		remoteName = match.Name
 		createdAt = match.CreatedAt
+		if match.Role != "" {
+			role = match.Role
+		}
 	} else {
 		db, err := client.CreateDatabase(ctx, cfg.Server.DeviceToken, name)
 		if err != nil {
@@ -116,6 +123,7 @@ func runInit(args []string) error {
 		LocalPath: absPath,
 		RemoteID:  remoteID,
 		LastSeq:   0,
+		Role:      role,
 	})
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)

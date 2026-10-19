@@ -289,7 +289,7 @@ func setupDaemonWorkers(cfg *config.Config, dbs []*config.Database, cliPath stri
 		if err != nil {
 			return workers, err
 		}
-		masterKey, entryKey, err := resolveMasterEntryKeys(pw, serverDB.Role, db.RemoteID, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
+		masterKey, entryKey, err := resolveMasterEntryKeys(pw, serverDB.Role, db, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
 		if err != nil {
 			passwd.Zero(pw)
 			return workers, err

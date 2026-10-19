@@ -71,7 +71,7 @@ func TestServerPlacementReport(t *testing.T) {
 			role, wrapped = serverDBs[i].Role, serverDBs[i].WrappedMasterKey
 		}
 	}
-	_, entryKey, err := resolveMasterEntryKeys(password, role, db.RemoteID, wrapped, cfg.Server.DevicePrivateKey)
+	_, entryKey, err := resolveMasterEntryKeys(password, role, db, wrapped, cfg.Server.DevicePrivateKey)
 	if err != nil {
 		t.Fatalf("nøgler: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestPendingGroupDeletions(t *testing.T) {
 			role, wrapped = serverDBs[i].Role, serverDBs[i].WrappedMasterKey
 		}
 	}
-	_, entryKey, err := resolveMasterEntryKeys(password, role, db.RemoteID, wrapped, cfg.Server.DevicePrivateKey)
+	_, entryKey, err := resolveMasterEntryKeys(password, role, db, wrapped, cfg.Server.DevicePrivateKey)
 	if err != nil {
 		t.Fatalf("nøgler: %v", err)
 	}

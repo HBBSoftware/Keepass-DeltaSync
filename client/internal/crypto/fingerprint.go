@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
@@ -47,4 +48,24 @@ func SameFingerprint(a, b string) bool {
 	}
 	na := norm(a)
 	return na != "" && na == norm(b)
+}
+
+// KeyCheck er en kontrolværdi for en databases entry-key: de første 128 bit af
+// HMAC-SHA256(entryKey, "deltasync-key-check-v1"), som hex. Klienten gemmer
+// den i config.toml og sammenligner ved hver kørsel, så en server ikke i
+// stilhed kan få klienten til at kryptere under en anden nøgle — fx ved at
+// kalde en ejer for medlem og levere sin egen wrapped_master_key.
+//
+// Værdien afslører ikke nøglen. Den lader dog den der har config.toml teste
+// gæt på masterpassword'et offline (Argon2id pr. gæt); det kan den lokale
+// .kdbx-fil allerede.
+func KeyCheck(entryKey []byte) string {
+	m := hmac.New(sha256.New, entryKey)
+	m.Write([]byte("deltasync-key-check-v1"))
+	return hex.EncodeToString(m.Sum(nil)[:16])
+}
+
+// SameKeyCheck sammenligner to kontrolværdier i konstant tid.
+func SameKeyCheck(a, b string) bool {
+	return hmac.Equal([]byte(a), []byte(b))
 }

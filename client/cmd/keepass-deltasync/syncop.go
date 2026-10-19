@@ -98,7 +98,7 @@ func setupEnv(name string, pwStdin bool, cliPath string, timeout time.Duration, 
 		return nil, err
 	}
 
-	masterKey, entryKey, err := resolveMasterEntryKeys(password, serverDB.Role, db.RemoteID, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
+	masterKey, entryKey, err := resolveMasterEntryKeys(password, serverDB.Role, db, serverDB.WrappedMasterKey, cfg.Server.DevicePrivateKey)
 	if err != nil {
 		passwd.Zero(password)
 		return nil, err
@@ -127,14 +127,65 @@ func findServerDatabase(ctx context.Context, client *api.Client, deviceToken, re
 }
 
 // resolveMasterEntryKeys returnerer entry-kryptering-keys for en database
-// baseret pa rolle. For owners: Argon2id(password). For members: unwrap
-// wrapped_master_key med device-keypair. Caller ejer det returnerede
-// keymateriale og skal zero det.
+// baseret pa rolle, og nægter hvis det ikke stemmer med hvad denne enhed ved
+// om databasen (db.Role, db.KeyCheck).
+//
+// Rollen kommer fra serveren, og den afgør hvor nøglen kommer fra: for en
+// owner Argon2id(password), for en member en wrapped_master_key som serveren
+// også leverer. Uden kontrollen her kunne en kompromitteret server kalde en
+// ejer for medlem — eller give et rigtigt medlem en ny wrapped key — og
+// klienten ville kryptere alt nyt under en nøgle serveren kender.
 //
 // password er det LOKALE kdbx-password (til keepassxc-cli). For owners er
 // det også masterpassword'et til Argon2id-derivation; for members er det
 // uafhængigt — Bob har valgt sit eget password til sin lokale kopi.
-func resolveMasterEntryKeys(password []byte, role, remoteID string, wrappedKeyB64 *string, devicePriv []byte) (masterKey, entryKey []byte, err error) {
+//
+// En binding fra før kontrollen fandtes, får sin rolle her ved første kørsel
+// (tillid ved første brug). KeyCheck sættes ikke her, for et forkert indtastet
+// password ville så blive husket som det rigtige; se recordKeyCheck.
+func resolveMasterEntryKeys(password []byte, serverRole string, db *config.Database, wrappedKeyB64 *string, devicePriv []byte) (masterKey, entryKey []byte, err error) {
+	role := serverRole
+	if role == "" {
+		role = "owner" // pre-v2 server
+	}
+	if db.Role != "" && db.Role != role {
+		return nil, nil, fmt.Errorf("the server now says you are %s of %q, but this device set it up as %s. "+
+			"Refusing to continue: a server that changes this can make the client encrypt under a key the server knows. "+
+			"If the database really has changed hands, run `keepass-deltasync forget %s` and set it up again",
+			role, db.Name, db.Role, db.Name)
+	}
+	masterKey, entryKey, err = keysForRole(password, role, db.RemoteID, wrappedKeyB64, devicePriv)
+	if err != nil {
+		return nil, nil, err
+	}
+	if db.KeyCheck != "" && !crypto.SameKeyCheck(db.KeyCheck, crypto.KeyCheck(entryKey)) {
+		passwd.Zero(masterKey)
+		passwd.Zero(entryKey)
+		if role == "owner" {
+			return nil, nil, fmt.Errorf("the master password does not give the key %q was set up with — is it the right password?", db.Name)
+		}
+		return nil, nil, fmt.Errorf("the key the server returned for %q is not the one this device has been using. "+
+			"Refusing to continue: a server that swaps it can read everything synced from now on. "+
+			"If the owner has really re-created the database key, run `keepass-deltasync forget %s` and `init-shared` again",
+			db.Name, db.Name)
+	}
+	if db.Role == "" {
+		db.Role = role
+	}
+	return masterKey, entryKey, nil
+}
+
+// recordKeyCheck husker entryKey's kontrolværdi, hvis vi ikke allerede har
+// en. Kaldes kun når nøglen bevisligt er den rigtige.
+func recordKeyCheck(db *config.Database, entryKey []byte) {
+	if db.KeyCheck == "" {
+		db.KeyCheck = crypto.KeyCheck(entryKey)
+	}
+}
+
+// keysForRole udleder nøglerne for en given rolle uden at tjekke noget mod
+// den lokale binding — det gør resolveMasterEntryKeys.
+func keysForRole(password []byte, role, remoteID string, wrappedKeyB64 *string, devicePriv []byte) (masterKey, entryKey []byte, err error) {
 	if role == "member" {
 		if wrappedKeyB64 == nil {
 			return nil, nil, errors.New("server reports member role but wrapped_master_key is missing — owner must re-share")
@@ -307,6 +358,11 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 		})
 	}
 	e.progressf("Decrypted %d entries, %d groups (+ %d tombstones).\n", len(entries), len(groups), len(deletions))
+	// Mindst én blob fra serveren lod sig dekryptere (AEAD-tag'et holdt), så
+	// nøglen er bevisligt den rigtige. Husk den, så en senere ombytning opdages.
+	if len(entries)+len(groups) > 0 {
+		recordKeyCheck(e.db, e.entryKey)
+	}
 
 	// Find lokal Root-gruppes UUID, så staging-merge lander nye entries
 	// direkte i Root i stedet for at oprette en "deltasync"-undergruppe.
