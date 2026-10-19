@@ -102,3 +102,65 @@ func assertFailsQuickly(t *testing.T, script string, xml []byte) {
 		t.Fatal("ImportXML hung after keepassxc-cli failed")
 	}
 }
+
+// fakeCLI skriver et script der logger om det fik en pipe eller en fil, og
+// kun lykkes med en almindelig fil — som en keepassxc-cli der ikke kan læse
+// fra en pipe.
+func fakeCLI(t *testing.T, dir string) (*CLI, string) {
+	t.Helper()
+	log := filepath.Join(dir, "calls.log")
+	bin := filepath.Join(dir, "fake-cli")
+	script := "#!/bin/sh\nif [ -p \"$4\" ]; then echo pipe >> " + log + "; exit 1; fi\n" +
+		"echo file >> " + log + "\ncat \"$4\" >/dev/null\ntouch \"$5\"\n"
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return &CLI{binary: bin}, log
+}
+
+// Med reserveløsningen slået til (som på macOS): pipen fejler, filen lykkes,
+// og næste import går direkte til filen.
+func TestImportXML_FallbackToFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no fifo on windows")
+	}
+	pipeBroken.Store(false)
+	t.Cleanup(func() { pipeFallback = runtime.GOOS == "darwin"; pipeBroken.Store(false) })
+	pipeFallback = true
+
+	dir := t.TempDir()
+	c, log := fakeCLI(t, dir)
+	for i := 0; i < 2; i++ {
+		if err := c.ImportXML(context.Background(), []byte("<KeePassFile/>"), dir, filepath.Join(dir, "out.kdbx"), []byte("pw")); err != nil {
+			t.Fatalf("import %d: %v", i, err)
+		}
+	}
+	calls, _ := os.ReadFile(log)
+	if got := strings.Fields(string(calls)); strings.Join(got, ",") != "pipe,file,file" {
+		t.Fatalf("calls = %v, want pipe,file,file", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "staging.xml")); !os.IsNotExist(err) {
+		t.Fatal("staging.xml left behind")
+	}
+}
+
+// Uden reserveløsningen (Linux): en fejl gennem pipen må ikke føre til at
+// klarteksten skrives til en fil.
+func TestImportXML_NoFallbackOnLinux(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no fifo on windows")
+	}
+	pipeBroken.Store(false)
+	t.Cleanup(func() { pipeFallback = runtime.GOOS == "darwin" })
+	pipeFallback = false
+
+	dir := t.TempDir()
+	c, log := fakeCLI(t, dir)
+	if err := c.ImportXML(context.Background(), []byte("<KeePassFile/>"), dir, filepath.Join(dir, "out.kdbx"), []byte("pw")); err == nil {
+		t.Fatal("expected the pipe failure to be returned")
+	}
+	calls, _ := os.ReadFile(log)
+	if strings.TrimSpace(string(calls)) != "pipe" {
+		t.Fatalf("calls = %q, want only the pipe attempt", calls)
+	}
+}

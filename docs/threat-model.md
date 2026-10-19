@@ -184,7 +184,9 @@ Mitigations:
 - **Klartekst under pull.** De hentede poster dekrypteres til en
   KeePass-XML, som `keepassxc-cli import` bygger en midlertidig `.kdbx` af.
   Ved `init-shared` er det hele databasen. På Linux og macOS går XML'en
-  gennem en navngiven pipe og rører aldrig disken. På Windows, der ikke har
+  gennem en navngiven pipe og rører aldrig disken. På macOS er pipen ikke
+  afprøvet mod keepassxc-cli; fejler importen gennem den, prøves den igen med
+  en fil som på Windows, og klienten bruger filen resten af kørslen. På Windows, der ikke har
   pipes i filsystemet, ligger den som fil (kun ejerens rettigheder) mens
   importen kører, og overskrives med nuller før den slettes; på SSD'er kan de
   gamle blokke stadig overleve. Bufferen i hukommelsen nulstilles bagefter.

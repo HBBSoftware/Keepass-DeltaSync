@@ -53,7 +53,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-4).
 
   On Linux and macOS the XML now goes through a named pipe, straight from the
-  client into `keepassxc-cli`, and never reaches the disk. Windows has no
+  client into `keepassxc-cli`, and never reaches the disk. The pipe is tested
+  on Linux only; on macOS a failed import through it is retried from a file,
+  so sync keeps working with the old behaviour rather than stopping. Windows has no
   pipes in the file system, so there it is still a file, readable only by
   you, for as long as the import runs, and it is overwritten with zeros
   before it is deleted. The copy in memory is zeroed in both cases. If
