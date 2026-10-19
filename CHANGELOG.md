@@ -8,32 +8,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
-- **The server could make a device encrypt under a key the server knows
-  (client)** — on every run the client asks the server whether it is the
-  owner or a member of the database, and that answer decides where the key
-  comes from: an owner derives it from the master password, a member unwraps
-  a `wrapped_master_key` that the server also supplies. Nothing on the device
-  remembered which it was. A compromised server could therefore call the owner
-  a member, hand over a key of its own wrapped to the device, and every entry
-  pushed from then on would be readable by the server. It could do the same to
-  a real member by swapping their wrapped key. Found in our own review; the
-  Android app was not affected, since it always derives the key from the
-  password.
-
-  Each binding in `config.toml` now records its `role` and a `key_check` (a
-  128-bit HMAC of the key, which does not reveal it). A run where the server's
-  role differs, or the key does not match, stops before anything is sent. The
-  role is set by `init` and `init-shared`; bindings made before this release
-  take it from their first run. The key check is recorded only when the key is
-  known to be right — at `init-shared`, or once a blob from the server has
-  decrypted — so a mistyped password is never remembered as the real one. As a
-  side effect, an owner who types the wrong password now gets a plain "is it
-  the right password?" instead of decryption errors later.
-
-  Tested against a 0.6.1 server whose database was changed by hand to stage
-  both attacks: client 1.10.0 synced and pushed the new entry under the
-  server's key; this version refuses and sends nothing.
-
 - **The deploy scripts sent the SFTP password before checking the host key
   (deploy)** — `server/deploy.py` and `website/deploy.py` pin the host's key
   so a redirected DNS name cannot collect the password, but they logged in
@@ -42,25 +16,6 @@ project adheres to [Semantic Versioning](https://semver.org/).
   connection, check the key and only then authenticate. Tested against an SFTP
   server: with a wrong pin the old scripts' login shows in the server log, the
   new ones' does not. Found in our own review.
-
-- **Pulled entries no longer touch the disk as plain text (client)** — to
-  merge what it pulled, the client decrypts the entries into a KeePass XML
-  document and has `keepassxc-cli import` build a temporary `.kdbx` from it.
-  That XML was written to a file in the temp directory first: every password
-  changed since the last pull, and on `init-shared` the whole database. The
-  file was deleted afterwards, but deleting does not erase, so the plain text
-  could be recovered from the disk later. Reported in
-  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-4).
-
-  On Linux and macOS the XML now goes through a named pipe, straight from the
-  client into `keepassxc-cli`, and never reaches the disk. The pipe is tested
-  on Linux only; on macOS a failed import through it is retried from a file,
-  so sync keeps working with the old behaviour rather than stopping. Windows has no
-  pipes in the file system, so there it is still a file, readable only by
-  you, for as long as the import runs, and it is overwritten with zeros
-  before it is deleted. The copy in memory is zeroed in both cases. If
-  `keepassxc-cli` fails before it opens the pipe, the client gives up within
-  seconds instead of waiting forever.
 
 ### Added
 
@@ -229,6 +184,72 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [client/v1.10.1] — 2026-10-19
+
+### Security
+
+- **The server could make a device encrypt under a key the server knows
+  (client)** — on every run the client asks the server whether it is the
+  owner or a member of the database, and that answer decides where the key
+  comes from: an owner derives it from the master password, a member unwraps
+  a `wrapped_master_key` that the server also supplies. Nothing on the device
+  remembered which it was. A compromised server could therefore call the owner
+  a member, hand over a key of its own wrapped to the device, and every entry
+  pushed from then on would be readable by the server. It could do the same to
+  a real member by swapping their wrapped key. Found in our own review; the
+  Android app was not affected, since it always derives the key from the
+  password.
+
+  Each binding in `config.toml` now records its `role` and a `key_check` (a
+  128-bit HMAC of the key, which does not reveal it). A run where the server's
+  role differs, or the key does not match, stops before anything is sent. The
+  role is set by `init` and `init-shared`; bindings made before this release
+  take it from their first run. The key check is recorded only when the key is
+  known to be right — at `init-shared`, or once a blob from the server has
+  decrypted — so a mistyped password is never remembered as the real one. As a
+  side effect, an owner who types the wrong password now gets a plain "is it
+  the right password?" instead of decryption errors later.
+
+  Tested against a 0.6.1 server whose database was changed by hand to stage
+  both attacks: client 1.10.0 synced and pushed the new entry under the
+  server's key; this version refuses and sends nothing.
+
+- **Pulled entries no longer touch the disk as plain text (client)** — to
+  merge what it pulled, the client decrypts the entries into a KeePass XML
+  document and has `keepassxc-cli import` build a temporary `.kdbx` from it.
+  That XML was written to a file in the temp directory first: every password
+  changed since the last pull, and on `init-shared` the whole database. The
+  file was deleted afterwards, but deleting does not erase, so the plain text
+  could be recovered from the disk later. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-4).
+
+  On Linux and macOS the XML now goes through a named pipe, straight from the
+  client into `keepassxc-cli`, and never reaches the disk. The pipe is tested
+  on Linux only; on macOS a failed import through it is retried from a file,
+  so sync keeps working with the old behaviour rather than stopping. Windows has no
+  pipes in the file system, so there it is still a file, readable only by
+  you, for as long as the import runs, and it is overwritten with zeros
+  before it is deleted. The copy in memory is zeroed in both cases. If
+  `keepassxc-cli` fails before it opens the pipe, the client gives up within
+  seconds instead of waiting forever.
+
+### Fixed
+
+- **The sync daemon used a quarter of a CPU core while idle (client)** —
+  every poll, once a minute, ran `keepassxc-cli export` on the whole
+  database to see whether anything had changed locally, and every export has
+  to unlock the database, which costs its KDF. On a real database that came to
+  about 16 CPU seconds a minute, around the clock. The daemon now remembers the
+  file's size and modification time from just before its last push and skips
+  the export when the file is untouched and the server has nothing new. A save
+  during a push leaves the remembered stamp stale, so the next round pushes it.
+  Measured on the same machine: 0 CPU seconds over two minutes.
+
+## [gui/v0.3.8] — 2026-10-19
+
+No changes to the GUI itself. The Windows installer now bundles command-line
+client 1.10.1 (see above).
 
 ## [android/v0.4.7] — 2026-10-19
 
