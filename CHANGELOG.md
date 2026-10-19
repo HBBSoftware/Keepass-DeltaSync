@@ -8,39 +8,13 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
-- **Sharing checks the recipient's key before giving it the database (client,
-  GUI, Android)** — to share, a client asks the server for the recipient's
-  public key and wraps the database key to it. Nothing checked that key, so a
-  compromised server could hand over its own and receive the database key in
-  the clear, with every past and future entry readable from then on. That is
-  the one way the server could break the promise in the threat model. Reported
-  in [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
-
-  Every client now shows the key's fingerprint, such as
-  `7F3A-91C2-0D4E-B8A1-55E0`, the first time you share with someone and
-  whenever their key changes. Sharing stays disabled until you confirm that
-  you have compared it with them, by phone or in person. The recipient sees
-  their own with `keepass-deltasync fingerprint`, under Settings in the
-  desktop app, or at the bottom of the Android app's main screen. A key you
-  have confirmed is remembered, so sharing again with the same person asks
-  nothing. A changed key gets a warning: it is expected when they set up a new
-  device, and it is also exactly what an attack would look like.
-
-  The fingerprint is computed in one place, in Go, and Android calls the same
-  function through gomobile, so a fingerprint read out from a phone matches
-  the one shown on a PC. Scripts keep working: `share --password-stdin` shares
-  to a known, unchanged key, and takes `--fingerprint` for anything else. The
-  desktop app looks the key up with `share --check`, shows the dialog, and
-  passes the fingerprint you confirmed, so a key that changes between the two
-  calls is refused. Nothing changes on the server or in the protocol.
-
-### Changed
-
-- **The threat model no longer promises certificate pinning (docs)** — it
-  said a man-in-the-middle was impossible "with valid certificate pinning",
-  but no client pins. They use the platform's normal certificate checks, and
-  they accept `http://` on purpose, because self-hosting on a LAN would
-  otherwise be impossible. The text now says so. Reported in #3 (F-3).
+- **Sharing checks the recipient's key before giving it the database
+  (Android)** — the same check as in client/v1.10.0 and gui/v0.3.7, for the
+  share screen: the key's fingerprint is shown the first time you share with
+  someone and when their key changes, and the share button stays disabled
+  until you confirm you compared it with them. The main screen shows this
+  device's own fingerprint. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
 
 ### Added
 
@@ -209,6 +183,62 @@ project adheres to [Semantic Versioning](https://semver.org/).
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
+
+## [client/v1.10.0] — 2026-10-19
+
+### Security
+
+- **Sharing checks the recipient's key before giving it the database
+  (client)** — to share, the client asks the server for the recipient's
+  public key and wraps the database key to it. Nothing checked that key, so a
+  compromised server could hand over its own and receive the database key in
+  the clear, with every past and future entry readable from then on. That is
+  the one way the server could break the promise in the threat model.
+  Reported in [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3)
+  (F-1).
+
+  `share` now prints the key's fingerprint, such as
+  `7F3A-91C2-0D4E-B8A1-55E0`, the first time you share with someone and
+  whenever their key changes, and asks whether you have compared it with
+  them, by phone or in person. Anything but `y` shares nothing. The recipient
+  sees their own with the new `keepass-deltasync fingerprint` command. A key
+  you have confirmed is remembered in `[known_keys]` in `config.toml`, so
+  sharing again with the same person asks nothing. A changed key gets a
+  warning: it is expected when they set up a new device, and it is also
+  exactly what an attack would look like.
+
+  Scripts keep working: `share --password-stdin` shares to a known, unchanged
+  key, and refuses anything else unless it is given `--fingerprint <fp>`.
+  `share --check` looks the key up and prints it without sharing; the desktop
+  app uses it. The fingerprint is computed in one place, in Go, and the
+  Android app will call the same function through gomobile, so a fingerprint
+  read out from a phone matches the one shown on a PC. Nothing changes on the
+  server or in the protocol.
+
+### Changed
+
+- **The threat model no longer promises certificate pinning (docs)** — it
+  said a man-in-the-middle was impossible "with valid certificate pinning",
+  but no client pins. They use the platform's normal certificate checks, and
+  they accept `http://` on purpose, because self-hosting on a LAN would
+  otherwise be impossible. The text now says so. Reported in #3 (F-3).
+
+## [gui/v0.3.7] — 2026-10-19
+
+### Security
+
+- **Sharing checks the recipient's key before giving it the database (GUI)**
+  — before it shares, the GUI looks the recipient's key up with `share
+  --check` (client 1.10.0) and, the first time you share with someone or when
+  their key has changed, shows its fingerprint in a dialog. The share button
+  stays disabled until you tick that you have compared it with them; a changed
+  key is shown as a warning. The fingerprint you confirmed is passed on with
+  `share --fingerprint`, so a key that changes in between is refused. Settings
+  now shows this device's own fingerprint, for others to compare. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-1).
+
+  With a command-line client older than 1.10.0 the GUI cannot check the key and
+  says so instead of sharing.
 
 ## [server/v0.6.1] — 2026-10-18
 
