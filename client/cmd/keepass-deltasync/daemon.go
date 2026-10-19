@@ -238,6 +238,34 @@ type dbWorker struct {
 	// debounceTimer styres kun fra main worker-loopet (single-threaded), så
 	// behøver ikke ekstra lås.
 	debounceTimer *time.Timer
+
+	// pushedStat er .kdbx-filens størrelse og ændringstid efter sidste
+	// vellykkede push. Push begynder med `keepassxc-cli export`, som skal låse
+	// databasen op — dvs. KeePass' KDF, typisk flere CPU-sekunder — og det
+	// skete hvert minut, også når intet var ændret. Er filen den samme som
+	// sidst, og har pull ikke skrevet i den, er der intet at pushe. Kun læst
+	// og skrevet under state.syncMu.
+	pushedStat fileStamp
+}
+
+// fileStamp er nok til at se om en fil er skrevet siden: KeePassXC skriver
+// altid hele filen, og en skrivning ændrer ændringstiden.
+type fileStamp struct {
+	ok   bool
+	size int64
+	mod  time.Time
+}
+
+func stampOf(path string) fileStamp {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return fileStamp{}
+	}
+	return fileStamp{ok: true, size: fi.Size(), mod: fi.ModTime()}
+}
+
+func (a fileStamp) same(b fileStamp) bool {
+	return a.ok && b.ok && a.size == b.size && a.mod.Equal(b.mod)
 }
 
 func (w *dbWorker) zeroKeys() {
@@ -455,6 +483,20 @@ func (w *dbWorker) doSync(ctx context.Context, state *daemonState, logf func(str
 		return
 	}
 
+	// Intet nyt fra serveren og filen urørt siden sidste push: spring den
+	// dyre eksport over. En pull der merger, skriver i filen og ændrer
+	// stemplet, så den fanges også her.
+	before := stampOf(w.db.LocalPath)
+	if merged == 0 && deletions == 0 && w.pushedStat.same(before) {
+		if newSeq != w.db.LastSeq {
+			w.db.LastSeq = newSeq
+			if err := config.Save(state.cfg); err != nil {
+				logf("save error: %v", err)
+			}
+		}
+		return
+	}
+
 	pushed, deleted, maxPushSeq, err := env.pushChanges(false)
 	if err != nil {
 		logf("push error: %v", err)
@@ -476,6 +518,10 @@ func (w *dbWorker) doSync(ctx context.Context, state *daemonState, logf func(str
 		logf("save error: %v", err)
 		return
 	}
+	// Stemplet er taget FØR push'ets eksport: det beskriver højst det filen
+	// indeholdt, da eksporten læste den. Gemmer brugeren undervejs, passer
+	// stemplet ikke længere, og næste runde pusher.
+	w.pushedStat = before
 
 	if merged > 0 || deletions > 0 || pushed > 0 || deleted > 0 {
 		logf("sync: pulled %d (+ %d tombstones), pushed %d (+ %d tombstones). last_seq=%d",
