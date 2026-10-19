@@ -341,6 +341,9 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("build staging xml: %w", err)
 	}
+	// De hentede poster i klartekst. De rører aldrig disken (ImportXML), og
+	// bufferen nulstilles når vi er færdige.
+	defer passwd.Zero(stagingXML)
 
 	tmpDir, err := os.MkdirTemp("", "kdsync-pull-*")
 	if err != nil {
@@ -348,14 +351,10 @@ func (e *runEnv) pullChanges() (newSeq int64, merged, deletionCount int, err err
 	}
 	defer os.RemoveAll(tmpDir)
 
-	tmpXML := filepath.Join(tmpDir, "staging.xml")
 	tmpKDBX := filepath.Join(tmpDir, "staging.kdbx")
-	if err := os.WriteFile(tmpXML, stagingXML, 0o600); err != nil {
-		return 0, 0, 0, fmt.Errorf("write staging xml: %w", err)
-	}
 
 	e.progressf("Building staging kdbx...\n")
-	if err := e.cli.Import(e.ctx, tmpXML, tmpKDBX, e.password); err != nil {
+	if err := e.cli.ImportXML(e.ctx, stagingXML, tmpDir, tmpKDBX, e.password); err != nil {
 		return 0, 0, 0, err
 	}
 

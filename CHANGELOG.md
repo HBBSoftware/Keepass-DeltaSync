@@ -8,6 +8,23 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Pulled entries no longer touch the disk as plain text (client)** — to
+  merge what it pulled, the client decrypts the entries into a KeePass XML
+  document and has `keepassxc-cli import` build a temporary `.kdbx` from it.
+  That XML was written to a file in the temp directory first: every password
+  changed since the last pull, and on `init-shared` the whole database. The
+  file was deleted afterwards, but deleting does not erase, so the plain text
+  could be recovered from the disk later. Reported in
+  [#3](https://gitlab.com/Star95/keepass-deltasync/-/issues/3) (F-4).
+
+  On Linux and macOS the XML now goes through a named pipe, straight from the
+  client into `keepassxc-cli`, and never reaches the disk. Windows has no
+  pipes in the file system, so there it is still a file, readable only by
+  you, for as long as the import runs, and it is overwritten with zeros
+  before it is deleted. The copy in memory is zeroed in both cases. If
+  `keepassxc-cli` fails before it opens the pipe, the client gives up within
+  seconds instead of waiting forever.
+
 - **Sharing checks the recipient's key before giving it the database
   (Android)** — the same check as in client/v1.10.0 and gui/v0.3.7, for the
   share screen: the key's fingerprint is shown the first time you share with

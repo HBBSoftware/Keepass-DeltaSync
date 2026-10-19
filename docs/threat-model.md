@@ -29,6 +29,16 @@ en klient-side nøgle. Det den DOG kan se:
 Konsekvenser:
 - En kompromitteret server kan slette eller manipulere blobs (DoS, men ikke
   forfalskning af content — klienten vil få MAC-fejl ved decryption)
+- En kompromitteret server kan **holde ændringer tilbage** fra en enhed, så
+  den står stille på et gammelt billede, og det kan klienten ikke opdage.
+  Den kan også **sende en ældre version af en post igen** under et nyt
+  `server_seq`; MAC'en er gyldig, for det er en ægte gammel blob. Det
+  sidste er afbødet: hver post bærer sit eget ændringstidspunkt inde i den
+  krypterede payload, og KeePassXC's merge beholder den nyeste udgave, så en
+  genudsendt gammel post taber til den lokale. En ny enhed (`init-shared`,
+  `init --bind`) har intet lokalt at sammenligne med og kan derfor få et
+  forældet billede. At binde `server_seq` ind i krypteringen virker ikke:
+  klienten krypterer, før serveren tildeler nummeret
 - En kompromitteret server kan slå alle entry-mtimes op og se aktivitetsmønstre
 - Database-navnet er valgt af brugeren og ofte beskrivende ("personal",
   "work") — _ikke_ behandlet som hemmelighed
@@ -150,10 +160,25 @@ Hvis en angriber får adgang til en klient-enhed:
 
 Mitigations:
 - Klient zeroer master_key + entry_key + password efter brug (`passwd.Zero`).
-  Reducerer cold-boot/memory-dump-vinduet men eliminerer det ikke.
+  Reducerer cold-boot/memory-dump-vinduet men eliminerer det ikke: Go's
+  garbage collector kan efterlade kopier, og keyring-biblioteket tager
+  kodeordet som `string`, som ikke kan nulstilles.
+- **Klartekst under pull.** De hentede poster dekrypteres til en
+  KeePass-XML, som `keepassxc-cli import` bygger en midlertidig `.kdbx` af.
+  Ved `init-shared` er det hele databasen. På Linux og macOS går XML'en
+  gennem en navngiven pipe og rører aldrig disken. På Windows, der ikke har
+  pipes i filsystemet, ligger den som fil (kun ejerens rettigheder) mens
+  importen kører, og overskrives med nuller før den slettes; på SSD'er kan de
+  gamle blokke stadig overleve. Bufferen i hukommelsen nulstilles bagefter.
 - OS keyring lagrer kun masterpasswords (kun for owned databases). Member-
   databases lagrer ikke master_key — den genskabes fra wrapped_master_key
   + device-private-key ved hver sync.
+- **OS-keyringen er kun så stærk som dens egen lås.** På Linux er
+  Secret Service-samlingen typisk låst op med login-kodeordet; er
+  login-keyringen sat op uden kodeord (almindeligt ved automatisk login),
+  ligger masterpasswords i praksis ubeskyttet på disken. Brug i så fald
+  hverken `daemon --store-keyring` eller `add-local --save-password`, eller
+  giv keyringen et kodeord.
 - Anbefaling til brugere: brug fuld-disk-encryption på enheden;
   device_private_key er i config.toml på klar tekst (TOML-fil, file-perm
   0600).

@@ -149,6 +149,9 @@ func runInitShared(args []string) error {
 	if err != nil {
 		return fmt.Errorf("build staging xml: %w", err)
 	}
+	// Hele databasen i klartekst. Den rører aldrig disken (ImportXML), og
+	// bufferen nulstilles når vi er færdige.
+	defer passwd.Zero(stagingXML)
 
 	tmpDir, err := os.MkdirTemp("", "kdsync-initshared-*")
 	if err != nil {
@@ -156,16 +159,12 @@ func runInitShared(args []string) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	tmpXML := filepath.Join(tmpDir, "staging.xml")
-	if err := os.WriteFile(tmpXML, stagingXML, 0o600); err != nil {
-		return fmt.Errorf("write staging xml: %w", err)
-	}
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o700); err != nil {
 		return fmt.Errorf("mkdir parent: %w", err)
 	}
 
 	fmt.Fprintln(os.Stderr, "Creating local kdbx...")
-	if err := cli.Import(ctx, tmpXML, absPath, password); err != nil {
+	if err := cli.ImportXML(ctx, stagingXML, tmpDir, absPath, password); err != nil {
 		return fmt.Errorf("import to %s: %w", absPath, err)
 	}
 
