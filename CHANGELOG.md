@@ -251,6 +251,18 @@ project adheres to [Semantic Versioning](https://semver.org/).
 No changes to the GUI itself. The Windows installer now bundles command-line
 client 1.10.1 (see above).
 
+## [android/v0.4.8] — 2026-10-20
+
+DeltaSync now targets Android 16 (API 36), the level Google Play requires for
+new apps. Nothing changes in how the app works.
+
+### Changed
+
+- **Target and compile SDK 36 (Android)**, with the Android Gradle Plugin
+  raised from 8.5.2 to 8.9.3, the first release that knows API 36. Tested on a
+  Galaxy S23 with Android 16: edge-to-edge layout, back navigation, the share
+  screen and a sync that pulled, wrote the `.kdbx` and then pushed nothing.
+
 ## [android/v0.4.7] — 2026-10-19
 
 ### Security

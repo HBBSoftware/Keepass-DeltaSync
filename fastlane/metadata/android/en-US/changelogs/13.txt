@@ -1,0 +1,1 @@
+DeltaSync now targets Android 16 (API 36), the level Google Play requires for new apps. Nothing changes in how the app works.
