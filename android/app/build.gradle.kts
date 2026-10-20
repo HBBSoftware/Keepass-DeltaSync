@@ -27,7 +27,7 @@ android {
         // Keystore-forankret EncryptedSharedPreferences er mere robust dér.
         minSdk = 23
         targetSdk = 36
-        versionCode = 13
+        versionCode = 14
         versionName = "0.4.8"
     }
 

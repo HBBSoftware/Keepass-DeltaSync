@@ -187,7 +187,7 @@ gomobile init
 #    mappen findes ikke i en frisk klon, så opret den først. `-trimpath` er et
 #    reproducerbarhedskrav — se "Reproducible build".
 mkdir -p ../android/libs
-gomobile bind -trimpath -androidapi 21 -o deltasync.aar ./mobile
+gomobile bind -trimpath -androidapi 21 -ldflags='-extldflags=-Wl,-z,max-page-size=16384' -o deltasync.aar ./mobile
 mv deltasync.aar ../android/libs/
 
 # 6. Udpak classes.jar til :sync's compileOnly-classpath. `unzip -p` skriver til

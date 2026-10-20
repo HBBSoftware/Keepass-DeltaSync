@@ -169,6 +169,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 cd client
 gomobile bind -androidapi 21 -target=android \
+    -ldflags='-extldflags=-Wl,-z,max-page-size=16384' \
     -o ../android/libs/deltasync.aar \
     gitlab.com/Star95/keepass-deltasync/client/mobile
 

@@ -337,7 +337,12 @@ build:android:
       # Same invocation as the F-Droid recipe, flag for flag: -target=android
       # is gomobile's default and is left out there to keep the metadata line
       # under the 80 columns fdroid rewritemeta wraps at.
+      # -extldflags max-page-size=16384: Google Play rejects 64-bit native
+      # libraries whose LOAD segments are aligned to 4 KB (16 KB-page devices,
+      # Android 15+), and NDK 25.2 links at 4 KB by default. Go does not allow
+      # the flag in a #cgo LDFLAGS line, so it has to be passed here.
       ( cd client && gomobile bind -trimpath -androidapi 21 \
+          -ldflags='-extldflags=-Wl,-z,max-page-size=16384' \
           -o ../android/libs/deltasync.aar ./mobile )
 
       # :sync compiles against the bound classes only (compileOnly), so the

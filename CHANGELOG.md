@@ -254,9 +254,19 @@ client 1.10.1 (see above).
 ## [android/v0.4.8] — 2026-10-20
 
 DeltaSync now targets Android 16 (API 36), the level Google Play requires for
-new apps. Nothing changes in how the app works.
+new apps, and its native code is aligned for phones that use 16 KB memory
+pages. Nothing changes in how the app works. versionCode 14: 13 was spent on a
+Play internal test build without the alignment.
 
 ### Changed
+
+- **16 KB page alignment for the Go library (Android)** — Google Play rejects
+  64-bit native libraries whose LOAD segments are aligned to 4 KB, because
+  Android 15+ phones may run with 16 KB memory pages. NDK 25.2, which the
+  F-Droid recipe pins, links `libgojni.so` at 4 KB by default. `gomobile bind`
+  now passes `-ldflags='-extldflags=-Wl,-z,max-page-size=16384'`; Go refuses
+  the flag in a `#cgo LDFLAGS` line, so it sits on the command line in CI and
+  must sit in the F-Droid recipe too. All four ABIs now load at 0x4000.
 
 - **Target and compile SDK 36 (Android)**, with the Android Gradle Plugin
   raised from 8.5.2 to 8.9.3, the first release that knows API 36. Tested on a
