@@ -185,6 +185,20 @@ project adheres to [Semantic Versioning](https://semver.org/).
   links, switches and buttons. A `values-night` override lightens it to
   `#A8C7FF`.
 
+## [server/v0.6.2] — 2026-10-21
+
+Only the container image changes. On plain PHP hosting, update PHP itself.
+
+### Security
+
+- **PHP 8.2.35 in the server image (server)** — the image was built on PHP
+  8.2.34, which is affected by PHP2Shell (CVE-2026-109618, CVE-2026-109619):
+  remote code execution without login. The base image is now pinned to
+  `php:8.2.35-apache`, because the `8.2-apache` tag still pointed at 8.2.34
+  at release time. Update if you run the image from Docker, TrueNAS, ghcr.io
+  or Docker Hub. On plain PHP hosting, update PHP to 8.2.35, 8.3.36, 8.4.27
+  or 8.5.12.
+
 ## [client/v1.10.1] — 2026-10-19
 
 ### Security

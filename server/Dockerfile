@@ -10,7 +10,9 @@
 # State lives entirely in PostgreSQL (see compose.yml) — this image is
 # stateless and can be rebuilt/replaced freely.
 
-FROM php:8.2-apache
+# Pinned to 8.2.35 for PHP2Shell (CVE-2026-109618/109619); the floating
+# 8.2-apache tag still pointed at 8.2.34 on 2026-10-21.
+FROM php:8.2.35-apache
 
 LABEL org.opencontainers.image.title="DeltaSync sync server" \
       org.opencontainers.image.description="End-to-end encrypted, entry-level sync server for KeePass databases (PHP + PostgreSQL). Requires self-hosting." \
