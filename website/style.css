@@ -476,6 +476,11 @@ footer.site a:hover { color: var(--text); }
   margin: var(--space-6) 0;
 }
 .callout.warn { border-left-color: var(--brand-gold); }
+/* Site-wide notice right under the header (e.g. a security update). */
+.callout.notice { margin: var(--space-4) 0; }
+/* It sits outside <main>, so it does not get the main a colours. */
+.callout.notice a { color: var(--link); text-underline-offset: 2px; }
+.callout.notice a:hover { color: var(--link-hover); }
 
 /* FAQ accordion */
 .faq { margin: var(--space-8) 0; }
