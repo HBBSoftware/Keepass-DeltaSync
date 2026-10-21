@@ -41,6 +41,15 @@ stages:
   - publish
   - release
 
+# Every job runs on our own runner on the TrueNAS box (tag "truenas") unless it
+# says otherwise. GitLab's shared runners give this namespace 400 minutes a
+# month, and one GUI release alone takes about 20 of them. The runner only
+# makes outbound connections to gitlab.com, is locked to this project and
+# takes nothing but jobs with this tag. If the box is off, tagged jobs wait in
+# the queue; to fall back, set `tags: []` on a job (or remove this block).
+default:
+  tags: [truenas]
+
 variables:
   # Match client/go.mod's required version. Bump when go.mod bumps.
   GO_VERSION: "1.26"
@@ -221,6 +230,10 @@ build:android:
   # sides use the same compiler. Bump this together with the `srclibs: go@...`
   # line in metadata/dk.bjoerckbraun.deltasync.yml, never on its own.
   image: golang:1.26.3-trixie
+  # GitLab's shared runners, not ours: F-Droid only publishes when its build
+  # matches this APK byte for byte, and that has been proven on GitLab's
+  # environment. Android releases are rare, so the minutes are worth it.
+  tags: []
   rules:
     - if: $CI_COMMIT_TAG =~ /^android\/v\d+\.\d+\.\d+$/
     # Escape hatch for iterating on this job itself. Without it, the only way
@@ -750,6 +763,9 @@ build:installer:
 
 publish:server-image:
   stage: publish
+  # GitLab's shared runners, not ours: buildx needs a privileged
+  # docker-in-docker service and qemu, which would be root on the NAS.
+  tags: []
   image: docker:27
   services:
     - docker:27-dind
