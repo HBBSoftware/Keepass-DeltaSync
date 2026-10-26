@@ -46,37 +46,37 @@ func init() {
 		WizardDoneBody:   "Sie können jetzt synchronisieren. Mit der Schaltfläche „Sync“ an einer Datenbank senden und holen Sie Änderungen.",
 
 		WizardAdvanced:     "Erweitert (Administrator)",
-		WizardFirefox:      "Aus Firefox suchen — ohne Konto",
-		FFIntro:            "Durchsuchen Sie Ihre KeePass-Einträge aus Firefox und springen Sie direkt zur passenden Website. Das braucht weder Konto noch Server — nur zweierlei, einmalig: das Programm auf Ihre .kdbx zeigen lassen und es bei Firefox registrieren. Das Ausfüllen der Anmeldedaten bleibt bei KeePassXC-Browser; die Erweiterung sieht nie ein Passwort.",
+		WizardFirefox:      "Aus dem Browser suchen — ohne Konto",
+		FFIntro:            "Durchsuchen Sie Ihre KeePass-Einträge aus Firefox, Chrome oder Edge und springen Sie direkt zur passenden Website. Das braucht weder Konto noch Server — nur zweierlei, einmalig: das Programm auf Ihre .kdbx zeigen lassen und es bei den Browsern auf diesem Rechner registrieren. Das Ausfüllen der Anmeldedaten bleibt bei KeePassXC-Browser; die Erweiterung sieht nie ein Passwort.",
 		FFAddLocal:         "Datenbank registrieren…",
 		FFAddLocalTitle:    "Eine Datenbank für die Suche registrieren",
-		FFAddLocalDone:     "Die Datenbank ist registriert. Als Nächstes: Bei Firefox registrieren — danach Firefox neu starten.",
+		FFAddLocalDone:     "Die Datenbank ist registriert. Als Nächstes: Bei den Browsern registrieren — danach den Browser neu starten.",
 		FFSavePassword:     "Das Master-Passwort im Schlüsselbund des Systems speichern (damit das Popup nicht danach fragt)",
 		FFPasswordMissing:  "Geben Sie das Master-Passwort ein oder entfernen Sie den Haken — dann fragt die Erweiterung danach.",
-		FFInstallHost:      "Bei Firefox registrieren",
-		FFHostInstalled:    "Bei Firefox registriert",
-		FFRestartFirefox:   "Starten Sie Firefox neu — erst dadurch wird die Registrierung übernommen.",
+		FFInstallHost:      "Bei den Browsern registrieren",
+		FFHostInstalled:    "Bei den Browsern registriert",
+		FFRestartFirefox:   "Starten Sie den Browser neu — erst dadurch wird die Registrierung übernommen.",
 		FFPreview:          "Anzeigen, was geschrieben würde",
 		FFPreviewTitle:     "Probelauf (es wird nichts geschrieben)",
 		FFUninstallHost:    "Registrierung entfernen",
-		FFUninstallConfirm: "Die Registrierung aus jeder Firefox-Variante auf diesem Rechner entfernen? Weder die Datenbank noch die Datei werden angerührt.",
+		FFUninstallConfirm: "Die Registrierung aus jedem Browser auf diesem Rechner entfernen? Weder die Datenbank noch die Datei werden angerührt.",
 		FFGuide:            "Anleitung",
 		FFProbe:            "Testen",
 		FFProbeTitle:       "Was der Browser bekäme — %s",
 		FFProbePwdHint:     "Optional — wird aus dem Schlüsselbund genommen, falls dort gespeichert",
 		FFProbeEmpty:       "Der Index ist leer: keine Einträge mit verwendbarer URL.",
-		FFCount:            "%d Datenbank(en) aus Firefox durchsuchbar",
+		FFCount:            "%d Datenbank(en) aus dem Browser durchsuchbar",
 		FFNone:             "Noch keine Datenbanken registriert — beginnen Sie mit „Datenbank registrieren“.",
 		FFKindSynced:       "(synchronisiert)",
 		FFKindLocal:        "(nur lokal)",
 		FFCLIPath:          "Programm:",
-		HelpFirefox: "## Firefox\n\n" +
-			"Volltextsuche über Ihre Einträge aus der Adressleiste von Firefox (`kp` + Leertaste) oder aus dem Popup (**Alt+Umschalt+K**), und ein Tastendruck öffnet die Website des Eintrags. Die Erweiterung erhält **nur** Titel, URLs und Gruppenpfad — niemals Passwörter, Benutzernamen, Notizen oder Anhänge.\n\n" +
+		HelpFirefox: "## Browser\n\n" +
+			"Volltextsuche über Ihre Einträge aus der Adressleiste des Browsers (`kp` + Leertaste) oder aus dem Popup (**Alt+Umschalt+K**), und ein Tastendruck öffnet die Website des Eintrags. Die Erweiterung erhält **nur** Titel, URLs und Gruppenpfad — niemals Passwörter, Benutzernamen, Notizen oder Anhänge.\n\n" +
 			"Die Einrichtung besteht aus zwei Schritten, einmal pro Rechner:\n\n" +
 			"- **Datenbank registrieren** — zeigt dem Programm eine `.kdbx` (`add-local`). Kein Server, kein Konto, nichts wird hochgeladen. Setzen Sie den Haken, und das Master-Passwort wandert in den Schlüsselbund des Systems, sodass das Popup nicht danach fragt.\n" +
-			"- **Bei Firefox registrieren** — schreibt das Native-Messaging-Manifest, damit Firefox den Host starten darf (`install-browser-host`). **Danach Firefox neu starten.**\n\n" +
+			"- **Bei den Browsern registrieren** — schreibt das Native-Messaging-Manifest für jeden Browser, der auf dem Rechner gefunden wird (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi und Opera), damit er den Host starten darf (`install-browser-host`). **Danach den Browser neu starten.**\n\n" +
 			"Außerdem: **Testen** zeigt genau den Index, den der Browser erhalten würde (`browser-host --probe`), und **Anzeigen, was geschrieben würde** ist dieselbe Registrierung, ohne etwas anzufassen (`--dry-run`).\n\n" +
-			"Das Add-on selbst wird von addons.mozilla.org installiert — siehe **Anleitung**.\n\n" +
+			"Die Erweiterung selbst wird für Firefox von addons.mozilla.org installiert — siehe **Anleitung** — und für Edge von Edge Add-ons. Im Chrome Web Store ist sie noch nicht; für Chrome wird sie aus dem Quellcode installiert und mit `install-browser-host --extension-id` registriert — siehe deltasync.org/chrome.html.\n\n" +
 			"**CLI-Befehle:**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -95,7 +95,7 @@ func init() {
 
 		TabDatabases: "Datenbanken",
 		TabDevices:   "Geräte",
-		TabFirefox:   "Firefox",
+		TabFirefox:   "Browser",
 		TabActivity:  "Aktivität",
 		TabLog:       "Protokoll",
 		TabAdmin:     "Verwaltung",

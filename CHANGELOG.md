@@ -180,6 +180,17 @@ project adheres to [Semantic Versioning](https://semver.org/).
   again, silently, and rebuilt the index from the OS keyring. A change event
   now only refreshes an index that already exists.
 
+- **The GUI's browser tab no longer says it is Firefox-only (GUI)** — the tab
+  that sets up the search extension was called "Firefox", and its button read
+  *Register with Firefox*, although `install-browser-host` has registered with
+  Chrome, Chromium, Edge, Brave, Vivaldi and Opera as well since client 1.9.0.
+  An Edge user reasonably concluded the button was not for them. The tab is now
+  *Browser*, the button *Register with browsers*, and the intro, help, wizard
+  entry and confirmations name the browsers it covers, in all five languages.
+  The help also says where the extension comes from per browser: AMO for
+  Firefox, Edge Add-ons for Edge, and from source for Chrome until it is in
+  the Chrome Web Store.
+
 - **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
   was hard to read against the near-black dark-theme background, affecting
   links, switches and buttons. A `values-night` override lightens it to

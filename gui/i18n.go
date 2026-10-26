@@ -364,37 +364,37 @@ var dicts = map[lang]*dict{
 		WizardDoneBody:   "Du er klar til at synkronisere. Brug knappen 'Synkronisér' på en database for at sende og hente ændringer.",
 
 		WizardAdvanced:     "Avanceret (administrator)",
-		WizardFirefox:      "Søg i Firefox — uden konto",
-		FFIntro:            "Søg i dine KeePass-poster fra Firefox og hop til den rigtige side. Det kræver hverken konto eller server — kun to ting, én gang: peg programmet på din .kdbx, og registrér den hos Firefox. Selve udfyldningen af login lader vi KeePassXC-Browser om; udvidelsen ser aldrig et password.",
+		WizardFirefox:      "Søg fra browseren — uden konto",
+		FFIntro:            "Søg i dine KeePass-poster fra Firefox, Chrome eller Edge og hop til den rigtige side. Det kræver hverken konto eller server — kun to ting, én gang: peg programmet på din .kdbx, og registrér det hos de browsere, maskinen har. Selve udfyldningen af login lader vi KeePassXC-Browser om; udvidelsen ser aldrig et password.",
 		FFAddLocal:         "Registrér database…",
 		FFAddLocalTitle:    "Registrér database til søgning",
-		FFAddLocalDone:     "Databasen er registreret. Næste trin: Registrér i Firefox — og genstart derefter Firefox.",
+		FFAddLocalDone:     "Databasen er registreret. Næste trin: Registrér i browserne — og genstart derefter browseren.",
 		FFSavePassword:     "Gem masterpasswordet i systemets nøglering (så popup'en ikke spørger)",
 		FFPasswordMissing:  "Skriv masterpasswordet, eller fjern fluebenet — så spørger udvidelsen i stedet.",
-		FFInstallHost:      "Registrér i Firefox",
-		FFHostInstalled:    "Registreret i Firefox",
-		FFRestartFirefox:   "Genstart Firefox — det er dét, der får den til at opdage registreringen.",
+		FFInstallHost:      "Registrér i browserne",
+		FFHostInstalled:    "Registreret i browserne",
+		FFRestartFirefox:   "Genstart browseren — det er dét, der får den til at opdage registreringen.",
 		FFPreview:          "Vis hvad der ville blive skrevet",
 		FFPreviewTitle:     "Prøvekørsel (der skrives intet)",
 		FFUninstallHost:    "Fjern registreringen",
-		FFUninstallConfirm: "Fjern registreringen fra alle Firefox-varianter på maskinen? Hverken databasen eller filen røres.",
+		FFUninstallConfirm: "Fjern registreringen fra alle browsere på maskinen? Hverken databasen eller filen røres.",
 		FFGuide:            "Vejledning",
 		FFProbe:            "Test",
 		FFProbeTitle:       "Hvad browseren ville få — %s",
 		FFProbePwdHint:     "Valgfrit — ligger det i nøgleringen, hentes det selv",
 		FFProbeEmpty:       "Indekset er tomt: ingen poster med en brugbar URL.",
-		FFCount:            "%d database(r) kan søges fra Firefox",
+		FFCount:            "%d database(r) kan søges fra browseren",
 		FFNone:             "Ingen databaser registreret endnu — start med Registrér database.",
 		FFKindSynced:       "(synkroniseret)",
 		FFKindLocal:        "(kun lokal)",
 		FFCLIPath:          "Program:",
-		HelpFirefox: "## Firefox\n\n" +
-			"Fritekstsøgning i dine poster fra Firefox' adresselinje (`kp` + mellemrum) eller popup'en (**Alt+Shift+K**), og et tryk åbner postens side. Udvidelsen får **kun** titel, URL'er og gruppesti — aldrig passwords, brugernavne, noter eller filer.\n\n" +
+		HelpFirefox: "## Browser\n\n" +
+			"Fritekstsøgning i dine poster fra browserens adresselinje (`kp` + mellemrum) eller popup'en (**Alt+Shift+K**), og et tryk åbner postens side. Udvidelsen får **kun** titel, URL'er og gruppesti — aldrig passwords, brugernavne, noter eller filer.\n\n" +
 			"Opsætningen er to trin, én gang pr. maskine:\n\n" +
 			"- **Registrér database** — peger programmet på en `.kdbx` (`add-local`). Ingen server, ingen konto, intet uploadet. Sætter du fluebenet, lægges masterpasswordet i systemets nøglering, så popup'en ikke spørger.\n" +
-			"- **Registrér i Firefox** — skriver native-manifestet, så Firefox må starte hosten (`install-browser-host`). **Genstart Firefox bagefter.**\n\n" +
+			"- **Registrér i browserne** — skriver native-manifestet hos hver browser, der findes på maskinen (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi og Opera), så den må starte hosten (`install-browser-host`). **Genstart browseren bagefter.**\n\n" +
 			"Derudover: **Test** viser præcis det indeks browseren ville få (`browser-host --probe`), og **Vis hvad der ville blive skrevet** er den samme registrering uden at røre noget (`--dry-run`).\n\n" +
-			"Selve udvidelsen installeres fra addons.mozilla.org — se **Vejledning**.\n\n" +
+			"Selve udvidelsen installeres fra addons.mozilla.org til Firefox — se **Vejledning** — og fra Edge Add-ons til Edge. Den er endnu ikke i Chrome Web Store, så til Chrome installeres den fra kildekoden og registreres med `install-browser-host --extension-id` — se deltasync.org/chrome.html.\n\n" +
 			"**CLI-kommandoer:**\n\n" +
 			"- `keepass-deltasync add-local <navn> <fil.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -413,7 +413,7 @@ var dicts = map[lang]*dict{
 
 		TabDatabases: "Databaser",
 		TabDevices:   "Enheder",
-		TabFirefox:   "Firefox",
+		TabFirefox:   "Browser",
 		TabActivity:  "Aktivitet",
 		TabLog:       "Log",
 		TabAdmin:     "Administration",
@@ -666,37 +666,37 @@ var dicts = map[lang]*dict{
 		WizardDoneBody:   "You're ready to sync. Use the 'Sync' button on a database to send and fetch changes.",
 
 		WizardAdvanced:     "Advanced (administrator)",
-		WizardFirefox:      "Search from Firefox — no account",
-		FFIntro:            "Search your KeePass entries from Firefox and jump straight to the right site. It needs no account and no server — just two things, once: point the program at your .kdbx, and register it with Firefox. Filling in the login stays with KeePassXC-Browser; the extension never sees a password.",
+		WizardFirefox:      "Search from your browser — no account",
+		FFIntro:            "Search your KeePass entries from Firefox, Chrome or Edge and jump straight to the right site. It needs no account and no server — just two things, once: point the program at your .kdbx, and register it with the browsers on this machine. Filling in the login stays with KeePassXC-Browser; the extension never sees a password.",
 		FFAddLocal:         "Register database…",
 		FFAddLocalTitle:    "Register a database for search",
-		FFAddLocalDone:     "The database is registered. Next: Register with Firefox — then restart Firefox.",
+		FFAddLocalDone:     "The database is registered. Next: Register with browsers — then restart the browser.",
 		FFSavePassword:     "Store the masterpassword in the OS keyring (so the popup does not ask)",
 		FFPasswordMissing:  "Type the masterpassword, or clear the checkbox — then the extension asks instead.",
-		FFInstallHost:      "Register with Firefox",
-		FFHostInstalled:    "Registered with Firefox",
-		FFRestartFirefox:   "Restart Firefox — that is what makes it pick the registration up.",
+		FFInstallHost:      "Register with browsers",
+		FFHostInstalled:    "Registered with browsers",
+		FFRestartFirefox:   "Restart the browser — that is what makes it pick the registration up.",
 		FFPreview:          "Show what would be written",
 		FFPreviewTitle:     "Dry run (nothing is written)",
 		FFUninstallHost:    "Remove the registration",
-		FFUninstallConfirm: "Remove the registration from every Firefox variant on this machine? Neither the database nor the file is touched.",
+		FFUninstallConfirm: "Remove the registration from every browser on this machine? Neither the database nor the file is touched.",
 		FFGuide:            "Guide",
 		FFProbe:            "Test",
 		FFProbeTitle:       "What the browser would get — %s",
 		FFProbePwdHint:     "Optional — taken from the keyring if it is stored there",
 		FFProbeEmpty:       "The index is empty: no entries with a usable URL.",
-		FFCount:            "%d database(s) searchable from Firefox",
+		FFCount:            "%d database(s) searchable from the browser",
 		FFNone:             "No databases registered yet — start with Register database.",
 		FFKindSynced:       "(synced)",
 		FFKindLocal:        "(local only)",
 		FFCLIPath:          "Program:",
-		HelpFirefox: "## Firefox\n\n" +
-			"Free-text search across your entries from Firefox' address bar (`kp` + space) or the popup (**Alt+Shift+K**), and one keypress opens the entry's site. The extension receives **only** title, URLs and group path — never passwords, usernames, notes or attachments.\n\n" +
+		HelpFirefox: "## Browser\n\n" +
+			"Free-text search across your entries from the browser's address bar (`kp` + space) or the popup (**Alt+Shift+K**), and one keypress opens the entry's site. The extension receives **only** title, URLs and group path — never passwords, usernames, notes or attachments.\n\n" +
 			"Setup is two steps, once per machine:\n\n" +
 			"- **Register database** — points the program at a `.kdbx` (`add-local`). No server, no account, nothing uploaded. Tick the box and the masterpassword goes into the OS keyring, so the popup does not ask for it.\n" +
-			"- **Register with Firefox** — writes the native messaging manifest so Firefox is allowed to start the host (`install-browser-host`). **Restart Firefox afterwards.**\n\n" +
+			"- **Register with browsers** — writes the native messaging manifest for every browser found on the machine (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi and Opera), so it is allowed to start the host (`install-browser-host`). **Restart the browser afterwards.**\n\n" +
 			"Besides those: **Test** shows the exact index the browser would receive (`browser-host --probe`), and **Show what would be written** is the same registration without touching anything (`--dry-run`).\n\n" +
-			"The add-on itself is installed from addons.mozilla.org — see **Guide**.\n\n" +
+			"The extension itself is installed from addons.mozilla.org for Firefox — see **Guide** — and from Edge Add-ons for Edge. It is not in the Chrome Web Store yet, so for Chrome it is installed from source and registered with `install-browser-host --extension-id` — see deltasync.org/chrome.html.\n\n" +
 			"**CLI commands:**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -715,7 +715,7 @@ var dicts = map[lang]*dict{
 
 		TabDatabases: "Databases",
 		TabDevices:   "Devices",
-		TabFirefox:   "Firefox",
+		TabFirefox:   "Browser",
 		TabActivity:  "Activity",
 		TabLog:       "Log",
 		TabAdmin:     "Administration",

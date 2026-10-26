@@ -46,37 +46,37 @@ func init() {
 		WizardDoneBody:   "Ya puede sincronizar. Use el botón «Sync» de una base de datos para enviar y recibir cambios.",
 
 		WizardAdvanced:     "Avanzado (administrador)",
-		WizardFirefox:      "Buscar desde Firefox — sin cuenta",
-		FFIntro:            "Busque en sus entradas de KeePass desde Firefox y vaya directo al sitio correcto. No hace falta cuenta ni servidor, solo dos cosas, una vez: indicar su .kdbx al programa y registrarlo en Firefox. Rellenar las credenciales sigue siendo cosa de KeePassXC-Browser; la extensión nunca ve una contraseña.",
+		WizardFirefox:      "Buscar desde el navegador — sin cuenta",
+		FFIntro:            "Busque en sus entradas de KeePass desde Firefox, Chrome o Edge y vaya directo al sitio correcto. No hace falta cuenta ni servidor, solo dos cosas, una vez: indicar su .kdbx al programa y registrarlo en los navegadores de este equipo. Rellenar las credenciales sigue siendo cosa de KeePassXC-Browser; la extensión nunca ve una contraseña.",
 		FFAddLocal:         "Registrar base de datos…",
 		FFAddLocalTitle:    "Registrar una base de datos para la búsqueda",
-		FFAddLocalDone:     "La base de datos está registrada. A continuación: Registrar en Firefox y reiniciar Firefox.",
+		FFAddLocalDone:     "La base de datos está registrada. A continuación: Registrar en los navegadores y reiniciar el navegador.",
 		FFSavePassword:     "Guardar la contraseña maestra en el llavero del sistema (para que la ventana no la pida)",
 		FFPasswordMissing:  "Escriba la contraseña maestra, o desmarque la casilla; entonces la pedirá la extensión.",
-		FFInstallHost:      "Registrar en Firefox",
-		FFHostInstalled:    "Registrado en Firefox",
-		FFRestartFirefox:   "Reinicie Firefox: es lo que hace que tome el registro.",
+		FFInstallHost:      "Registrar en los navegadores",
+		FFHostInstalled:    "Registrado en los navegadores",
+		FFRestartFirefox:   "Reinicie el navegador: es lo que hace que tome el registro.",
 		FFPreview:          "Mostrar lo que se escribiría",
 		FFPreviewTitle:     "Simulación (no se escribe nada)",
 		FFUninstallHost:    "Eliminar el registro",
-		FFUninstallConfirm: "¿Eliminar el registro de todas las variantes de Firefox de este equipo? Ni la base de datos ni el archivo se tocan.",
+		FFUninstallConfirm: "¿Eliminar el registro de todos los navegadores de este equipo? Ni la base de datos ni el archivo se tocan.",
 		FFGuide:            "Guía",
 		FFProbe:            "Probar",
 		FFProbeTitle:       "Lo que recibiría el navegador — %s",
 		FFProbePwdHint:     "Opcional: se toma del llavero si está guardada ahí",
 		FFProbeEmpty:       "El índice está vacío: no hay entradas con una URL utilizable.",
-		FFCount:            "%d base(s) de datos consultable(s) desde Firefox",
+		FFCount:            "%d base(s) de datos consultable(s) desde el navegador",
 		FFNone:             "Aún no hay bases de datos registradas; empiece por Registrar base de datos.",
 		FFKindSynced:       "(sincronizada)",
 		FFKindLocal:        "(solo local)",
 		FFCLIPath:          "Programa:",
-		HelpFirefox: "## Firefox\n\n" +
-			"Búsqueda de texto libre en sus entradas desde la barra de direcciones de Firefox (`kp` + espacio) o desde la ventana emergente (**Alt+Mayús+K**), y una tecla abre el sitio de la entrada. La extensión recibe **solo** el título, las URL y la ruta del grupo; nunca contraseñas, nombres de usuario, notas ni archivos adjuntos.\n\n" +
+		HelpFirefox: "## Navegador\n\n" +
+			"Búsqueda de texto libre en sus entradas desde la barra de direcciones del navegador (`kp` + espacio) o desde la ventana emergente (**Alt+Mayús+K**), y una tecla abre el sitio de la entrada. La extensión recibe **solo** el título, las URL y la ruta del grupo; nunca contraseñas, nombres de usuario, notas ni archivos adjuntos.\n\n" +
 			"La configuración son dos pasos, una vez por equipo:\n\n" +
 			"- **Registrar base de datos**: indica un `.kdbx` al programa (`add-local`). Sin servidor, sin cuenta, no se sube nada. Marque la casilla y la contraseña maestra pasa al llavero del sistema, de modo que la ventana no la pida.\n" +
-			"- **Registrar en Firefox**: escribe el manifiesto de mensajería nativa para que Firefox pueda iniciar el host (`install-browser-host`). **Reinicie Firefox después.**\n\n" +
+			"- **Registrar en los navegadores**: escribe el manifiesto de mensajería nativa para cada navegador que encuentre en el equipo (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi y Opera), para que pueda iniciar el host (`install-browser-host`). **Reinicie el navegador después.**\n\n" +
 			"Además: **Probar** muestra el índice exacto que recibiría el navegador (`browser-host --probe`), y **Mostrar lo que se escribiría** hace el mismo registro sin tocar nada (`--dry-run`).\n\n" +
-			"El complemento se instala desde addons.mozilla.org; consulte la **Guía**.\n\n" +
+			"La extensión se instala desde addons.mozilla.org para Firefox (consulte la **Guía**) y desde Edge Add-ons para Edge. Aún no está en Chrome Web Store: para Chrome se instala desde el código fuente y se registra con `install-browser-host --extension-id`; consulte deltasync.org/chrome.html.\n\n" +
 			"**Órdenes de la CLI:**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -95,7 +95,7 @@ func init() {
 
 		TabDatabases: "Bases de datos",
 		TabDevices:   "Dispositivos",
-		TabFirefox:   "Firefox",
+		TabFirefox:   "Navegador",
 		TabActivity:  "Actividad",
 		TabLog:       "Registro",
 		TabAdmin:     "Administración",

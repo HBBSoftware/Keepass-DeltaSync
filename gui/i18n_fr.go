@@ -46,37 +46,37 @@ func init() {
 		WizardDoneBody:   "Vous pouvez synchroniser. Utilisez le bouton « Sync » sur une base pour envoyer et récupérer les modifications.",
 
 		WizardAdvanced:     "Avancé (administrateur)",
-		WizardFirefox:      "Rechercher depuis Firefox — sans compte",
-		FFIntro:            "Cherchez dans vos entrées KeePass depuis Firefox et allez droit au bon site. Ni compte ni serveur nécessaires — seulement deux choses, une fois : indiquer votre .kdbx au programme, et l'enregistrer auprès de Firefox. Le remplissage des identifiants reste l'affaire de KeePassXC-Browser ; l'extension ne voit jamais de mot de passe.",
+		WizardFirefox:      "Rechercher depuis le navigateur — sans compte",
+		FFIntro:            "Cherchez dans vos entrées KeePass depuis Firefox, Chrome ou Edge et allez droit au bon site. Ni compte ni serveur nécessaires — seulement deux choses, une fois : indiquer votre .kdbx au programme, et l'enregistrer auprès des navigateurs de cette machine. Le remplissage des identifiants reste l'affaire de KeePassXC-Browser ; l'extension ne voit jamais de mot de passe.",
 		FFAddLocal:         "Enregistrer une base…",
 		FFAddLocalTitle:    "Enregistrer une base pour la recherche",
-		FFAddLocalDone:     "La base est enregistrée. Ensuite : Enregistrer auprès de Firefox — puis redémarrez Firefox.",
+		FFAddLocalDone:     "La base est enregistrée. Ensuite : Enregistrer auprès des navigateurs — puis redémarrez le navigateur.",
 		FFSavePassword:     "Conserver le mot de passe maître dans le trousseau du système (pour que la fenêtre ne le demande pas)",
 		FFPasswordMissing:  "Saisissez le mot de passe maître, ou décochez la case — l'extension le demandera alors elle-même.",
-		FFInstallHost:      "Enregistrer auprès de Firefox",
-		FFHostInstalled:    "Enregistré auprès de Firefox",
-		FFRestartFirefox:   "Redémarrez Firefox — c'est ce qui lui fait prendre l'enregistrement en compte.",
+		FFInstallHost:      "Enregistrer auprès des navigateurs",
+		FFHostInstalled:    "Enregistré auprès des navigateurs",
+		FFRestartFirefox:   "Redémarrez le navigateur — c'est ce qui lui fait prendre l'enregistrement en compte.",
 		FFPreview:          "Afficher ce qui serait écrit",
 		FFPreviewTitle:     "Simulation (rien n'est écrit)",
 		FFUninstallHost:    "Supprimer l'enregistrement",
-		FFUninstallConfirm: "Supprimer l'enregistrement de toutes les variantes de Firefox présentes sur cette machine ? Ni la base ni le fichier ne sont touchés.",
+		FFUninstallConfirm: "Supprimer l'enregistrement de tous les navigateurs présents sur cette machine ? Ni la base ni le fichier ne sont touchés.",
 		FFGuide:            "Guide",
 		FFProbe:            "Tester",
 		FFProbeTitle:       "Ce que le navigateur recevrait — %s",
 		FFProbePwdHint:     "Facultatif — repris du trousseau s'il y est enregistré",
 		FFProbeEmpty:       "L'index est vide : aucune entrée avec une URL exploitable.",
-		FFCount:            "%d base(s) consultable(s) depuis Firefox",
+		FFCount:            "%d base(s) consultable(s) depuis le navigateur",
 		FFNone:             "Aucune base enregistrée pour l'instant — commencez par Enregistrer une base.",
 		FFKindSynced:       "(synchronisée)",
 		FFKindLocal:        "(locale uniquement)",
 		FFCLIPath:          "Programme :",
-		HelpFirefox: "## Firefox\n\n" +
-			"Recherche en texte libre dans vos entrées depuis la barre d'adresse de Firefox (`kp` + espace) ou depuis la fenêtre (**Alt+Maj+K**), et une touche ouvre le site de l'entrée. L'extension reçoit **uniquement** le titre, les URL et le chemin du groupe — jamais de mots de passe, de noms d'utilisateur, de notes ni de pièces jointes.\n\n" +
+		HelpFirefox: "## Navigateur\n\n" +
+			"Recherche en texte libre dans vos entrées depuis la barre d'adresse du navigateur (`kp` + espace) ou depuis la fenêtre (**Alt+Maj+K**), et une touche ouvre le site de l'entrée. L'extension reçoit **uniquement** le titre, les URL et le chemin du groupe — jamais de mots de passe, de noms d'utilisateur, de notes ni de pièces jointes.\n\n" +
 			"La configuration tient en deux étapes, une fois par machine :\n\n" +
 			"- **Enregistrer une base** — indique un `.kdbx` au programme (`add-local`). Aucun serveur, aucun compte, rien n'est envoyé. Cochez la case et le mot de passe maître va dans le trousseau du système, afin que la fenêtre ne le demande pas.\n" +
-			"- **Enregistrer auprès de Firefox** — écrit le manifeste de messagerie native pour que Firefox ait le droit de lancer l'hôte (`install-browser-host`). **Redémarrez Firefox ensuite.**\n\n" +
+			"- **Enregistrer auprès des navigateurs** — écrit le manifeste de messagerie native pour chaque navigateur trouvé sur la machine (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi et Opera), afin qu'il ait le droit de lancer l'hôte (`install-browser-host`). **Redémarrez le navigateur ensuite.**\n\n" +
 			"En plus : **Tester** montre l'index exact que le navigateur recevrait (`browser-host --probe`), et **Afficher ce qui serait écrit** effectue le même enregistrement sans rien modifier (`--dry-run`).\n\n" +
-			"Le module lui-même s'installe depuis addons.mozilla.org — voir **Guide**.\n\n" +
+			"L'extension elle-même s'installe depuis addons.mozilla.org pour Firefox — voir **Guide** — et depuis Edge Add-ons pour Edge. Elle n'est pas encore sur le Chrome Web Store : pour Chrome, elle s'installe depuis les sources et s'enregistre avec `install-browser-host --extension-id` — voir deltasync.org/chrome.html.\n\n" +
 			"**Commandes CLI :**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -95,7 +95,7 @@ func init() {
 
 		TabDatabases: "Bases",
 		TabDevices:   "Appareils",
-		TabFirefox:   "Firefox",
+		TabFirefox:   "Navigateur",
 		TabActivity:  "Activité",
 		TabLog:       "Journal",
 		TabAdmin:     "Administration",
