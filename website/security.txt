@@ -1,0 +1,6 @@
+Contact: mailto:deltasync@hb-b.dk
+Contact: https://gitlab.com/Star95/keepass-deltasync/-/issues/new
+Expires: 2027-10-26T00:00:00.000Z
+Preferred-Languages: en, da
+Canonical: https://deltasync.org/security.txt
+Policy: https://gitlab.com/Star95/keepass-deltasync/-/blob/main/SECURITY.md

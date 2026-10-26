@@ -15,7 +15,7 @@ Instead, use one of these private channels:
    (tick *"This issue is confidential"*), or a private security advisory under
    the project's *Secure → Security advisories* if available.
 2. **Email** the maintainer if you cannot use GitLab. The contact address is
-   published in [`/.well-known/security.txt`](https://deltasync.bjoerck-braun.dk/.well-known/security.txt).
+   published in [`security.txt`](https://deltasync.org/security.txt).
 
 Please include:
 

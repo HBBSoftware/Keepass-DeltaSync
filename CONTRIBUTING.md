@@ -1,14 +1,14 @@
 # Contributing to DeltaSync
 
 Thanks for your interest. This is a monorepo with five code components
-(server, desktop client, desktop GUI, Android, Firefox extension) plus shared
+(server, desktop client, desktop GUI, Android, browser extension) plus shared
 docs — see the [README](README.md#repository-layout) for the layout and
 per-component licenses.
 
 ## Ground rules
 
-- **DCO sign-off is required** on every commit. Add a `Signed-off-by` line by
-  committing with `-s`:
+- **DCO sign-off is required** on every contributed commit. Add a
+  `Signed-off-by` line by committing with `-s`:
 
   ```sh
   git commit -s -m "your message"
@@ -19,9 +19,12 @@ per-component licenses.
 - **Security issues do not go in public issues or merge requests.** Follow
   [`SECURITY.md`](SECURITY.md) instead.
 
-- **Crypto and auth code is sensitive.** Changes to encryption, key handling,
-  token validation, or the sharing key-wrap require review and sign-off from at
-  least two maintainers.
+- **Crypto and auth code is sensitive.** DeltaSync currently has a single
+  maintainer, so there is no second reviewer to lean on. Changes to
+  encryption, key handling, token validation, or the sharing key-wrap must
+  therefore come with tests, and the reasoning belongs in the merge request.
+  An independent review of this code is especially welcome — see
+  [`SECURITY.md`](SECURITY.md) for how to report what you find.
 
 ## Versioning & releases
 

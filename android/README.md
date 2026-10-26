@@ -7,78 +7,34 @@ egne kdbx-filer redigeres af brugerens foretrukne Android-KeePass-app
 holder `.kdbx`-filen synkroniseret i baggrunden via WorkManager.
 
 - **Licens:** GPL-3.0-or-later
-- **Distribution:** F-Droid først (reproducible builds, ingen Google Play
-  Services), Play-version kan tilføjes senere uden refactor.
-- **Status:** M4 i gang.
-  - Go-siden via `mobile`-pakken er på plads (`gomobile bind`-vendt API for
-    crypto + canonical wire-format).
-  - Gradle-skelet + `:sync`-modulet er oppe at køre med canonical Kotlin-
-    typer der parser Go-emitterede fixtures.
-  - Kotpass-mapper på plads — `Mapper.toCanonical()` /
-    `Mapper.toKotpass()` konverterer mellem kotpass' typed Entry og vores
-    wire-format.
-  - `SyncEngine` på plads — orkestrerer pull+push mod serverens REST-API
-    (via OkHttp) med entry-level last-writer-wins merge. Tests via
-    MockWebServer dækker pull-only, push-only, konfliktscenarier, og
-    tombstones (24 grønne tests i alt).
-  - `GomobileCryptoSession` på plads — production-implementation der
-    wrapper den gomobile-bound `mobile.Session` fra `libs/deltasync.aar`.
-    Kompilerer mod den gomobile-genererede classes.jar (compileOnly);
-    JNI-laget aktiveres først på Android-runtime.
-  - `KotpassLocalStateAdapter` på plads — læser/skriver mellem kotpass'
-    `KeePassDatabase` og vores `LocalState`. Sletninger propagerer nu:
-    den walker selv gruppe-træet (kotpass' `findEntries` filtrerer
-    recycle-bin-entries fra) og materialiserer tombstones fra både
-    `DeletedObjects` og recycle-bin-entries (`DeletedAt =
-    LocationChanged`) — 1:1 med desktop'ens `ParseExport`.
-  - `Synchronizer` på plads — high-level orkestrator der pakker hele
-    pipelinen i én `sync(databaseId)`-kald: load .kdbx → adapter →
-    sync-engine → adapter → atomisk-skriv .kdbx tilbage. Persistens af
-    `lastSeq`/`syncedAt` mellem app-starter abstraheret via
-    `SyncStatePersistence` (in-memory impl til tests; Android-impl
-    bruger DataStore).
-  - `EnrollmentClient` på plads — bytter éngangs enrollment-token for
-    permanent device-token via POST `/api/v1/devices/enroll`. `TokenStore`-
-    interface for sikker lagring af device-token + private key
-    (in-memory impl til tests; Android impl bruger Keystore).
-  - 40 grønne tests i alt på Kotlin-siden.
-  - `:app` Android-modul **bygger som installerbar debug-APK** (~18.8 MB
-    inkl. JNI .so for alle 4 ABIs) med komplet enroll → setup → sync flow:
-    - `MainActivity` — status-skærm. Viser om enheden er enrolled, om en
-      database er konfigureret, og en "Sync now"-knap når begge er på plads.
-    - `EnrollActivity` — enrollment-formular (server-URL +
-      enrollment-token + valgfrit device-navn). Genererer X25519-keypair
-      via gomobile-laget, POST'er til serveren, gemmer device-token via
-      Keystore. Kan også **scanne en QR-kode** (ZXing) fra web-admin-panelet
-      — `deltasync://enroll?server=…&token=…` — der udfylder felterne, så
-      brugeren slipper for at taste. Parseren ligger i `:sync`
-      (`EnrollUriParser`, ren JVM + unit-testet).
-    - `SetupActivity` — kdbx-picker via SAF (Storage Access Framework) +
-      database-vælger der lister databases fra serveren.
-    - `KeystoreTokenStore` — `EncryptedSharedPreferences` + Android
-      Keystore master-key.
-    - `DataStoreSyncStatePersistence` — Jetpack DataStore for sync-state
-      (lastSeq + syncedAt) mellem app-starter.
-    - `DatabaseConfigStore` — kdbx-URI + server-database-mapping.
-    - `KdbxFile`-abstraktion: `PathKdbxFile` (tests) / `SafKdbxFile`
-      (production via ContentResolver).
-    - `SyncWorker` — periodisk WorkManager-CoroutineWorker.
-  - `EncryptedPassphraseStore` + biometrisk opt-in på plads — krydser
-    brugeren "husk password & synk i baggrunden" bekræftes identiteten
-    med `BiometricPrompt`, og efter en vellykket sync gemmes
-    masterpasswordet Keystore-krypteret (ikke længere klartekst i
-    WorkManager) og den periodiske `SyncWorker` tændes. Keystore-nøglen
-    kræver bevidst ikke per-brug-auth, så baggrunds-worker'en kan
-    dekryptere uden bruger til stede; biometri gater opt-in'en, ikke
-    hver læsning.
-  - `ShareActivity` på plads — ejer-side v2 sharing fra app'en: list
-    medlemmer, del med brugernavn, fjern medlem. Bruger den nye
-    `mobile.WrapMasterKeyForShare`-binding (Argon2id → sealed-box til
-    target-enhedens public-key) + `ApiClient.lookupUser/listShares/
-    shareDatabase/unshareDatabase`. Server håndhæver owner-only (403 →
-    pæn besked).
-  - F-Droid-submit er gennemført: MR !41661 blev merget 2026-09-10 på
-    0.4.2 / versionCode 7, med reproducible builds slået til.
+- **Distribution:** [Google Play](https://play.google.com/store/apps/details?id=dk.bjoerckbraun.deltasync),
+  [F-Droid](https://f-droid.org/packages/dk.bjoerckbraun.deltasync/) og
+  [GitHub Releases](https://github.com/HBBSoftware/Keepass-DeltaSync/releases)
+  (via Obtainium). Alle tre kanaler er signeret med projektets egen nøgle, så
+  man kan skifte mellem dem uden at afinstallere.
+- **Status:** udgivet og i brug. Ændringer pr. version står i
+  [`CHANGELOG.md`](../CHANGELOG.md).
+
+## Hvad app'en kan
+
+- **Tilmelding af enheden** (`EnrollActivity`): server-URL + éngangs
+  enrollment-token, eller **scan QR-koden** fra web-admin-panelet
+  (`deltasync://enroll?server=…&token=…`). Enheden får sit eget
+  X25519-nøglepar; device-token gemmes i Android Keystore.
+- **Vælg database** (`SetupActivity`): `.kdbx`-filen vælges via Storage
+  Access Framework, og den kobles til en database på serveren.
+- **Synkronisering** (`MainActivity` + `SyncWorker`): "Sync now" fra
+  status-skærmen, og periodisk i baggrunden via WorkManager.
+- **Baggrunds-sync med biometri**: krydser man "husk password & synk i
+  baggrunden" af, bekræftes identiteten med `BiometricPrompt`, og
+  masterpasswordet gemmes Keystore-krypteret, så `SyncWorker` kan køre uden
+  bruger til stede. Biometrien gater opt-in'en, ikke hver læsning.
+- **Deling** (`ShareActivity`): ejeren kan dele en database med en anden
+  bruger, se medlemmer og fjerne dem. Master-nøglen pakkes med sealed-box til
+  modtagerens enhed; serveren håndhæver at kun ejeren kan dele.
+
+Selve posterne redigeres i brugerens foretrukne KeePass-app — app'en har
+bevidst ingen editor.
 
 ## Arkitektur
 
@@ -119,7 +75,7 @@ seier — samme semantik som desktop's keepassxc-cli merge på entry-niveau.
 
 ### Kotlin-siden (`:sync`-modulet)
 
-JVM-only modul med canonical-typer + (senere) kotpass-mapper. Tests kører
+JVM-only modul med canonical-typer, kotpass-mapper og sync-motoren. Tests kører
 på JBR fra Android Studio, ingen emulator nødvendig:
 
 ```sh
@@ -185,7 +141,7 @@ trække JNI-laget med ind i ren-JVM-tests.
 
 ## Distribution
 
-- **F-Droid** (optaget 2026-09-10): reproducible builds, fuld open
+- **F-Droid** (optaget 2026-09-10, MR !41661): reproducible builds, fuld open
   source-toolchain. Kræver at vi undgår Google Play Services — ingen FCM
   push, så sync drives af WorkManager-polling med rimelig interval
   (15–30 min) plus manuel "sync now" fra UI. Nye udgivelser samles op af
@@ -195,8 +151,8 @@ trække JNI-laget med ind i ren-JVM-tests.
 - **Obtainium** (tilgængelig nu): signeret APK på GitHub Releases, som
   Obtainium selv holder opdateret. Samme signatur som F-Droid-kanalen.
   Se nedenfor.
-- **Play** (senere): standard Android-signering. Kan tilføjes uden ændringer
-  af kerne-arkitekturen.
+- **Google Play**: AAB uploadet med **vores egen nøgle** til Play App
+  Signing, så Play-versionen har samme signatur som F-Droid og Obtainium.
 
 ### Installér med Obtainium
 
@@ -274,11 +230,3 @@ at uploade noget.
 - Egen entry-editor / UI til at læse passwords
 - `keepassxc-cli` integration (kører ikke på Android)
 - Daemon mode (Android har WorkManager i stedet for fsnotify)
-
-## Hvad mangler (M4-resterende punkter)
-
-- Gradle-skelet (Kotlin DSL, multi-module: app/, sync/)
-- kotpass-dep + Kotlin-side mapper mellem kotpass.Entry og canonical JSON
-- Foreground service + WorkManager-trigger
-- F-Droid metadata + signed reproducible-build config
-- Test mod Keepass2Android som ekstern UI
