@@ -76,7 +76,7 @@ func init() {
 			"- **Datenbank registrieren** — zeigt dem Programm eine `.kdbx` (`add-local`). Kein Server, kein Konto, nichts wird hochgeladen. Setzen Sie den Haken, und das Master-Passwort wandert in den Schlüsselbund des Systems, sodass das Popup nicht danach fragt.\n" +
 			"- **Bei den Browsern registrieren** — schreibt das Native-Messaging-Manifest für jeden Browser, der auf dem Rechner gefunden wird (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi und Opera), damit er den Host starten darf (`install-browser-host`). **Danach den Browser neu starten.**\n\n" +
 			"Außerdem: **Testen** zeigt genau den Index, den der Browser erhalten würde (`browser-host --probe`), und **Anzeigen, was geschrieben würde** ist dieselbe Registrierung, ohne etwas anzufassen (`--dry-run`).\n\n" +
-			"Die Erweiterung selbst wird für Firefox von addons.mozilla.org installiert — siehe **Anleitung** — und für Edge von Edge Add-ons. Im Chrome Web Store ist sie noch nicht; für Chrome wird sie aus dem Quellcode installiert und mit `install-browser-host --extension-id` registriert — siehe deltasync.org/chrome.html.\n\n" +
+			"Die Erweiterung selbst wird für Firefox von addons.mozilla.org installiert — siehe **Anleitung** — für Edge von Edge Add-ons und für Chrome aus dem Chrome Web Store (https://chromewebstore.google.com/detail/bilgianamdfdhkfhjhcmikpkpfcbilbe).\n\n" +
 			"**CLI-Befehle:**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +

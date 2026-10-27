@@ -394,7 +394,7 @@ var dicts = map[lang]*dict{
 			"- **Registrér database** — peger programmet på en `.kdbx` (`add-local`). Ingen server, ingen konto, intet uploadet. Sætter du fluebenet, lægges masterpasswordet i systemets nøglering, så popup'en ikke spørger.\n" +
 			"- **Registrér i browserne** — skriver native-manifestet hos hver browser, der findes på maskinen (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi og Opera), så den må starte hosten (`install-browser-host`). **Genstart browseren bagefter.**\n\n" +
 			"Derudover: **Test** viser præcis det indeks browseren ville få (`browser-host --probe`), og **Vis hvad der ville blive skrevet** er den samme registrering uden at røre noget (`--dry-run`).\n\n" +
-			"Selve udvidelsen installeres fra addons.mozilla.org til Firefox — se **Vejledning** — og fra Edge Add-ons til Edge. Den er endnu ikke i Chrome Web Store, så til Chrome installeres den fra kildekoden og registreres med `install-browser-host --extension-id` — se deltasync.org/chrome.html.\n\n" +
+			"Selve udvidelsen installeres fra addons.mozilla.org til Firefox — se **Vejledning** — fra Edge Add-ons til Edge og fra Chrome Web Store til Chrome (https://chromewebstore.google.com/detail/bilgianamdfdhkfhjhcmikpkpfcbilbe).\n\n" +
 			"**CLI-kommandoer:**\n\n" +
 			"- `keepass-deltasync add-local <navn> <fil.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
@@ -696,7 +696,7 @@ var dicts = map[lang]*dict{
 			"- **Register database** — points the program at a `.kdbx` (`add-local`). No server, no account, nothing uploaded. Tick the box and the masterpassword goes into the OS keyring, so the popup does not ask for it.\n" +
 			"- **Register with browsers** — writes the native messaging manifest for every browser found on the machine (Firefox, Chrome, Chromium, Edge, Brave, Vivaldi and Opera), so it is allowed to start the host (`install-browser-host`). **Restart the browser afterwards.**\n\n" +
 			"Besides those: **Test** shows the exact index the browser would receive (`browser-host --probe`), and **Show what would be written** is the same registration without touching anything (`--dry-run`).\n\n" +
-			"The extension itself is installed from addons.mozilla.org for Firefox — see **Guide** — and from Edge Add-ons for Edge. It is not in the Chrome Web Store yet, so for Chrome it is installed from source and registered with `install-browser-host --extension-id` — see deltasync.org/chrome.html.\n\n" +
+			"The extension itself is installed from addons.mozilla.org for Firefox — see **Guide** — from Edge Add-ons for Edge, and from the Chrome Web Store for Chrome (https://chromewebstore.google.com/detail/bilgianamdfdhkfhjhcmikpkpfcbilbe).\n\n" +
 			"**CLI commands:**\n\n" +
 			"- `keepass-deltasync add-local <name> <file.kdbx>`\n" +
 			"- `keepass-deltasync install-browser-host`\n" +
