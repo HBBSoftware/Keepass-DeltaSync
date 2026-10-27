@@ -56,7 +56,8 @@ Everything here is **English**. Neither listing has another locale.
   August when it shipped ahead of the client command it told people to run.
 
   Recorded so far: **Edge Add-ons** `dpmaneajjlanhipmbgdpdnfljiigdnjo`
-  (Store ID `0RDCKFJ7FBFG`). Chrome Web Store: not submitted.
+  (Store ID `0RDCKFJ7FBFG`), **Chrome Web Store**
+  `bilgianamdfdhkfhjhcmikpkpfcbilbe`.
 
 ## Assets
 

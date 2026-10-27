@@ -38,7 +38,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
   Chromium derives an extension's ID from the store's signing key, so the ID
   does not exist until the extension is uploaded and differs between the two
   stores; until then it comes in with `--extension-id`, and those browsers are
-  skipped rather than registered with an empty allow-list. See
+  skipped rather than registered with an empty allow-list. Both store IDs are
+  now built in — Edge Add-ons and Chrome Web Store — so a store install works
+  without the flag. See
   [`extension-chromium/README.md`](extension-chromium/README.md).
 
   Brave, Vivaldi and Opera are covered as well. Opera is the odd one:

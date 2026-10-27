@@ -52,6 +52,7 @@ type nativeManifest struct {
 // sig ikke så længe mappen ligger det samme sted.
 var chromiumExtensionIDs = []string{
 	"dpmaneajjlanhipmbgdpdnfljiigdnjo", // Edge Add-ons
+	"bilgianamdfdhkfhjhcmikpkpfcbilbe", // Chrome Web Store
 }
 
 // stringList samler et flag der må gentages. flag-pakken kan ikke selv, og
