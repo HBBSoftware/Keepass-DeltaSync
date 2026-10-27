@@ -193,6 +193,10 @@ credentials or other info" — not credentials, but the client.
 The client named in step 2 must already be released, and must carry this
 store's ID. Otherwise the reviewer gets "cannot reach the host" and rejects it.
 
+The text below is the Edge version. For the Chrome Web Store, change two
+things: step 2 asks for client **1.10.2** or newer (the first with Chrome's
+ID), and steps 5 and 6 say Chrome instead of Edge.
+
 ```
 WHAT IT DOES
 A search box over the titles and URLs in the user's own local KeePass database, with navigation to the entry's website. The Chromium build of "DeltaSync — KeePass search & go" on addons.mozilla.org; same source files.
