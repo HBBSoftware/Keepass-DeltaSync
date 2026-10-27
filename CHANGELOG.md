@@ -38,9 +38,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   Chromium derives an extension's ID from the store's signing key, so the ID
   does not exist until the extension is uploaded and differs between the two
   stores; until then it comes in with `--extension-id`, and those browsers are
-  skipped rather than registered with an empty allow-list. Both store IDs are
-  now built in — Edge Add-ons and Chrome Web Store — so a store install works
-  without the flag. See
+  skipped rather than registered with an empty allow-list. See
   [`extension-chromium/README.md`](extension-chromium/README.md).
 
   Brave, Vivaldi and Opera are covered as well. Opera is the odd one:
@@ -182,6 +180,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
   again, silently, and rebuilt the index from the OS keyring. A change event
   now only refreshes an index that already exists.
 
+- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
+  was hard to read against the near-black dark-theme background, affecting
+  links, switches and buttons. A `values-night` override lightens it to
+  `#A8C7FF`.
+
+## [client/v1.10.2] — 2026-10-27
+
+### Changed
+
+- **The Chrome Web Store ID is built in (client)** — the extension now has an
+  item in the Chrome Web Store, `bilgianamdfdhkfhjhcmikpkpfcbilbe`.
+  `install-browser-host` puts it into `allowed_origins` next to the Edge
+  Add-ons ID, so an extension installed from either store reaches the host
+  without `--extension-id`. Run `install-browser-host` again after updating;
+  the manifests it wrote before do not name the new ID.
+
+## [gui/v0.3.9] — 2026-10-27
+
+The Windows installer bundles command-line client 1.10.2 (see above).
+
+### Changed
+
 - **The GUI's browser tab no longer says it is Firefox-only (GUI)** — the tab
   that sets up the search extension was called "Firefox", and its button read
   *Register with Firefox*, although `install-browser-host` has registered with
@@ -190,13 +210,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
   *Browser*, the button *Register with browsers*, and the intro, help, wizard
   entry and confirmations name the browsers it covers, in all five languages.
   The help also says where the extension comes from per browser: AMO for
-  Firefox, Edge Add-ons for Edge, and from source for Chrome until it is in
-  the Chrome Web Store.
-
-- **Dark-theme contrast (Android)** — the saturated brand blue (`#1E40AF`)
-  was hard to read against the near-black dark-theme background, affecting
-  links, switches and buttons. A `values-night` override lightens it to
-  `#A8C7FF`.
+  Firefox, Edge Add-ons for Edge and the Chrome Web Store for Chrome.
 
 ## [server/v0.6.2] — 2026-10-21
 
