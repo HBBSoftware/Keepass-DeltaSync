@@ -241,5 +241,17 @@ is on the extension's overview page as soon as the submission exists.
 and a new publisher may have two published items before asking for more. The
 item ID appears in the dashboard URL right after the first upload.
 
+Two things keep *Submit for review* greyed out until they are fixed, and only
+the "why can't I submit" link next to the button says so:
+
+- The publisher contact email, on the account's *Settings* page, not the
+  item's. It must be entered **and verified** through the mail Google sends.
+- The support URL must answer to a visitor who is not logged in. The GitLab
+  issues page returns 404 to anonymous visitors, so the listing uses
+  `https://deltasync.org/`; the homepage field is
+  `https://deltasync.org/chrome.html`.
+
+0.1.0 went to review on 2026-10-28.
+
 Both stores sign the package themselves. The unsigned-zip wording on the
 GitLab release applies only to that copy.
