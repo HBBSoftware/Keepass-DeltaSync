@@ -44,7 +44,7 @@ func runAddLocal(args []string) error {
 	// skriver, og flag stopper ved første positional. Samme behandling som
 	// delete-database giver sine flag.
 	args = rearrangeFlagsFirst(args, map[string]bool{"save-password": true, "password-stdin": true})
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

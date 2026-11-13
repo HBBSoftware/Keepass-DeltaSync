@@ -126,7 +126,7 @@ func runInstallBrowserHost(args []string) error {
 		fmt.Fprintln(fs.Output(), "assigns, so those two are skipped until one is passed with --extension-id.")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -240,7 +240,7 @@ func runUninstallBrowserHost(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync uninstall-browser-host")
 		fmt.Fprintln(fs.Output(), "\nRemoves the native messaging manifest and launcher.")
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

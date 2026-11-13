@@ -52,7 +52,7 @@ func runDeleteDatabase(args []string) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, map[string]bool{"yes": true})
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

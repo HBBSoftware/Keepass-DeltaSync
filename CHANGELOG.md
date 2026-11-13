@@ -6,6 +6,19 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flags after the other arguments were refused (client)** — the
+  documentation shows `init mypasswords ~/keepass/my.kdbx --bind <UUID>`, but
+  Go's flag parser stops at the first argument that is not a flag, so that
+  command failed with "init takes exactly 2 arguments" and said nothing about
+  the order. Every command now accepts flags anywhere: before, between or
+  after the other arguments. `--` still ends the flags, for a name that starts
+  with a dash. The help for `init --bind` also read `-bind databases`, because
+  a word in backticks in a flag's description is taken as the name of its
+  value; it now reads `-bind string`. Reported in
+  [#4](https://gitlab.com/Star95/keepass-deltasync/-/issues/4).
+
 ### Security
 
 - **The deploy scripts sent the SFTP password before checking the host key

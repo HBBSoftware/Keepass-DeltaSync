@@ -25,7 +25,7 @@ func runEnroll(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync enroll [--server URL] [--device-name NAME] <enrollment-token>")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

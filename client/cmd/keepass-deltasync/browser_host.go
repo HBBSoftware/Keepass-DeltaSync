@@ -133,7 +133,7 @@ func runBrowserHost(args []string) error {
 	// Firefox starter hosten med manifest-stien som argument. Den er
 	// uinteressant for os, men må ikke få flag-parsing til at fejle — og
 	// det gør den ikke, for flag stopper ved første ikke-flag.
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

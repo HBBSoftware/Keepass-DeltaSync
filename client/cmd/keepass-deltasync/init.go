@@ -28,12 +28,12 @@ var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 // til at finde UUID'en. Dette er det normale 2nd-device-flow.
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
-	bind := fs.String("bind", "", "bind to an existing server-side database (UUID from `databases` listing) instead of creating a new one")
+	bind := fs.String("bind", "", "bind to an existing server-side database (UUID from the databases listing) instead of creating a new one")
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync init <name> <local.kdbx> [--bind <remote-uuid>]")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

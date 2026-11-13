@@ -37,13 +37,13 @@ const syncTestEntryUUID = "deadbeef-cafe-1234-5678-123456789abc"
 //	5. Verificér også at GET /versions returnerer mindst én version
 func runSyncTest(args []string) error {
 	fs := flag.NewFlagSet("sync-test", flag.ContinueOnError)
-	dbFlag := fs.String("database", "", "name of a locally registered database (from `init`)")
+	dbFlag := fs.String("database", "", "name of a locally registered database (from init)")
 	pwStdin := fs.Bool("password-stdin", false, "read masterpassword from stdin (one line)")
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync sync-test --database NAME --password-stdin")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

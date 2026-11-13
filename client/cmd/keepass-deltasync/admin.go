@@ -159,7 +159,7 @@ func runAdminTokenSQL(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync admin token-sql")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -211,7 +211,7 @@ func runAdminUserCreate(args []string) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -262,7 +262,7 @@ func runAdminUserList(args []string) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -321,7 +321,7 @@ func runAdminUserEnrollment(args []string) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -375,7 +375,7 @@ func runAdminSetDisabled(args []string, disabled bool) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, nil)
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -426,7 +426,7 @@ func runAdminUserDelete(args []string) error {
 		fs.PrintDefaults()
 	}
 	args = rearrangeFlagsFirst(args, map[string]bool{"yes": true})
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

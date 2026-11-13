@@ -53,7 +53,7 @@ func runDaemon(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync daemon [--db NAME]... [--poll-interval DUR] [--debounce DUR] [--store-keyring] [--password-stdin] [--keepassxc-cli PATH] [--sync-timeout DUR]")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

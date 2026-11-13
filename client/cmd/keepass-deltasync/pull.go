@@ -22,7 +22,7 @@ func runPull(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync pull <name> [--password-stdin] [--keepassxc-cli PATH]")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}

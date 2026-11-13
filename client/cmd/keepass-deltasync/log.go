@@ -26,7 +26,7 @@ func runLog(args []string) error {
 		fmt.Fprintln(fs.Output(), "Usage: keepass-deltasync log [--since=DURATION] [--limit=N]")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
